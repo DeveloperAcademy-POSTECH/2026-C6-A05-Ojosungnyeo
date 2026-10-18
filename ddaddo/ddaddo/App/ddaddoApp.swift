@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 @main
 struct ddaddoApp: App {
+    private let store = Store(initialState: RootFeature.State()) {
+        RootFeature()
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView(store: store)
         }
     }
 }

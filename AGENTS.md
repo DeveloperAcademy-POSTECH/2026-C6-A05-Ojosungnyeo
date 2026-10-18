@@ -10,10 +10,7 @@
 - 여행 장소 선택 및 그룹화
 - 일자별 여행 동선 확인
 - 친구와 일정 분리
-- 친구와 재합류
-- 사용자 위치 확인 및 공유
-- 여행 기록 저장 및 공유
-- 알림 및 Live Activity 제공
+- 친구와 재합류 알림
 
 ### Tech Stack
 
@@ -24,7 +21,6 @@
 - Location: CoreLocation
 - Backend: Firebase
 - Notification: UserNotifications
-- Live Activity: ActivityKit
 
 ---
 

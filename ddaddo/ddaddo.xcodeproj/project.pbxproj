@@ -6,6 +6,10 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A4082CB73085064E0024DF57 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A4082CB63085064E0024DF57 /* ComposableArchitecture */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		A4082CA73085064D0024DF57 /* ddaddo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ddaddo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -22,6 +26,7 @@
 		A4082CA43085064D0024DF57 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				A4082CB73085064E0024DF57 /* ComposableArchitecture in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -60,6 +65,9 @@
 				A4082CA93085064D0024DF57 /* ddaddo */,
 			);
 			name = ddaddo;
+			packageProductDependencies = (
+				A4082CB63085064E0024DF57 /* ComposableArchitecture */,
+			);
 			productName = ddaddo;
 			productReference = A4082CA73085064D0024DF57 /* ddaddo.app */;
 			productType = "com.apple.product-type.application";
@@ -88,6 +96,9 @@
 			);
 			mainGroup = A4082C9E3085064D0024DF57;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A4082CB53085064E0024DF57 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A4082CA83085064D0024DF57 /* Products */;
 			projectDirPath = "";
@@ -245,6 +256,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6B47X24XTW;
 				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = .gitkeep;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -277,6 +289,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6B47X24XTW;
 				ENABLE_PREVIEWS = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = .gitkeep;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -320,6 +333,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A4082CB53085064E0024DF57 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-composable-architecture";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.26.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A4082CB63085064E0024DF57 /* ComposableArchitecture */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A4082CB53085064E0024DF57 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
+			productName = ComposableArchitecture;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A4082C9F3085064D0024DF57 /* Project object */;
 	validationLevel = 1;

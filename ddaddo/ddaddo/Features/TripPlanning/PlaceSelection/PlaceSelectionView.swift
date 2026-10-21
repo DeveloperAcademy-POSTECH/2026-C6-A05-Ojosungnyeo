@@ -14,7 +14,7 @@ struct PlaceSelectionView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            GoogleMapView()
+            GoogleMapView(selectedPlace: store.selectedPlace)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -23,7 +23,7 @@ struct PlaceSelectionView: View {
                 Spacer()
             }
 
-            if store.isBottomSheetExpanded {
+            if store.isBottomSheetExpanded && store.selectedPlace == nil {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
                     .onTapGesture {
@@ -32,15 +32,23 @@ struct PlaceSelectionView: View {
 
             }
 
-            PlaceSelectionBottomSheet(
-                isExpanded: store.isBottomSheetExpanded
-            ) {
-                store.send(.searchButtonTapped)
+            if let selectedPlace = store.selectedPlace {
+                SelectedPlaceBottomSheet(
+                    place: selectedPlace,
+                    isLoading: store.isPlaceDetailsLoading
+                )
+                .ignoresSafeArea(edges: .bottom)
+            } else {
+                PlaceSelectionBottomSheet(
+                    isExpanded: store.isBottomSheetExpanded
+                ) {
+                    store.send(.searchButtonTapped)
+                }
+                .frame(height: currentSheetHeight, alignment: .top)
+                .clipped()
+                .ignoresSafeArea(edges: .bottom)
+                .gesture(sheetDragGesture)
             }
-            .frame(height: currentSheetHeight, alignment: .top)
-            .clipped()
-            .ignoresSafeArea(edges: .bottom)
-            .gesture(sheetDragGesture)
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .preferredColorScheme(.dark)
@@ -92,7 +100,7 @@ struct PlaceSelectionView: View {
 
             Spacer(minLength: 0)
 
-            Text("0/3")
+            Text(store.selectedPlace == nil ? "0/3" : "1/3")
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.horizontal, DDSpacing.small)
@@ -105,18 +113,48 @@ struct PlaceSelectionView: View {
     }
 
     private var searchField: some View {
-        DDSearchField(
-            placeholder: "꼭 가고 싶은 장소 8개를 추가하세요",
-            text: Binding(
-                get: { store.searchText },
-                set: { store.send(.searchTextChanged($0)) }
-            )
-        )
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                store.send(.searchFieldTapped)
+        Group {
+            if store.selectedPlace != nil {
+                HStack(spacing: DDSpacing.small) {
+                    Text(store.searchText)
+                        .ddTypography(.body16)
+                        .foregroundStyle(DDColor.textPrimary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        store.send(.clearSelectedPlaceButtonTapped)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(DDColor.iconDefault)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, DDSpacing.xLarge)
+                .frame(height: 41)
+                .background(DDColor.surfaceElevated)
+                .clipShape(.capsule)
+                .overlay {
+                    Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
+                }
+            } else {
+                DDSearchField(
+                    placeholder: "꼭 가고 싶은 장소 8개를 추가하세요",
+                    text: Binding(
+                        get: { store.searchText },
+                        set: { store.send(.searchTextChanged($0)) }
+                    )
+                )
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        store.send(.searchFieldTapped)
+                    }
+                )
             }
-        )
+        }
         .padding(.horizontal, DDSpacing.large)
         .padding(.top, DDSpacing.zero)
     }

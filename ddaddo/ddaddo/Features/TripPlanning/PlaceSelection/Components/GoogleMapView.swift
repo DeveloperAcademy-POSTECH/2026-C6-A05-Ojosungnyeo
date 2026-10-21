@@ -12,6 +12,15 @@ struct GoogleMapView: UIViewRepresentable {
     var latitude: CLLocationDegrees = 37.7749
     var longitude: CLLocationDegrees = -122.4194
     var zoom: Float = 15
+    var selectedPlace: PlaceDetails?
+
+    final class Coordinator {
+        var selectedPlaceID: String?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeUIView(context: Context) -> GMSMapView {
         let camera = GMSCameraPosition(
@@ -26,10 +35,30 @@ struct GoogleMapView: UIViewRepresentable {
         mapView.settings.myLocationButton = false
         mapView.isBuildingsEnabled = true
         mapView.mapStyle = try? GMSMapStyle(jsonString: Self.darkMapStyle)
+        updateSelection(on: mapView, coordinator: context.coordinator)
         return mapView
     }
 
-    func updateUIView(_ mapView: GMSMapView, context: Context) {}
+    func updateUIView(_ mapView: GMSMapView, context: Context) {
+        updateSelection(on: mapView, coordinator: context.coordinator)
+    }
+
+    private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {
+        guard coordinator.selectedPlaceID != selectedPlace?.id else { return }
+        coordinator.selectedPlaceID = selectedPlace?.id
+        mapView.clear()
+        guard let selectedPlace else { return }
+
+        let coordinate = CLLocationCoordinate2D(
+            latitude: selectedPlace.latitude,
+            longitude: selectedPlace.longitude
+        )
+        let marker = GMSMarker(position: coordinate)
+        marker.icon = UIImage(named: "UFO")
+        marker.groundAnchor = CGPoint(x: 0.5, y: 1)
+        marker.map = mapView
+        mapView.animate(to: GMSCameraPosition(target: coordinate, zoom: 15))
+    }
 
     private static let darkMapStyle = """
     [

@@ -23,7 +23,7 @@ enum DDTypography {
 
     fileprivate var fontName: String {
         switch self {
-        case .heading20, .bodyEmphasis16, .labelEmphasis14, .captionEmphasis12:
+        case .heading20, .heading18, .bodyEmphasis16, .labelEmphasis14, .captionEmphasis12:
             "Pretendard-SemiBold"
         default:
             "Pretendard-Regular"

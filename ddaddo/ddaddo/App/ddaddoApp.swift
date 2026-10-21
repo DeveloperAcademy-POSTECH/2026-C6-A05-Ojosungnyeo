@@ -14,6 +14,10 @@ struct ddaddoApp: App {
         RootFeature()
     }
 
+    init() {
+        GoogleMapsService.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView(store: store)

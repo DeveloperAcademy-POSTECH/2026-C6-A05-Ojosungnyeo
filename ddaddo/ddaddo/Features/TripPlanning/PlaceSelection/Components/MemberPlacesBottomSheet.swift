@@ -11,6 +11,7 @@ struct MemberPlacesBottomSheet: View {
     let isExpanded: Bool
     let selectedMember: TripMember
     let places: [PinnedPlace]
+    var bottomContentInset: CGFloat = DDSpacing.xLarge
     let memberTapped: (TripMember) -> Void
 
     var body: some View {
@@ -31,7 +32,7 @@ struct MemberPlacesBottomSheet: View {
                             PlacePinCard(place: place)
                         }
                     }
-                    .padding(.bottom, DDSpacing.xLarge)
+                    .padding(.bottom, bottomContentInset)
                 }
                 .padding(.top, DDSpacing.medium)
             } else {

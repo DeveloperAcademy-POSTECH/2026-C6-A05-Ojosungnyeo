@@ -49,7 +49,8 @@ struct PlaceSelectionView: View {
                 MemberPlacesBottomSheet(
                     isExpanded: store.isBottomSheetExpanded,
                     selectedMember: store.selectedMember,
-                    places: store.displayedPlaces
+                    places: store.displayedPlaces,
+                    bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
                     store.send(.memberProfileTapped(member))
                 }

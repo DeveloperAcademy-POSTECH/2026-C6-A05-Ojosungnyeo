@@ -10,12 +10,19 @@ import ComposableArchitecture
 
 struct RootFeature: Reducer {
     @ObservableState
-    struct State: Equatable {}
+    struct State: Equatable {
+        var placeSelection = PlaceSelectionFeature.State()
+    }
 
-    enum Action {}
+    @CasePathable
+    enum Action {
+        case placeSelection(PlaceSelectionFeature.Action)
+    }
 
     var body: some Reducer<State, Action> {
-        EmptyReducer()
+        Scope(state: \.placeSelection, action: \.placeSelection) {
+            PlaceSelectionFeature()
+        }
     }
 }
 
@@ -23,7 +30,12 @@ struct RootView: View {
     let store: StoreOf<RootFeature>
 
     var body: some View {
-        HomeView()
+        PlaceSelectionView(
+            store: store.scope(
+                state: \.placeSelection,
+                action: \.placeSelection
+            )
+        )
     }
 }
 

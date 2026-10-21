@@ -10,12 +10,27 @@ import ComposableArchitecture
 
 struct RootFeature: Reducer {
     @ObservableState
-    struct State: Equatable {}
+    struct State: Equatable {
+        var home = HomeFeature.State()
+    }
 
-    enum Action {}
+    @CasePathable
+    enum Action {
+        case home(HomeFeature.Action)
+    }
 
     var body: some Reducer<State, Action> {
-        EmptyReducer()
+        Reduce { _, action in
+            switch action {
+            case .home(.addTripButtonTapped):
+                // 여행 생성 화면이 추가되면 이 지점에서 Root 내비게이션 상태를 변경합니다.
+                return .none
+            }
+        }
+
+        Scope(state: \.home, action: \.home) {
+            HomeFeature()
+        }
     }
 }
 
@@ -23,7 +38,7 @@ struct RootView: View {
     let store: StoreOf<RootFeature>
 
     var body: some View {
-        HomeView()
+        HomeView(store: store.scope(state: \.home, action: \.home))
     }
 }
 

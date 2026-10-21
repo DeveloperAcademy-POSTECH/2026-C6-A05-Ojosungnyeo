@@ -55,13 +55,20 @@ struct HomeView: View {
 
             Spacer()
 
-            // 추후 화면 나오면 수정 필요. 버튼 형태로
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 24, weight: .medium))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .accessibilityHidden(true)
+            
+            Button {
+                store.send(.menuButtonTapped)
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 24, weight: .medium))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("메뉴 열기")
         }
         .padding(.horizontal, DDSpacing.large)
     }

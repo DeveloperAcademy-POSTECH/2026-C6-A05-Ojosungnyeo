@@ -11,12 +11,15 @@ struct HomeFeature: Reducer {
 
     enum Action {
         case addTripButtonTapped
+        case menuButtonTapped
     }
 
     var body: some Reducer<State, Action> {
         Reduce { _, action in
             switch action {
             case .addTripButtonTapped:
+                return .none
+            case .menuButtonTapped:
                 return .none
             }
         }

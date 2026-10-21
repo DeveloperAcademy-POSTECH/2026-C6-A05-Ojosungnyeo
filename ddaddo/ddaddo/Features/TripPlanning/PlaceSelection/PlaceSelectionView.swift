@@ -14,16 +14,23 @@ struct PlaceSelectionView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            GoogleMapView(selectedPlace: store.selectedPlace)
+            GoogleMapView(
+                selectedPlace: store.selectedPlace,
+                pinnedPlaces: store.displayedPlaces
+            )
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 navigationBar
-                searchField
+                if !store.hasSelectionEnded {
+                    searchField
+                }
                 Spacer()
             }
 
-            if store.isBottomSheetExpanded && store.selectedPlace == nil {
+            if store.isBottomSheetExpanded
+                && store.selectedPlace == nil
+                && store.displayedPlaces.isEmpty {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
                     .onTapGesture {
@@ -38,6 +45,19 @@ struct PlaceSelectionView: View {
                     isLoading: store.isPlaceDetailsLoading
                 )
                 .ignoresSafeArea(edges: .bottom)
+            } else if !store.displayedPlaces.isEmpty {
+                MemberPlacesBottomSheet(
+                    isExpanded: store.isBottomSheetExpanded,
+                    selectedMember: store.selectedMember,
+                    places: store.displayedPlaces,
+                    bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
+                ) { member in
+                    store.send(.memberProfileTapped(member))
+                }
+                .frame(height: currentMemberSheetHeight, alignment: .top)
+                .clipped()
+                .ignoresSafeArea(edges: .bottom)
+                .gesture(sheetDragGesture)
             } else {
                 PlaceSelectionBottomSheet(
                     isExpanded: store.isBottomSheetExpanded
@@ -49,9 +69,17 @@ struct PlaceSelectionView: View {
                 .ignoresSafeArea(edges: .bottom)
                 .gesture(sheetDragGesture)
             }
+
+            if store.hasSelectionEnded {
+                completionCTA
+            }
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
+        .animation(.easeOut(duration: 0.22), value: store.hasSelectionEnded)
         .preferredColorScheme(.dark)
+        .task {
+            await store.send(.onAppear).finish()
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { store.isSearchPresented },
@@ -88,19 +116,25 @@ struct PlaceSelectionView: View {
                     .ddTypography(.heading18)
                     .foregroundStyle(DDColor.textPrimary)
 
-                HStack(spacing: DDSpacing.small) {
-                    Image(systemName: "timer")
-                        .font(.system(size: 13, weight: .semibold))
-
-                    Text("06:34:05")
+                if store.hasSelectionEnded {
+                    Text("모두 장소 선택을 마쳤어요")
                         .ddTypography(.captionEmphasis12)
+                        .foregroundStyle(DDColor.textSecondary)
+                } else {
+                    HStack(spacing: DDSpacing.small) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 13, weight: .semibold))
+
+                        Text(store.timerText)
+                            .ddTypography(.captionEmphasis12)
+                    }
+                    .foregroundStyle(DDColor.textPrimary)
                 }
-                .foregroundStyle(DDColor.textPrimary)
             }
 
             Spacer(minLength: 0)
 
-            Text(store.selectedPlace == nil ? "0/3" : "1/3")
+            Text(store.hasSelectionEnded ? "3/3" : (store.selectedPlace == nil ? "2/3" : "1/3"))
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.horizontal, DDSpacing.small)
@@ -142,7 +176,9 @@ struct PlaceSelectionView: View {
                 }
             } else {
                 DDSearchField(
-                    placeholder: "꼭 가고 싶은 장소 8개를 추가하세요",
+                    placeholder: store.displayedPlaces.isEmpty
+                        ? "꼭 가고 싶은 장소 8개를 추가하세요"
+                        : "꼭 가고 싶은 장소 3개를 추가하세요.",
                     text: Binding(
                         get: { store.searchText },
                         set: { store.send(.searchTextChanged($0)) }
@@ -162,6 +198,20 @@ struct PlaceSelectionView: View {
     private var currentSheetHeight: CGFloat {
         let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 156
         return min(322, max(156, restingHeight - sheetDragTranslation))
+    }
+
+    private var currentMemberSheetHeight: CGFloat {
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 395 : 156
+        return min(395, max(156, restingHeight - sheetDragTranslation))
+    }
+
+    private var completionCTA: some View {
+        DDCTAButton(title: "이동 기준 정하기") {
+            store.send(.moveCriteriaButtonTapped)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .padding(.bottom, 20)
+        .background(DDColor.surfaceDefault)
     }
 
     private var sheetDragGesture: some Gesture {

@@ -13,9 +13,10 @@ struct GoogleMapView: UIViewRepresentable {
     var longitude: CLLocationDegrees = -122.4194
     var zoom: Float = 15
     var selectedPlace: PlaceDetails?
+    var pinnedPlaces: [PinnedPlace] = []
 
     final class Coordinator {
-        var selectedPlaceID: String?
+        var markerSignature = ""
     }
 
     func makeCoordinator() -> Coordinator {
@@ -44,20 +45,39 @@ struct GoogleMapView: UIViewRepresentable {
     }
 
     private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {
-        guard coordinator.selectedPlaceID != selectedPlace?.id else { return }
-        coordinator.selectedPlaceID = selectedPlace?.id
+        let signature = selectedPlace?.id ?? pinnedPlaces.map(\.id).joined(separator: ",")
+        guard coordinator.markerSignature != signature else { return }
+        coordinator.markerSignature = signature
         mapView.clear()
-        guard let selectedPlace else { return }
 
-        let coordinate = CLLocationCoordinate2D(
-            latitude: selectedPlace.latitude,
-            longitude: selectedPlace.longitude
-        )
+        if let selectedPlace {
+            let coordinate = CLLocationCoordinate2D(
+                latitude: selectedPlace.latitude,
+                longitude: selectedPlace.longitude
+            )
+            addMarker(at: coordinate, to: mapView)
+            mapView.animate(to: GMSCameraPosition(target: coordinate, zoom: 15))
+            return
+        }
+
+        guard !pinnedPlaces.isEmpty else { return }
+        var bounds = GMSCoordinateBounds()
+        for place in pinnedPlaces {
+            let coordinate = CLLocationCoordinate2D(
+                latitude: place.latitude,
+                longitude: place.longitude
+            )
+            addMarker(at: coordinate, to: mapView)
+            bounds = bounds.includingCoordinate(coordinate)
+        }
+        mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 72))
+    }
+
+    private func addMarker(at coordinate: CLLocationCoordinate2D, to mapView: GMSMapView) {
         let marker = GMSMarker(position: coordinate)
         marker.icon = UIImage(named: "UFO")
         marker.groundAnchor = CGPoint(x: 0.5, y: 1)
         marker.map = mapView
-        mapView.animate(to: GMSCameraPosition(target: coordinate, zoom: 15))
     }
 
     private static let darkMapStyle = """

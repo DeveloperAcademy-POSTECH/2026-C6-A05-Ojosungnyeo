@@ -50,8 +50,8 @@ extension PlaceGroupingFeature.Member {
     fileprivate static let preview: [Self] = [
         .init(id: "tae", character: .tae),
         .init(id: "header", character: .header),
-        .init(id: "grae", character: .grae),
         .init(id: "juni", character: .juni),
+        .init(id: "grae", character: .grae),
     ]
 }
 

@@ -13,19 +13,27 @@ struct DDCTAButton: View {
         case secondary
     }
 
+    enum Layout {
+        case full
+        case compact
+    }
+
     let title: String
     var style: Style = .primary
+    var layout: Layout = .full
     var isEnabled = true
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .ddTypography(.heading20)
+                .ddTypography(layout == .full ? .heading20 : .bodyEmphasis16)
                 .foregroundStyle(foregroundColor)
-                .frame(maxWidth: .infinity, minHeight: 55)
+                .padding(.horizontal, layout == .full ? 0 : DDSpacing.large)
+                .frame(maxWidth: layout == .full ? .infinity : nil)
+                .frame(minHeight: layout == .full ? 55 : 44)
                 .background(backgroundColor)
-                .clipShape(.rect(cornerRadius: DDRadius.medium))
+                .clipShape(.rect(cornerRadius: layout == .full ? DDRadius.medium : DDRadius.pill))
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)

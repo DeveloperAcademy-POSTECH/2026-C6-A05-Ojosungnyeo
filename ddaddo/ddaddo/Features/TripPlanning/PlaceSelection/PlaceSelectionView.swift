@@ -14,7 +14,10 @@ struct PlaceSelectionView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            GoogleMapView(selectedPlace: store.selectedPlace)
+            GoogleMapView(
+                selectedPlace: store.selectedPlace,
+                pinnedPlaces: store.displayedPlaces
+            )
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -23,7 +26,9 @@ struct PlaceSelectionView: View {
                 Spacer()
             }
 
-            if store.isBottomSheetExpanded && store.selectedPlace == nil {
+            if store.isBottomSheetExpanded
+                && store.selectedPlace == nil
+                && store.displayedPlaces.isEmpty {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
                     .onTapGesture {
@@ -38,6 +43,18 @@ struct PlaceSelectionView: View {
                     isLoading: store.isPlaceDetailsLoading
                 )
                 .ignoresSafeArea(edges: .bottom)
+            } else if !store.displayedPlaces.isEmpty {
+                MemberPlacesBottomSheet(
+                    isExpanded: store.isBottomSheetExpanded,
+                    selectedMember: store.selectedMember,
+                    places: store.displayedPlaces
+                ) { member in
+                    store.send(.memberProfileTapped(member))
+                }
+                .frame(height: currentMemberSheetHeight, alignment: .top)
+                .clipped()
+                .ignoresSafeArea(edges: .bottom)
+                .gesture(sheetDragGesture)
             } else {
                 PlaceSelectionBottomSheet(
                     isExpanded: store.isBottomSheetExpanded
@@ -100,7 +117,7 @@ struct PlaceSelectionView: View {
 
             Spacer(minLength: 0)
 
-            Text(store.selectedPlace == nil ? "0/3" : "1/3")
+            Text(store.selectedPlace == nil ? "2/3" : "1/3")
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.horizontal, DDSpacing.small)
@@ -142,7 +159,9 @@ struct PlaceSelectionView: View {
                 }
             } else {
                 DDSearchField(
-                    placeholder: "꼭 가고 싶은 장소 8개를 추가하세요",
+                    placeholder: store.displayedPlaces.isEmpty
+                        ? "꼭 가고 싶은 장소 8개를 추가하세요"
+                        : "꼭 가고 싶은 장소 3개를 추가하세요.",
                     text: Binding(
                         get: { store.searchText },
                         set: { store.send(.searchTextChanged($0)) }
@@ -162,6 +181,11 @@ struct PlaceSelectionView: View {
     private var currentSheetHeight: CGFloat {
         let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 156
         return min(322, max(156, restingHeight - sheetDragTranslation))
+    }
+
+    private var currentMemberSheetHeight: CGFloat {
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 535 : 156
+        return min(535, max(156, restingHeight - sheetDragTranslation))
     }
 
     private var sheetDragGesture: some Gesture {

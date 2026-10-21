@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import CoreGraphics
+import Foundation
 
 struct PlaceSelectionFeature: Reducer {
     @ObservableState
@@ -18,10 +19,20 @@ struct PlaceSelectionFeature: Reducer {
         var isPlaceDetailsLoading = false
         var selectedMember: TripMember = .tae
         var memberPlaces = Self.mockMemberPlaces
+        var remainingSeconds = 5
+        var isTimerRunning = false
+        var hasSelectionEnded = false
         var placeSearch = PlaceSearchFeature.State()
 
         var displayedPlaces: [PinnedPlace] {
             memberPlaces[selectedMember] ?? []
+        }
+
+        var timerText: String {
+            let hours = remainingSeconds / 3_600
+            let minutes = remainingSeconds % 3_600 / 60
+            let seconds = remainingSeconds % 60
+            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }
 
         private static let mockMemberPlaces: [TripMember: [PinnedPlace]] = [
@@ -102,6 +113,7 @@ struct PlaceSelectionFeature: Reducer {
 
     @CasePathable
     enum Action: Equatable {
+        case onAppear
         case backButtonTapped
         case searchFieldTapped
         case searchTextChanged(String)
@@ -110,6 +122,8 @@ struct PlaceSelectionFeature: Reducer {
         case bottomSheetDragEnded(CGFloat)
         case clearSelectedPlaceButtonTapped
         case memberProfileTapped(TripMember)
+        case timerTicked
+        case moveCriteriaButtonTapped
         case placeDetailsResponse(PlaceDetails)
         case placeDetailsFailed
         case searchDismissed
@@ -117,10 +131,24 @@ struct PlaceSelectionFeature: Reducer {
     }
 
     @Dependency(\.placeClient) var placeClient
+    @Dependency(\.continuousClock) var clock
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                guard !state.isTimerRunning, !state.hasSelectionEnded else {
+                    return .none
+                }
+                state.isTimerRunning = true
+                return .run { send in
+                    for _ in 0..<5 {
+                        try await clock.sleep(for: .seconds(1))
+                        await send(.timerTicked)
+                    }
+                }
+                .cancellable(id: "place-selection-timer", cancelInFlight: true)
+
             case .backButtonTapped:
                 return .none
 
@@ -161,6 +189,19 @@ struct PlaceSelectionFeature: Reducer {
                 state.selectedMember = member
                 state.selectedPlace = nil
                 state.searchText = ""
+                return .none
+
+            case .timerTicked:
+                guard state.remainingSeconds > 0 else { return .none }
+                state.remainingSeconds -= 1
+                if state.remainingSeconds == 0 {
+                    state.isTimerRunning = false
+                    state.hasSelectionEnded = true
+                    state.isBottomSheetExpanded = true
+                }
+                return .none
+
+            case .moveCriteriaButtonTapped:
                 return .none
 
             case let .placeDetailsResponse(details):

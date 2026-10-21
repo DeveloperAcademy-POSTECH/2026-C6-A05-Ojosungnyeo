@@ -22,7 +22,9 @@ struct PlaceSelectionView: View {
 
             VStack(spacing: 0) {
                 navigationBar
-                searchField
+                if !store.hasSelectionEnded {
+                    searchField
+                }
                 Spacer()
             }
 
@@ -66,9 +68,17 @@ struct PlaceSelectionView: View {
                 .ignoresSafeArea(edges: .bottom)
                 .gesture(sheetDragGesture)
             }
+
+            if store.hasSelectionEnded {
+                completionCTA
+            }
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
+        .animation(.easeOut(duration: 0.22), value: store.hasSelectionEnded)
         .preferredColorScheme(.dark)
+        .task {
+            await store.send(.onAppear).finish()
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { store.isSearchPresented },
@@ -105,19 +115,25 @@ struct PlaceSelectionView: View {
                     .ddTypography(.heading18)
                     .foregroundStyle(DDColor.textPrimary)
 
-                HStack(spacing: DDSpacing.small) {
-                    Image(systemName: "timer")
-                        .font(.system(size: 13, weight: .semibold))
-
-                    Text("06:34:05")
+                if store.hasSelectionEnded {
+                    Text("모두 장소 선택을 마쳤어요")
                         .ddTypography(.captionEmphasis12)
+                        .foregroundStyle(DDColor.textSecondary)
+                } else {
+                    HStack(spacing: DDSpacing.small) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 13, weight: .semibold))
+
+                        Text(store.timerText)
+                            .ddTypography(.captionEmphasis12)
+                    }
+                    .foregroundStyle(DDColor.textPrimary)
                 }
-                .foregroundStyle(DDColor.textPrimary)
             }
 
             Spacer(minLength: 0)
 
-            Text(store.selectedPlace == nil ? "2/3" : "1/3")
+            Text(store.hasSelectionEnded ? "3/3" : (store.selectedPlace == nil ? "2/3" : "1/3"))
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.horizontal, DDSpacing.small)
@@ -184,8 +200,17 @@ struct PlaceSelectionView: View {
     }
 
     private var currentMemberSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 535 : 156
-        return min(535, max(156, restingHeight - sheetDragTranslation))
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 395 : 156
+        return min(395, max(156, restingHeight - sheetDragTranslation))
+    }
+
+    private var completionCTA: some View {
+        DDCTAButton(title: "이동 기준 정하기") {
+            store.send(.moveCriteriaButtonTapped)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .padding(.bottom, 20)
+        .background(DDColor.surfaceDefault)
     }
 
     private var sheetDragGesture: some Gesture {

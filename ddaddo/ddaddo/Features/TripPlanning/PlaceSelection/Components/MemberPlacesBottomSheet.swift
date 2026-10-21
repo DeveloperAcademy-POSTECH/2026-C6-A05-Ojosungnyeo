@@ -40,7 +40,7 @@ struct MemberPlacesBottomSheet: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: isExpanded ? 535 : 156)
+        .frame(height: isExpanded ? 395 : 156)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
     }

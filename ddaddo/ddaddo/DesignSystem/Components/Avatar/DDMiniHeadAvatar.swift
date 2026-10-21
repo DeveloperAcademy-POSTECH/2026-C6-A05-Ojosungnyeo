@@ -11,7 +11,7 @@ struct DDMiniHeadAvatar: View {
     enum Character: String {
         case tae = "DDMiniHeadTae"
         case header = "DDMiniHeadHeader"
-        case grae = "DDMiniHeadGrace"
+        case grae = "DDMiniHeadGrae"
         case juni = "DDMiniHeadJuni"
     }
 

@@ -11,17 +11,17 @@ import ComposableArchitecture
 struct RootFeature: Reducer {
     @ObservableState
     struct State: Equatable {
-        var home = HomeFeature.State()
+        var tripItinerary = TripItineraryFeature.State()
     }
 
     @CasePathable
     enum Action {
-        case home(HomeFeature.Action)
+        case tripItinerary(TripItineraryFeature.Action)
     }
 
     var body: some Reducer<State, Action> {
-        Scope(state: \.home, action: \.home) {
-            HomeFeature()
+        Scope(state: \.tripItinerary, action: \.tripItinerary) {
+            TripItineraryFeature()
         }
     }
 }
@@ -30,10 +30,10 @@ struct RootView: View {
     let store: StoreOf<RootFeature>
 
     var body: some View {
-        HomeView(
+        TripItineraryView(
             store: store.scope(
-                state: \.home,
-                action: \.home
+                state: \.tripItinerary,
+                action: \.tripItinerary
             )
         )
     }

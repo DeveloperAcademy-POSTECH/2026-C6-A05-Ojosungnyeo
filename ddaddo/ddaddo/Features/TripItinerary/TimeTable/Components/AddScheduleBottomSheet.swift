@@ -13,25 +13,34 @@ struct AddScheduleBottomSheet: View {
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("일정 추가")
-                .ddTypography(.heading18)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.top, DDSpacing.small)
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(DDColor.actionSecondary)
+                .frame(width: 142, height: 4)
+                .padding(.top, 19)
+                .padding(.bottom, 18)
 
-            searchBar
-                .padding(.top, DDSpacing.small)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("일정 추가")
+                    .ddTypography(.heading18)
+                    .foregroundStyle(DDColor.textPrimary)
 
-            Text("도쿄 추천 여행지를 보여드려요")
-                .ddTypography(.body16)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.top, DDSpacing.small)
+                searchBar
+                    .padding(.top, 7)
 
-            results
-                .padding(.top, DDSpacing.xSmall)
+                Text("도쿄 추천 여행지를 보여드려요")
+                    .ddTypography(.body16)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .padding(.top, 6)
+
+                results
+                    .padding(.top, DDSpacing.xSmall)
+            }
+            .padding(.horizontal, DDSpacing.large)
         }
-        .padding(.horizontal, 15)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DDColor.surfaceDefault)
+        .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
         .preferredColorScheme(.dark)
     }
 

@@ -41,9 +41,9 @@ struct TimeTableView: View {
             )
         ) {
             AddScheduleBottomSheet(store: store)
-                .presentationDetents([.height(390), .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(32)
+                .presentationDetents([.height(395), .large])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(40)
                 .presentationBackground(DDColor.surfaceDefault)
         }
     }

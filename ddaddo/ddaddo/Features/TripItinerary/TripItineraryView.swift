@@ -18,7 +18,12 @@ struct TripItineraryView: View {
                 set: { store.send(.tabSelected($0)) }
             )
         ) {
-            TimeTableView()
+            TimeTableView(
+                store: store.scope(
+                    state: \.timeTable,
+                    action: \.timeTable
+                )
+            )
                 .tabItem {
                     Label("plans", systemImage: "calendar")
                 }

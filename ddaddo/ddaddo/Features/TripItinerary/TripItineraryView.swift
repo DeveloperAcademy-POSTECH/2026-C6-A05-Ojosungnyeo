@@ -18,7 +18,7 @@ struct TripItineraryView: View {
                 set: { store.send(.tabSelected($0)) }
             )
         ) {
-            DailyItineraryView()
+            TimeTableView()
                 .tabItem {
                     Label("plans", systemImage: "calendar")
                 }

@@ -8,6 +8,17 @@
 import SwiftUI
 
 struct TripSetupOverviewView: View {
+    let onBack: () -> Void
+    let onRecommendationTapped: () -> Void
+
+    init(
+        onBack: @escaping () -> Void = {},
+        onRecommendationTapped: @escaping () -> Void = {}
+    ) {
+        self.onBack = onBack
+        self.onRecommendationTapped = onRecommendationTapped
+    }
+
     var body: some View {
         VStack(spacing: DDSpacing.zero) {
             navigation
@@ -31,7 +42,10 @@ struct TripSetupOverviewView: View {
 
                 Spacer()
 
-                DDCTAButton(title: "취향 기반 여행 추천 보기", action: {})
+                DDCTAButton(
+                    title: "취향 기반 여행 추천 보기",
+                    action: onRecommendationTapped
+                )
                     .padding(.bottom, 11)
             }
             .padding(.horizontal, DDSpacing.large)
@@ -42,8 +56,12 @@ struct TripSetupOverviewView: View {
 
     private var navigation: some View {
         HStack {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 24, weight: .regular))
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 24, weight: .regular))
+            }
+            .buttonStyle(.plain)
+
             Spacer()
         }
         .frame(height: 43)

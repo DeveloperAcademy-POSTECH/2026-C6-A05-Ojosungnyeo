@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct TripInvitationStatusView: View {
     enum ScreenState: Equatable {
@@ -22,21 +23,76 @@ struct TripInvitationStatusView: View {
     }
 
     let screenState: ScreenState
-    var presentedSheet: PresentedSheet?
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var activeSheet: PresentedSheet?
+    @State private var joinedCount: Int
+    @State private var nickname = ""
+    @State private var reminderTargetName = "그레"
+    @State private var hasCopiedInviteLink = false
+    @State private var showsSetupOverview = false
+
+    private let mockInviteLink = "ddaddo://invite/TG8C5H"
+
+    init(
+        screenState: ScreenState,
+        presentedSheet: PresentedSheet? = nil
+    ) {
+        self.screenState = screenState
+        _activeSheet = State(initialValue: presentedSheet)
+        _joinedCount = State(
+            initialValue: Self.initialJoinedCount(
+                for: screenState,
+                presentedSheet: presentedSheet
+            )
+        )
+    }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            content
-
-            if let presentedSheet {
-                Color.black.opacity(0.58)
-                    .ignoresSafeArea()
-
-                TripInvitationBottomSheet(style: presentedSheet)
+        ZStack {
+            if showsSetupOverview {
+                TripSetupOverviewView(onBack: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showsSetupOverview = false
+                    }
+                })
+                .transition(.move(edge: .trailing))
+            } else {
+                invitationStatus
+                    .transition(.move(edge: .leading))
             }
         }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .foregroundStyle(DDColor.textPrimary)
+    }
+
+    private var invitationStatus: some View {
+        ZStack(alignment: .bottom) {
+            content
+
+            if let activeSheet {
+                Color.black.opacity(0.58)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        dismissSheet()
+                    }
+
+                TripInvitationBottomSheet(
+                    style: activeSheet,
+                    reminderTargetName: reminderTargetName,
+                    hasCopiedInviteLink: hasCopiedInviteLink,
+                    onDismiss: dismissSheet,
+                    onCopyLink: copyInviteLink,
+                    onSendReminder: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            self.activeSheet = .reminded
+                        }
+                    }
+                )
+                .transition(.move(edge: .bottom))
+            }
+        }
     }
 
     private var content: some View {
@@ -51,17 +107,18 @@ struct TripInvitationStatusView: View {
                             alignment: .topLeading
                         )
 
-                    if screenState == .nicknameEntry {
+                    if currentScreenState == .nicknameEntry {
                         nicknameField
                     }
 
                     TripSummaryCard()
 
                     ParticipantStatusCard(
-                        style: participantCardStyle
+                        style: participantCardStyle,
+                        onWaitingParticipantTapped: showReminder
                     )
 
-                    if screenState == .allJoined {
+                    if currentScreenState == .allJoined {
                         nextStepCard
                     } else {
                         refreshStatus
@@ -79,7 +136,7 @@ struct TripInvitationStatusView: View {
 
     private var navigation: some View {
         ZStack {
-            if screenState == .nicknameEntry {
+            if currentScreenState == .nicknameEntry {
                 VStack(spacing: 1) {
                     Text("도쿄 여행")
                         .ddTypography(.labelEmphasis14)
@@ -90,11 +147,14 @@ struct TripInvitationStatusView: View {
             }
 
             HStack(spacing: DDSpacing.zero) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 24, weight: .regular))
-                    .frame(width: 24, height: 24)
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 24, weight: .regular))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
 
-                if screenState == .hostWaiting || screenState == .allJoined {
+                if currentScreenState == .hostWaiting || currentScreenState == .allJoined {
                     Text(navigationTitle)
                         .ddTypography(.title24)
                 }
@@ -108,7 +168,7 @@ struct TripInvitationStatusView: View {
 
     @ViewBuilder
     private var heading: some View {
-        switch screenState {
+        switch currentScreenState {
         case .hostWaiting:
             subtitle(
                 first: "초대 링크를 친구에게 공유해 주세요.",
@@ -160,9 +220,11 @@ struct TripInvitationStatusView: View {
     }
 
     private var nicknameField: some View {
-        Text("닉네임 (예: 리도)")
+        TextField("닉네임 (예: 리도)", text: $nickname)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .ddTypography(.body16)
-            .foregroundStyle(DDColor.textTertiary)
+            .foregroundStyle(DDColor.textPrimary)
             .padding(.horizontal, DDSpacing.large)
             .frame(maxWidth: .infinity, minHeight: 39, alignment: .leading)
             .background(Color(red: 0.96, green: 0.96, blue: 0.96))
@@ -170,20 +232,23 @@ struct TripInvitationStatusView: View {
     }
 
     private var refreshStatus: some View {
-        HStack(spacing: DDSpacing.small) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 13, weight: .regular))
-            Text("참여 현황 새로고침")
-                .font(
-                    screenState == .friendWaiting
-                        ? .custom("Pretendard-Regular", size: 13)
-                        : .custom("Pretendard-Regular", size: 14)
-                )
+        Button(action: refreshParticipants) {
+            HStack(spacing: DDSpacing.small) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 13, weight: .regular))
+                Text("참여 현황 새로고침")
+                    .font(
+                        currentScreenState == .friendWaiting
+                            ? .custom("Pretendard-Regular", size: 13)
+                            : .custom("Pretendard-Regular", size: 14)
+                    )
+            }
+            .foregroundStyle(DDColor.textSecondary)
+            .frame(maxWidth: .infinity)
+            .frame(height: currentScreenState == .nicknameEntry ? 32 : 26)
+            .padding(.top, currentScreenState == .friendWaiting ? -9 : 0)
         }
-        .foregroundStyle(DDColor.textSecondary)
-        .frame(maxWidth: .infinity)
-        .frame(height: screenState == .nicknameEntry ? 32 : 26)
-        .padding(.top, screenState == .friendWaiting ? -9 : 0)
+        .buttonStyle(.plain)
     }
 
     private var nextStepCard: some View {
@@ -202,14 +267,22 @@ struct TripInvitationStatusView: View {
 
     private var actions: some View {
         Group {
-            if screenState == .allJoined {
-                DDCTAButton(title: "함께 장소 선택하기", action: {})
+            if currentScreenState == .allJoined {
+                DDCTAButton(
+                    title: "함께 장소 선택하기",
+                    action: showSetupOverview
+                )
             } else {
                 HStack(spacing: DDSpacing.small) {
-                    DDCTAButton(title: "링크 공유", style: .secondary, action: {})
                     DDCTAButton(
-                        title: screenState == .nicknameEntry ? "장소 선택" : "바로 시작",
-                        action: {}
+                        title: "링크 공유",
+                        style: .secondary,
+                        action: showInviteSheet
+                    )
+                    DDCTAButton(
+                        title: currentScreenState == .nicknameEntry ? "장소 선택" : "바로 시작",
+                        isEnabled: canContinue,
+                        action: showSetupOverview
                     )
                 }
             }
@@ -221,35 +294,97 @@ struct TripInvitationStatusView: View {
     }
 
     private var navigationTitle: String {
-        screenState == .allJoined ? "모두 함께할 준비가 돼따 ⚡" : "친구를 기다리고 이따 ⚡"
+        currentScreenState == .allJoined ? "모두 함께할 준비가 돼따 ⚡" : "친구를 기다리고 이따 ⚡"
     }
 
     private var headingTopPadding: CGFloat {
-        switch screenState {
+        switch currentScreenState {
         case .hostWaiting, .allJoined: 6
         case .nicknameEntry, .friendWaiting: 29
         }
     }
 
     private var headingMinimumHeight: CGFloat {
-        switch screenState {
+        switch currentScreenState {
         case .hostWaiting, .nicknameEntry, .allJoined: 82
         case .friendWaiting: 115
         }
     }
 
     private var participantCardStyle: ParticipantStatusCard.Style {
-        if presentedSheet == .remind || presentedSheet == .reminded {
+        switch joinedCount {
+        case ...2: .twoJoined
+        case 3: .threeJoined
+        default: .allJoined
+        }
+    }
+
+    private var currentScreenState: ScreenState {
+        if joinedCount == 4, screenState != .nicknameEntry {
             return .allJoined
+        }
+        return screenState
+    }
+
+    private var canContinue: Bool {
+        guard currentScreenState == .nicknameEntry else { return true }
+        return !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func showInviteSheet() {
+        hasCopiedInviteLink = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            activeSheet = .invite
+        }
+    }
+
+    private func showReminder(for participantName: String) {
+        reminderTargetName = participantName
+        hasCopiedInviteLink = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            activeSheet = .remind
+        }
+    }
+
+    private func dismissSheet() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            activeSheet = nil
+        }
+    }
+
+    private func copyInviteLink() {
+        UIPasteboard.general.string = mockInviteLink
+        hasCopiedInviteLink = true
+    }
+
+    private func refreshParticipants() {
+        guard joinedCount < 4 else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            joinedCount += 1
+        }
+    }
+
+    private func showSetupOverview() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showsSetupOverview = true
+        }
+    }
+
+    private static func initialJoinedCount(
+        for screenState: ScreenState,
+        presentedSheet: PresentedSheet?
+    ) -> Int {
+        if presentedSheet == .remind || presentedSheet == .reminded {
+            return 4
         }
 
         switch screenState {
         case .hostWaiting, .nicknameEntry:
-            return .twoJoined
+            return 2
         case .friendWaiting:
-            return .threeJoined
+            return 3
         case .allJoined:
-            return .allJoined
+            return 4
         }
     }
 }
@@ -292,6 +427,7 @@ private struct ParticipantStatusCard: View {
     }
 
     let style: Style
+    let onWaitingParticipantTapped: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DDSpacing.medium) {
@@ -299,7 +435,7 @@ private struct ParticipantStatusCard: View {
                 Text("함께하는 친구")
                     .ddTypography(.bodyEmphasis16)
                 Spacer()
-                Text(style == .allJoined ? "4/4 참여 완료" : "2/4 참여 완료")
+                Text("\(joinedCount)/4 참여 완료")
                     .ddTypography(.captionEmphasis12)
             }
 
@@ -346,13 +482,34 @@ private struct ParticipantStatusCard: View {
                 name: "주니",
                 character: .juni,
                 showsAvatar: style != .twoJoined,
-                status: style == .threeJoined ? "참여 완료" : "참여 대기"
+                status: style == .twoJoined ? "참여 대기" : "참여 완료"
             ),
-            Participant(name: "그레", character: .grae, showsAvatar: false, status: "참여 대기")
+            Participant(
+                name: "그레",
+                character: .grae,
+                showsAvatar: style == .allJoined,
+                status: style == .allJoined ? "참여 완료" : "참여 대기"
+            )
         ]
     }
 
+    @ViewBuilder
     private func participant(_ participant: Participant) -> some View {
+        if participant.showsAvatar {
+            participantContent(participant)
+                .accessibilityHint("참여 완료")
+        } else {
+            Button {
+                onWaitingParticipantTapped(participant.name)
+            } label: {
+                participantContent(participant)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("참여 알림 메뉴 열기")
+        }
+    }
+
+    private func participantContent(_ participant: Participant) -> some View {
         VStack(spacing: DDSpacing.xSmall) {
             if participant.showsAvatar {
                 ZStack {
@@ -387,6 +544,14 @@ private struct ParticipantStatusCard: View {
         .frame(maxWidth: .infinity)
     }
 
+    private var joinedCount: Int {
+        switch style {
+        case .twoJoined: 2
+        case .threeJoined: 3
+        case .allJoined: 4
+        }
+    }
+
     private func avatarBackground(for character: DDMiniHeadAvatar.Character) -> Color {
         switch character {
         case .tae:
@@ -403,6 +568,11 @@ private struct ParticipantStatusCard: View {
 
 private struct TripInvitationBottomSheet: View {
     let style: TripInvitationStatusView.PresentedSheet
+    let reminderTargetName: String
+    let hasCopiedInviteLink: Bool
+    let onDismiss: () -> Void
+    let onCopyLink: () -> Void
+    let onSendReminder: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DDSpacing.zero) {
@@ -488,7 +658,7 @@ private struct TripInvitationBottomSheet: View {
 
     private func reminderCard(subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: DDSpacing.small) {
-            Text("그레")
+            Text(reminderTargetName)
                 .ddTypography(.heading18)
             Text(subtitle)
                 .ddTypography(.caption12)
@@ -509,16 +679,27 @@ private struct TripInvitationBottomSheet: View {
         switch style {
         case .invite:
             HStack(spacing: DDSpacing.small) {
-                DDCTAButton(title: "참여 현황", style: .secondary, action: {})
-                DDCTAButton(title: "링크 복사", action: {})
+                DDCTAButton(
+                    title: "참여 현황",
+                    style: .secondary,
+                    action: onDismiss
+                )
+                DDCTAButton(
+                    title: hasCopiedInviteLink ? "복사 완료" : "링크 복사",
+                    action: onCopyLink
+                )
             }
         case .remind:
             HStack(spacing: DDSpacing.small) {
-                DDCTAButton(title: "링크 재공유", style: .secondary, action: {})
-                DDCTAButton(title: "알림 보내기", action: {})
+                DDCTAButton(
+                    title: hasCopiedInviteLink ? "복사 완료" : "링크 재공유",
+                    style: .secondary,
+                    action: onCopyLink
+                )
+                DDCTAButton(title: "알림 보내기", action: onSendReminder)
             }
         case .reminded:
-            DDCTAButton(title: "확인", action: {})
+            DDCTAButton(title: "확인", action: onDismiss)
         }
     }
 }

@@ -6,6 +6,12 @@
 import SwiftUI
 
 struct TripDatePickerView: View {
+    enum SelectionMode {
+        case range
+        case single
+    }
+
+    let selectionMode: SelectionMode
     let selectedStartDate: Date?
     let selectedEndDate: Date?
     let onDateSelected: (Date) -> Void
@@ -22,6 +28,7 @@ struct TripDatePickerView: View {
     )
 
     init(
+        selectionMode: SelectionMode = .range,
         selectedStartDate: Date?,
         selectedEndDate: Date?,
         today: Date = Date(),
@@ -30,6 +37,7 @@ struct TripDatePickerView: View {
         onClose: @escaping () -> Void,
         onConfirm: @escaping () -> Void
     ) {
+        self.selectionMode = selectionMode
         self.selectedStartDate = selectedStartDate
         self.selectedEndDate = selectedEndDate
         self.today = Calendar.autoupdatingCurrent.startOfDay(for: today)
@@ -101,7 +109,12 @@ struct TripDatePickerView: View {
     }
 
     private var isSelectionComplete: Bool {
-        selectedStartDate != nil && selectedEndDate != nil
+        switch selectionMode {
+        case .range:
+            selectedStartDate != nil && selectedEndDate != nil
+        case .single:
+            selectedStartDate != nil
+        }
     }
 
     private func monthView(_ month: Date) -> some View {
@@ -236,7 +249,8 @@ struct TripDatePickerView: View {
     }
 
     private var rangeExpansionAnimation: Animation? {
-        selectedEndDate == nil ? nil : .easeInOut(duration: 0.25)
+        guard selectionMode == .range, selectedEndDate != nil else { return nil }
+        return .easeInOut(duration: 0.25)
     }
 
     private func dayForegroundColor(

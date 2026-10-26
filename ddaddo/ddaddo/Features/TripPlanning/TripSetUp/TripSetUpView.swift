@@ -10,49 +10,68 @@ struct TripSetUpView: View {
     let store: StoreOf<TripSetUpFeature>
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, DDSpacing.large)
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    header
+                        .padding(.horizontal, DDSpacing.large)
 
-                DDProgressBar(currentStep: 2)
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.bottom, DDSpacing.xxLarge)
+                    DDProgressBar(currentStep: 2)
+                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.bottom, DDSpacing.xxLarge)
 
-                ScrollView {
-                    VStack(spacing: 0) {
-                        tripSummary
-                        setUpCards
-                            .padding(.top, 28)
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            tripSummary
+                            setUpCards
+                                .padding(.top, 28)
+                        }
+                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.bottom, DDSpacing.large)
                     }
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.bottom, DDSpacing.large)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                bottomActionArea
-            }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    bottomActionArea
+                }
 
-            if store.isDatePickerPresented {
-                Color.black.opacity(0.7)
-                    .ignoresSafeArea()
+                if store.isDatePickerPresented {
+                    Color.black.opacity(0.7)
+                        .ignoresSafeArea()
 
-                TripDatePickerView(
-                    selectedStartDate: store.draftStartDate,
-                    selectedEndDate: store.draftEndDate,
-                    onDateSelected: { store.send(.tripDateTapped($0)) },
-                    onClose: { store.send(.tripDatePickerCloseButtonTapped) },
-                    onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
+                    TripDatePickerView(
+                        selectedStartDate: store.draftStartDate,
+                        selectedEndDate: store.draftEndDate,
+                        onDateSelected: { store.send(.tripDateTapped($0)) },
+                        onClose: { store.send(.tripDatePickerCloseButtonTapped) },
+                        onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
+                    )
+                    .frame(maxHeight: 710)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: store.isDatePickerPresented)
+            .background(DDColor.surfaceDefault.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .preferredColorScheme(.dark)
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { store.isAddFlightPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.addFlightDismissed)
+                        }
+                    }
                 )
-                .frame(maxHeight: 710)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            ) {
+                TripSetUpAddFlightView(
+                    store: store.scope(
+                        state: \.addFlight,
+                        action: \.addFlight
+                    )
+                )
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: store.isDatePickerPresented)
-        .background(DDColor.surfaceDefault.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(.dark)
     }
 
     private var header: some View {
@@ -119,7 +138,7 @@ struct TripSetUpView: View {
 
             travelerCard
 
-            navigationCard(title: "항공권 정보", detail: "선택 사항") {
+            navigationCard(title: "항공권 정보", detail: store.flightSummary) {
                 store.send(.flightInfoButtonTapped)
             }
 

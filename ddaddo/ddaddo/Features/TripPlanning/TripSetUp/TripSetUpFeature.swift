@@ -20,9 +20,13 @@ struct TripSetUpFeature: Reducer {
         var draftStartDate: Date?
         var draftEndDate: Date?
         var isDatePickerPresented = false
+        var addFlight = TripSetUpAddFlightFeature.State()
+        var isAddFlightPresented = false
+        var flightRegistration: TripSetUpAddFlightFeature.FlightRegistration?
 
         var tripTitle: String { "\(destinationName) 여행" }
         var destinationSummary: String { "\(countryName) · \(cityCount)개 도시" }
+        var flightSummary: String { flightRegistration?.outbound.flightNumber ?? "선택 사항" }
         var isSaveEnabled: Bool {
             guard
                 let tripStartDate,
@@ -61,6 +65,7 @@ struct TripSetUpFeature: Reducer {
         }
     }
 
+    @CasePathable
     enum Action: Equatable {
         case backButtonTapped
         case destinationChangeButtonTapped
@@ -71,6 +76,8 @@ struct TripSetUpFeature: Reducer {
         case travelerDecreaseButtonTapped
         case travelerIncreaseButtonTapped
         case flightInfoButtonTapped
+        case addFlightDismissed
+        case addFlight(TripSetUpAddFlightFeature.Action)
         case accommodationInfoButtonTapped
         case inviteFriendButtonTapped
         case saveButtonTapped
@@ -138,13 +145,35 @@ struct TripSetUpFeature: Reducer {
                 state.travelerCount += 1
                 return .none
 
+            case .flightInfoButtonTapped:
+                state.addFlight = TripSetUpAddFlightFeature.State(
+                    registration: state.flightRegistration
+                )
+                state.isAddFlightPresented = true
+                return .none
+
+            case .addFlightDismissed, .addFlight(.delegate(.dismiss)):
+                state.isAddFlightPresented = false
+                return .none
+
+            case let .addFlight(.delegate(.completed(registration))):
+                state.flightRegistration = registration
+                state.isAddFlightPresented = false
+                return .none
+
+            case .addFlight:
+                return .none
+
             case .backButtonTapped,
                  .destinationChangeButtonTapped,
-                 .flightInfoButtonTapped,
                  .accommodationInfoButtonTapped,
                  .inviteFriendButtonTapped:
                 return .none
             }
+        }
+
+        Scope(state: \.addFlight, action: \.addFlight) {
+            TripSetUpAddFlightFeature()
         }
     }
 }

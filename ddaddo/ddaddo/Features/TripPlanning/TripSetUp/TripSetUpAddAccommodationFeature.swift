@@ -12,9 +12,10 @@ struct TripSetUpAddAccommodationFeature: Reducer {
         let name: String
         let address: String
         let website: String
+        let latitude: Double
+        let longitude: Double
         let thumbnailImageName: String
         let heroImageName: String
-        let mapImageName: String
     }
 
     enum Step: Equatable {
@@ -43,50 +44,11 @@ struct TripSetUpAddAccommodationFeature: Reducer {
             guard isSearchEnabled else { return [] }
 
             let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            return Self.mockAccommodations.filter {
+            return TripSetUpAccommodationMockData.accommodations.filter {
                 $0.name.localizedCaseInsensitiveContains(query)
                     || $0.address.localizedCaseInsensitiveContains(query)
             }
         }
-
-        private static let mockAccommodations = [
-            Accommodation(
-                id: "tokyo-dome-hotel",
-                name: "도쿄돔 호텔",
-                address: "1-3-61 고라쿠, 분쿄구, 도쿄",
-                website: "https://www.tokyodome-hotels.com",
-                thumbnailImageName: "DDMockAccommodationThumbnail",
-                heroImageName: "DDMockAccommodationHero",
-                mapImageName: "DDMockAccommodationMap"
-            ),
-            Accommodation(
-                id: "richmond-suidobashi",
-                name: "리치몬드 호텔 도쿄 스이도바시",
-                address: "1-33-9 혼고, 분쿄구, 도쿄",
-                website: "https://richmondhotel.jp/suidobashi/",
-                thumbnailImageName: "DDMockAccommodationThumbnail",
-                heroImageName: "DDMockAccommodationHero",
-                mapImageName: "DDMockAccommodationMap"
-            ),
-            Accommodation(
-                id: "metropolitan-edmont",
-                name: "호텔 메트로폴리탄 에드몬트",
-                address: "3-10-8 이이다바시, 치요다구, 도쿄",
-                website: "https://edmont.metropolitan.jp/",
-                thumbnailImageName: "DDMockAccommodationThumbnail",
-                heroImageName: "DDMockAccommodationHero",
-                mapImageName: "DDMockAccommodationMap"
-            ),
-            Accommodation(
-                id: "hotel-niwa-tokyo",
-                name: "호텔 니와 도쿄",
-                address: "1-1-16 간다미사키초, 치요다구, 도쿄",
-                website: "https://www.hotelniwa.jp/",
-                thumbnailImageName: "DDMockAccommodationThumbnail",
-                heroImageName: "DDMockAccommodationHero",
-                mapImageName: "DDMockAccommodationMap"
-            )
-        ]
     }
 
     enum Action: Equatable {

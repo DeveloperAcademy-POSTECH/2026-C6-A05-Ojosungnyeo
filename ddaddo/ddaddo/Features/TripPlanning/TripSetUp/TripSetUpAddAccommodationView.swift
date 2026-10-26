@@ -4,6 +4,7 @@
 //
 
 import ComposableArchitecture
+import CoreLocation
 import SwiftUI
 import UIKit
 
@@ -207,9 +208,14 @@ struct TripSetUpAddAccommodationView: View {
                             .padding(.top, DDSpacing.xSmall)
                         }
 
-                        Image(accommodation.mapImageName)
-                            .resizable()
-                            .scaledToFill()
+                        GoogleMapView(
+                            latitude: accommodation.latitude,
+                            longitude: accommodation.longitude,
+                            selectedCoordinate: CLLocationCoordinate2D(
+                                latitude: accommodation.latitude,
+                                longitude: accommodation.longitude
+                            )
+                        )
                             .frame(maxWidth: .infinity)
                             .frame(height: 207)
                             .clipShape(.rect(cornerRadius: DDRadius.medium))

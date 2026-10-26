@@ -63,33 +63,13 @@ struct TripSearchView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: DDSpacing.small) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(DDColor.textPrimary)
-
-            TextField(
-                "",
-                text: Binding(
-                    get: { store.searchText },
-                    set: { store.send(.searchTextChanged($0)) }
-                ),
-                prompt: Text("도시/지역 이름 (예: 도쿄)")
-                    .foregroundStyle(DDColor.textSecondary)
+        DDSearchField(
+            placeholder: "도시/지역 이름 (예: 도쿄)",
+            text: Binding(
+                get: { store.searchText },
+                set: { store.send(.searchTextChanged($0)) }
             )
-            .ddTypography(.body16)
-            .foregroundStyle(DDColor.textPrimary)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-        }
-        .padding(.horizontal, DDSpacing.xLarge)
-        .frame(height: 41)
-        .background(DDColor.surfaceElevated)
-        .clipShape(.capsule)
-        .overlay {
-            Capsule()
-                .stroke(DDColor.borderDefault, lineWidth: 1)
-        }
+        )
     }
 
     private var regionFilters: some View {

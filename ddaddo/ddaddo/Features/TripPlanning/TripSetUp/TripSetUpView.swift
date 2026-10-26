@@ -10,28 +10,46 @@ struct TripSetUpView: View {
     let store: StoreOf<TripSetUpFeature>
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-                .padding(.horizontal, DDSpacing.large)
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                header
+                    .padding(.horizontal, DDSpacing.large)
 
-            DDProgressBar(currentStep: 2)
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.bottom, DDSpacing.xxLarge)
+                DDProgressBar(currentStep: 2)
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.bottom, DDSpacing.xxLarge)
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    tripSummary
-                    setUpCards
-                        .padding(.top, 28)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        tripSummary
+                        setUpCards
+                            .padding(.top, 28)
+                    }
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.bottom, DDSpacing.large)
                 }
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.bottom, DDSpacing.large)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomActionArea
+            }
+
+            if store.isDatePickerPresented {
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+
+                TripDatePickerView(
+                    selectedStartDate: store.draftStartDate,
+                    selectedEndDate: store.draftEndDate,
+                    onDateSelected: { store.send(.tripDateTapped($0)) },
+                    onClose: { store.send(.tripDatePickerCloseButtonTapped) },
+                    onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
+                )
+                .frame(maxHeight: 710)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomActionArea
-        }
+        .animation(.easeInOut(duration: 0.25), value: store.isDatePickerPresented)
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -91,7 +109,11 @@ struct TripSetUpView: View {
 
     private var setUpCards: some View {
         VStack(spacing: DDSpacing.medium) {
-            navigationCard(title: "여행 일정", isRequired: true) {
+            navigationCard(
+                title: "여행 일정",
+                detail: store.tripDateSummary,
+                isRequired: true
+            ) {
                 store.send(.travelScheduleButtonTapped)
             }
 
@@ -169,7 +191,11 @@ struct TripSetUpView: View {
             }
             .buttonStyle(.plain)
 
-            DDCTAButton(title: "이 일정으로 저장") {
+            DDCTAButton(
+                title: "이 일정으로 저장",
+                style: store.isSaveEnabled ? .primary : .secondary,
+                isEnabled: store.isSaveEnabled
+            ) {
                 store.send(.saveButtonTapped)
             }
         }

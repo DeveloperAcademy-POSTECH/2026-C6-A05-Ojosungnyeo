@@ -23,10 +23,14 @@ struct TripSetUpFeature: Reducer {
         var addFlight = TripSetUpAddFlightFeature.State()
         var isAddFlightPresented = false
         var flightRegistration: TripSetUpAddFlightFeature.FlightRegistration?
+        var addAccommodation = TripSetUpAddAccommodationFeature.State()
+        var isAddAccommodationPresented = false
+        var accommodation: TripSetUpAddAccommodationFeature.Accommodation?
 
         var tripTitle: String { "\(destinationName) 여행" }
         var destinationSummary: String { "\(countryName) · \(cityCount)개 도시" }
         var flightSummary: String { flightRegistration?.outbound.flightNumber ?? "선택 사항" }
+        var accommodationSummary: String { accommodation?.name ?? "선택 사항" }
         var isSaveEnabled: Bool {
             guard
                 let tripStartDate,
@@ -79,6 +83,8 @@ struct TripSetUpFeature: Reducer {
         case addFlightDismissed
         case addFlight(TripSetUpAddFlightFeature.Action)
         case accommodationInfoButtonTapped
+        case addAccommodationDismissed
+        case addAccommodation(TripSetUpAddAccommodationFeature.Action)
         case inviteFriendButtonTapped
         case saveButtonTapped
     }
@@ -164,9 +170,31 @@ struct TripSetUpFeature: Reducer {
             case .addFlight:
                 return .none
 
+            case .accommodationInfoButtonTapped:
+                if state.addAccommodation.selectedAccommodation == nil,
+                   let accommodation = state.accommodation {
+                    state.addAccommodation = TripSetUpAddAccommodationFeature.State(
+                        accommodation: accommodation
+                    )
+                }
+                state.isAddAccommodationPresented = true
+                return .none
+
+            case .addAccommodationDismissed,
+                 .addAccommodation(.delegate(.dismiss)):
+                state.isAddAccommodationPresented = false
+                return .none
+
+            case let .addAccommodation(.delegate(.completed(accommodation))):
+                state.accommodation = accommodation
+                state.isAddAccommodationPresented = false
+                return .none
+
+            case .addAccommodation:
+                return .none
+
             case .backButtonTapped,
                  .destinationChangeButtonTapped,
-                 .accommodationInfoButtonTapped,
                  .inviteFriendButtonTapped:
                 return .none
             }
@@ -174,6 +202,10 @@ struct TripSetUpFeature: Reducer {
 
         Scope(state: \.addFlight, action: \.addFlight) {
             TripSetUpAddFlightFeature()
+        }
+
+        Scope(state: \.addAccommodation, action: \.addAccommodation) {
+            TripSetUpAddAccommodationFeature()
         }
     }
 }

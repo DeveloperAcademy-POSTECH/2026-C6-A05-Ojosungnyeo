@@ -88,7 +88,7 @@ struct TripSetUpAddFlightView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if store.step == .flightNumber {
                 DDCTAButton(
-                    title: "다음",
+                    title: "편명 등록하기",
                     style: store.isFlightNumberValid ? .primary : .secondary,
                     isEnabled: store.isFlightNumberValid
                 ) {

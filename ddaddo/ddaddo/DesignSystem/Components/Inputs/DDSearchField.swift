@@ -10,22 +10,20 @@ import SwiftUI
 struct DDSearchField: View {
     let placeholder: String
     @Binding var text: String
+    var focus: FocusState<Bool>.Binding?
 
     var body: some View {
         HStack(spacing: DDSpacing.small) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(DDColor.iconDefault)
 
-            TextField(
-                "",
-                text: $text,
-                prompt: Text(placeholder)
-                    .foregroundStyle(DDColor.textSecondary)
-            )
-            .ddTypography(.body16)
-            .foregroundStyle(DDColor.textPrimary)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
+            Group {
+                if let focus {
+                    searchTextField.focused(focus)
+                } else {
+                    searchTextField
+                }
+            }
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 41)
@@ -35,6 +33,19 @@ struct DDSearchField: View {
             Capsule()
                 .stroke(DDColor.borderSubtle, lineWidth: 1)
         }
+    }
+
+    private var searchTextField: some View {
+        TextField(
+            "",
+            text: $text,
+            prompt: Text(placeholder)
+                .foregroundStyle(DDColor.textSecondary)
+        )
+        .ddTypography(.body16)
+        .foregroundStyle(DDColor.textPrimary)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
     }
 }
 

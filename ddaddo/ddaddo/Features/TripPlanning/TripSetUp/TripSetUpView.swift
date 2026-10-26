@@ -71,6 +71,23 @@ struct TripSetUpView: View {
                     )
                 )
             }
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { store.isAddAccommodationPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.addAccommodationDismissed)
+                        }
+                    }
+                )
+            ) {
+                TripSetUpAddAccommodationView(
+                    store: store.scope(
+                        state: \.addAccommodation,
+                        action: \.addAccommodation
+                    )
+                )
+            }
         }
     }
 
@@ -142,7 +159,7 @@ struct TripSetUpView: View {
                 store.send(.flightInfoButtonTapped)
             }
 
-            navigationCard(title: "숙소 정보", detail: "선택 사항") {
+            navigationCard(title: "숙소 정보", detail: store.accommodationSummary) {
                 store.send(.accommodationInfoButtonTapped)
             }
         }

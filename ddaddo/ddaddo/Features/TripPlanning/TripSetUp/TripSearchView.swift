@@ -46,7 +46,7 @@ struct TripSearchView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("뒤로가기")
+            .accessibilityLabel("뒤로 가기")
 
             HStack(spacing: DDSpacing.xSmall) {
                 Text("여행지를 찾아보게따")
@@ -124,9 +124,16 @@ struct TripSearchView: View {
                                 title: city.name,
                                 isSelected: store.selectedCityIDs.contains(city.id)
                             ) {
-                                Image(city.thumbnailName)
-                                    .resizable()
-                                    .scaledToFill()
+                                if let thumbnail = UIImage(named: city.thumbnailName) {
+                                    Image(uiImage: thumbnail)
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(DDColor.textSecondary)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
                             }
                         }
                         .buttonStyle(.plain)

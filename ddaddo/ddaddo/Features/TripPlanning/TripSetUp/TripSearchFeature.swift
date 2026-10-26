@@ -27,7 +27,7 @@ struct TripSearchFeature: Reducer {
         var searchText = ""
         var selectedRegion: Region = .asia
         var selectedCityIDs: Set<City.ID> = []
-        var cities = Self.mockCities
+        var cities = TripSearchMockData.cities
 
         var filteredCities: [City] {
             let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -43,44 +43,6 @@ struct TripSearchFeature: Reducer {
         var selectedCities: [City] {
             cities.filter { selectedCityIDs.contains($0.id) }
         }
-
-        private static let mockCities: [City] = [
-            City(
-                id: "osaka",
-                country: "일본",
-                name: "오사카",
-                region: .asia,
-                thumbnailName: "DDTripSearchOsaka"
-            ),
-            City(
-                id: "kyoto",
-                country: "일본",
-                name: "교토",
-                region: .asia,
-                thumbnailName: "DDTripSearchKyoto"
-            ),
-            City(
-                id: "tokyo",
-                country: "일본",
-                name: "도쿄",
-                region: .asia,
-                thumbnailName: "DDTripSearchTokyo"
-            ),
-            City(
-                id: "fukuoka",
-                country: "일본",
-                name: "후쿠오카",
-                region: .asia,
-                thumbnailName: "DDTripSearchFukuoka"
-            ),
-            City(
-                id: "sapporo",
-                country: "일본",
-                name: "삿포로",
-                region: .asia,
-                thumbnailName: "DDTripSearchSapporo"
-            )
-        ]
     }
 
     enum Action: Equatable {

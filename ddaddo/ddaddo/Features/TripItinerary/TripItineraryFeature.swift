@@ -15,13 +15,15 @@ struct TripItineraryFeature: Reducer {
 
     @ObservableState
     struct State: Equatable {
-        var selectedTab: Tab = .routeOverview
+        var selectedTab: Tab = .dailyItinerary
+        var timeTable = TimeTableFeature.State()
         var routeOverview = RouteOverviewFeature.State()
     }
 
     @CasePathable
     enum Action: Equatable {
         case tabSelected(Tab)
+        case timeTable(TimeTableFeature.Action)
         case routeOverview(RouteOverviewFeature.Action)
     }
 
@@ -32,9 +34,13 @@ struct TripItineraryFeature: Reducer {
                 state.selectedTab = tab
                 return .none
 
-            case .routeOverview:
+            case .timeTable, .routeOverview:
                 return .none
             }
+        }
+
+        Scope(state: \.timeTable, action: \.timeTable) {
+            TimeTableFeature()
         }
 
         Scope(state: \.routeOverview, action: \.routeOverview) {

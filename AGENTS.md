@@ -73,7 +73,7 @@ ddaddo/
 │   │
 │   ├── TripSetup/
 │   │   ├── TripSearch/
-│   │   ├── TripCreation/
+│   │   ├── TripSetUp/
 │   │   └── WaitingForParticipants/
 │   │
 │   ├── TripCoordination/

@@ -12,6 +12,7 @@ enum DDColor {
     static let surfaceElevated = Color("DDSurfaceElevated")
     static let surfaceControl = Color("DDSurfaceControl")
     static let surfaceSelected = Color("DDSurfaceSelected")
+    static let surfaceNavigation = Color("DDSurfaceNavigation")
 
     static let actionPrimary = Color("DDActionPrimary")
     static let actionSecondary = Color("DDActionSecondary")

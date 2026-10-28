@@ -10,37 +10,35 @@ import SwiftUI
 
 struct TripItineraryView: View {
     let store: StoreOf<TripItineraryFeature>
+    private let tabItems = TripItineraryTabItemFactory.makeItems()
 
     var body: some View {
-        TabView(
-            selection: Binding(
-                get: { store.selectedTab },
-                set: { store.send(.tabSelected($0)) }
-            )
-        ) {
-            TimeTableView(
-                store: store.scope(
-                    state: \.timeTable,
-                    action: \.timeTable
+        Group {
+            switch store.selectedTab {
+            case .dailyItinerary:
+                TimeTableView(
+                    store: store.scope(
+                        state: \.timeTable,
+                        action: \.timeTable
+                    )
                 )
-            )
-                .tabItem {
-                    Label("plans", systemImage: "calendar")
-                }
-                .tag(TripItineraryFeature.Tab.dailyItinerary)
 
-            RouteOverviewView(
-                store: store.scope(
-                    state: \.routeOverview,
-                    action: \.routeOverview
+            case .routeOverview:
+                RouteOverviewView(
+                    store: store.scope(
+                        state: \.routeOverview,
+                        action: \.routeOverview
+                    )
                 )
-            )
-                .tabItem {
-                    Label("route", systemImage: "map.fill")
-                }
-                .tag(TripItineraryFeature.Tab.routeOverview)
+            }
         }
-        .tint(DDColor.actionPrimary)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDCustomTabBar(
+                items: tabItems,
+                selection: store.selectedTab,
+                onSelect: { store.send(.tabSelected($0)) }
+            )
+        }
     }
 }
 

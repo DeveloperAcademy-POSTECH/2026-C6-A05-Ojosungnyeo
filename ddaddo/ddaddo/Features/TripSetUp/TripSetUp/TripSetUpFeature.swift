@@ -15,6 +15,9 @@ struct TripSetUpFeature: Reducer {
         var travelerCount = 1
         var tripStartDate: Date?
         var tripEndDate: Date?
+        var draftStartDate: Date?
+        var draftEndDate: Date?
+        var isDatePickerPresented = false
         var transportationSelection: TripSetUpTransportationFeature.Selection?
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
@@ -79,6 +82,10 @@ struct TripSetUpFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case backButtonTapped
+        case travelScheduleButtonTapped
+        case tripDateTapped(Date)
+        case tripDatePickerCloseButtonTapped
+        case tripDatePickerConfirmButtonTapped
         case travelerDecreaseButtonTapped
         case travelerIncreaseButtonTapped
         case transportationCardTapped
@@ -90,6 +97,55 @@ struct TripSetUpFeature: Reducer {
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .travelScheduleButtonTapped:
+                state.draftStartDate = state.tripStartDate
+                state.draftEndDate = state.tripEndDate
+                state.isDatePickerPresented = true
+                return .none
+
+            case let .tripDateTapped(date):
+                let calendar = Calendar.autoupdatingCurrent
+                let selectedDate = calendar.startOfDay(for: date)
+                let today = calendar.startOfDay(for: Date())
+                guard selectedDate >= today else { return .none }
+
+                guard let draftStartDate = state.draftStartDate else {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = nil
+                    return .none
+                }
+
+                if state.draftEndDate != nil {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = nil
+                } else if selectedDate < draftStartDate {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = draftStartDate
+                } else if selectedDate > draftStartDate {
+                    state.draftEndDate = selectedDate
+                }
+                return .none
+
+            case .tripDatePickerCloseButtonTapped:
+                state.draftStartDate = nil
+                state.draftEndDate = nil
+                state.isDatePickerPresented = false
+                return .none
+
+            case .tripDatePickerConfirmButtonTapped:
+                guard
+                    let draftStartDate = state.draftStartDate,
+                    let draftEndDate = state.draftEndDate,
+                    draftStartDate < draftEndDate
+                else { return .none }
+
+                state.tripStartDate = draftStartDate
+                state.tripEndDate = draftEndDate
+                state.draftStartDate = nil
+                state.draftEndDate = nil
+                state.isDatePickerPresented = false
+                return .none
+
             case .saveButtonTapped:
                 guard state.isSaveEnabled else { return .none }
                 return .none

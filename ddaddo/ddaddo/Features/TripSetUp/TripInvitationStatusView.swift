@@ -2,8 +2,6 @@
 //  TripInvitationStatusView.swift
 //  ddaddo
 //
-//  Created by Codex on 10/26/26.
-//
 
 import SwiftUI
 import UIKit

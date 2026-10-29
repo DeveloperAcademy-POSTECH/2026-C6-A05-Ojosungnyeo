@@ -37,11 +37,18 @@ struct LoginView: View {
                 .frame(width: Layout.designWidth, height: 178)
                 .offset(y: 696)
 
-                Image("DDLoginLogo")
-                    .resizable()
-                    .frame(width: 176, height: 145)
-                    .offset(x: 113, y: 119)
-                    .accessibilityHidden(true)
+                VStack(spacing: 0) {
+                    Image("DDLoginLogo_KR")
+                        .resizable()
+                        .frame(width: 165, height: 91)
+
+                    Image("DDLoginLogo_EN")
+                        .resizable()
+                        .frame(width: 92, height: 19)
+                }
+                .frame(width: 176)
+                .offset(x: 113, y: 138)
+                .accessibilityHidden(true)
 
                 if let errorMessage = store.errorMessage {
                     Text(errorMessage)
@@ -93,12 +100,10 @@ struct LoginView: View {
     }
 
     private var mascot: some View {
-        Image("DDLoginMascot")
+        Image("DDMascot")
             .resizable()
-            .frame(width: 278, height: 431)
-            .offset(y: -48)
-            .frame(width: 278, height: 365, alignment: .top)
-            .clipped()
+            .scaledToFit()
+            .frame(width: 278, height: 365)
             .position(x: 201, y: 480.5)
             .accessibilityHidden(true)
     }

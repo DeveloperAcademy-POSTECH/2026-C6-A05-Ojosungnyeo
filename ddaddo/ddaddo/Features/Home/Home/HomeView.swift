@@ -23,7 +23,7 @@ struct HomeView: View {
                 speechBubble
                     .padding(.top, 137)
 
-                Image("DDHomeMascot")
+                Image("DDMascot")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 278, height: 365)

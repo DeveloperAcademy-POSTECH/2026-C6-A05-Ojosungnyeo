@@ -5,140 +5,211 @@
 //  Created by sun on 10/19/26.
 //
 
-import SwiftUI
 import ComposableArchitecture
+import SwiftUI
 
 struct HomeView: View {
     let store: StoreOf<HomeFeature>
 
     var body: some View {
-        GeometryReader { _ in
-            ZStack(alignment: .top) {
+        GeometryReader { proxy in
+            let scale = min(
+                proxy.size.width / Layout.designWidth,
+                proxy.size.height / Layout.designHeight
+            )
+
+            ZStack(alignment: .topLeading) {
                 DDColor.surfaceDefault
-                    .ignoresSafeArea()
 
-                header
-                    .padding(.top, 32)
-
+                moonSurface
+                mascot
+                sparkles
+                bottomGradient
                 speechBubble
-                    .padding(.top, 137)
+                menuButton
+                exploreTripsButton
 
-                Image("DDHomeMascot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 278, height: 365)
-                    .padding(.top, 239)
-
-                VStack(spacing: 0) {
-                    Spacer()
-
-                    tripCard
-                        .padding(.horizontal, DDSpacing.large)
-                        .padding(.bottom, 22)
+                if store.isMenuPresented {
+                    menuDismissArea
+                    accountMenu
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: Layout.designWidth, height: Layout.designHeight)
+            .scaleEffect(scale, anchor: .top)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .top
+            )
+            .clipped()
         }
+        .ignoresSafeArea()
         .preferredColorScheme(.dark)
     }
 
-    private var header: some View {
-        HStack(spacing: 2) {
-            HStack(spacing: 2) {
-                Text("어서오세따!")
-                    .ddTypography(.title24)
+    private var moonSurface: some View {
+        Image("DDLoginMoon")
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: 788.417, height: 539.306)
+            .clipped()
+            .rotationEffect(.degrees(-10.09))
+            .position(x: 160.359, y: 731.555)
+            .accessibilityHidden(true)
+    }
 
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 22, weight: .semibold))
-            }
-            .foregroundStyle(DDColor.textPrimary)
-
-            Spacer()
-
-            
-            Button {
-                store.send(.menuButtonTapped)
-            } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 24, weight: .medium))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("메뉴 열기")
-        }
-        .padding(.horizontal, DDSpacing.large)
+    private var mascot: some View {
+        Image("DDMascot")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 278, height: 365)
+            .position(x: 201, y: 480.5)
+            .accessibilityHidden(true)
     }
 
     private var speechBubble: some View {
-        Text("저는 따또입니따.\n당신의 즐거운 지구 여행을 책임집니따.")
+        Text("어서오세따. 저는 따또입니따.\n당신의 즐거운 지구 여행을 책임집니따.")
             .ddTypography(.bodyEmphasis16)
             .foregroundStyle(DDColor.textOnPrimary)
-            .frame(width: 244, alignment: .leading)
+            .lineSpacing(4)
+            .frame(width: 241, alignment: .leading)
             .frame(width: 324, height: 92)
             .background(.white)
             .clipShape(.rect(cornerRadius: 46))
             .overlay(alignment: .bottomTrailing) {
                 Image("DDSpeechBubbleTail")
                     .resizable()
-                    .frame(width: 27, height: 25)
+                    .frame(width: 27.0645, height: 24.5)
                     .rotationEffect(.degrees(180))
-                    .offset(x: -55, y: 17)
+                    .offset(x: -54, y: 17)
+            }
+            .position(x: 203, y: 242)
+    }
+
+    private var sparkles: some View {
+        ZStack {
+            sparkle(size: 29, x: 66.5, y: 397)
+            sparkle(size: 24, x: 299, y: 568)
+            sparkle(size: 39, x: 334.5, y: 389)
+            sparkle(size: 28, x: 80, y: 552)
+            sparkle(size: 20, x: 345, y: 524)
+        }
+        .frame(width: Layout.designWidth, height: Layout.designHeight)
+        .foregroundStyle(DDColor.actionPrimary)
+        .accessibilityHidden(true)
+    }
+
+    private func sparkle(size: CGFloat, x: CGFloat, y: CGFloat) -> some View {
+        Image(systemName: "sparkle")
+            .font(.system(size: size, weight: .semibold))
+            .position(x: x, y: y)
+    }
+
+    private var bottomGradient: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 168 / 255, green: 165 / 255, blue: 164 / 255)
+                    .opacity(0.3),
+                Color.black.opacity(0.3)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(width: Layout.designWidth, height: 178)
+        .offset(y: 696)
+        .allowsHitTesting(false)
+    }
+
+    private var menuButton: some View {
+        Button {
+            store.send(.menuButtonTapped)
+        } label: {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 28, weight: .regular))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .position(x: 370, y: 78)
+        .accessibilityLabel("메뉴 열기")
+    }
+
+    private var menuDismissArea: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .frame(width: Layout.designWidth, height: Layout.designHeight)
+            .onTapGesture {
+                store.send(.menuDismissed)
             }
     }
 
-    private var tripCard: some View {
-        DDColor.borderDefault
-            .frame(height: 145)
-            .overlay(alignment: .topLeading) {
-                Image("DDHomeTripCardMascot")
-                    .resizable()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 146)
+    private var accountMenu: some View {
+        VStack(spacing: 0) {
+            accountMenuButton("로그아웃") {
+                store.send(.logoutButtonTapped)
             }
-            .overlay {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: DDSpacing.xSmall) {
-                        Image(systemName: "globe")
-                        Text("Flight Ticket")
-                            .ddTypography(.heading20)
 
-                        Spacer()
+            Rectangle()
+                .fill(Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255))
+                .frame(height: 1)
 
-                        Text("DDADDO")
-                            .font(.system(size: 20, weight: .regular))
-                            .foregroundStyle(Color(red: 208 / 255, green: 208 / 255, blue: 208 / 255))
-                    }
+            accountMenuButton("탈퇴 아직 안함") {
+                store.send(.withdrawButtonTapped)
+            }
+        }
+        .frame(width: 133)
+        .background(Color.black)
+        .clipShape(.rect(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(
+                    Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
+                    lineWidth: 1
+                )
+        }
+        .position(x: 321.5, y: 100)
+        .accessibilityElement(children: .contain)
+    }
 
-                    Spacer()
-
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
-                            Text("EARTH")
-                                .ddTypography(.title28)
-
-                            Text("어디로 갈까요?")
-                                .ddTypography(.body16)
-                                .foregroundStyle(DDColor.textSecondary)
-                        }
-
-                        Spacer()
-
-                        DDCTAButton(
-                            title: "여행 추가하기",
-                            layout: .compact,
-                            action: { store.send(.addTripButtonTapped) }
-                        )
-                    }
-                }
-                .foregroundStyle(DDColor.textPrimary)
+    private func accountMenuButton(
+        _ title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
                 .padding(.horizontal, DDSpacing.large)
-                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var exploreTripsButton: some View {
+        Button {
+            store.send(.exploreTripsButtonTapped)
+        } label: {
+            VStack(spacing: 10) {
+                Image(systemName: "chevron.down.dotted.2")
+                    .font(.system(size: 16, weight: .semibold))
+                    .rotationEffect(.degrees(180))
+
+                Text("여행 찾아보기")
+                    .ddTypography(.heading20)
             }
-            .clipShape(.rect(cornerRadius: 20))
+            .foregroundStyle(.white)
+            .frame(width: 346, height: 72)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .position(x: 201, y: 766)
+    }
+
+    private enum Layout {
+        static let designWidth: CGFloat = 402
+        static let designHeight: CGFloat = 874
     }
 }
 

@@ -15,7 +15,7 @@ struct DDSearchField: View {
     var body: some View {
         HStack(spacing: DDSpacing.small) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(DDColor.iconDefault)
+                .foregroundStyle(DDColor.textSecondary)
 
             Group {
                 if let focus {

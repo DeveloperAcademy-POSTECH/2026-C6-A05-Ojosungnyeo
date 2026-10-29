@@ -11,26 +11,32 @@ struct TripSetUpFeature: Reducer {
     struct State: Equatable {
         static let maximumTravelerCount = 4
 
-        var destinationName = "도쿄"
-        var countryName = "일본"
-        var cityCount = 1
+        var selectedCities: [TripSearchFeature.City] = []
         var travelerCount = 1
         var tripStartDate: Date?
         var tripEndDate: Date?
-        var draftStartDate: Date?
-        var draftEndDate: Date?
-        var isDatePickerPresented = false
-        var addFlight = TripSetUpAddFlightFeature.State()
-        var isAddFlightPresented = false
-        var flightRegistration: TripSetUpAddFlightFeature.FlightRegistration?
-        var addAccommodation = TripSetUpAddAccommodationFeature.State()
-        var isAddAccommodationPresented = false
-        var accommodation: TripSetUpAddAccommodationFeature.Accommodation?
+        var transportationSelection: TripSetUpTransportationFeature.Selection?
+        var transportationSheet = TripSetUpTransportationFeature.State()
+        var isTransportationSheetPresented = false
 
-        var tripTitle: String { "\(destinationName) 여행" }
-        var destinationSummary: String { "\(countryName) · \(cityCount)개 도시" }
-        var flightSummary: String { flightRegistration?.outbound.flightNumber ?? "선택 사항" }
-        var accommodationSummary: String { accommodation?.name ?? "선택 사항" }
+        var tripTitle: String {
+            guard let firstCity = selectedCities.first else { return "" }
+            guard selectedCities.count > 1 else { return "\(firstCity.name) 여행" }
+            return "\(firstCity.name) 외 \(selectedCities.count - 1)개 도시 여행"
+        }
+
+        var destinationSummary: String {
+            guard !selectedCities.isEmpty else { return "" }
+            var countries: [String] = []
+            for city in selectedCities where !countries.contains(city.country) {
+                countries.append(city.country)
+            }
+            return "\(countries.joined(separator: ", ")) · \(selectedCities.count)개 도시"
+        }
+        var transportationSummary: String? {
+            guard let transportationSelection else { return nil }
+            return "\(transportationSelection.transportation.title) · \(transportationSelection.duration.title)"
+        }
         var isSaveEnabled: Bool {
             guard
                 let tripStartDate,
@@ -39,6 +45,7 @@ struct TripSetUpFeature: Reducer {
             else { return false }
 
             return (1...Self.maximumTravelerCount).contains(travelerCount)
+                && transportationSelection != nil
         }
 
         var tripDateSummary: String? {
@@ -72,26 +79,18 @@ struct TripSetUpFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case backButtonTapped
-        case destinationChangeButtonTapped
-        case travelScheduleButtonTapped
-        case tripDateTapped(Date)
-        case tripDatePickerCloseButtonTapped
-        case tripDatePickerConfirmButtonTapped
         case travelerDecreaseButtonTapped
         case travelerIncreaseButtonTapped
-        case flightInfoButtonTapped
-        case addFlightDismissed
-        case addFlight(TripSetUpAddFlightFeature.Action)
-        case accommodationInfoButtonTapped
-        case addAccommodationDismissed
-        case addAccommodation(TripSetUpAddAccommodationFeature.Action)
-        case inviteFriendButtonTapped
+        case transportationCardTapped
+        case transportationSheetDismissed
+        case transportationSheet(TripSetUpTransportationFeature.Action)
         case saveButtonTapped
     }
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+<<<<<<< HEAD
             case .travelScheduleButtonTapped:
                 state.draftStartDate = state.tripStartDate
                 state.draftEndDate = state.tripEndDate
@@ -141,6 +140,8 @@ struct TripSetUpFeature: Reducer {
                 state.isDatePickerPresented = false
                 return .none
 
+=======
+>>>>>>> develop
             case .saveButtonTapped:
                 guard state.isSaveEnabled else { return .none }
                 return .none
@@ -155,61 +156,33 @@ struct TripSetUpFeature: Reducer {
                 state.travelerCount += 1
                 return .none
 
-            case .flightInfoButtonTapped:
-                state.addFlight = TripSetUpAddFlightFeature.State(
-                    registration: state.flightRegistration
+            case .transportationCardTapped:
+                state.transportationSheet = TripSetUpTransportationFeature.State(
+                    selection: state.transportationSelection
                 )
-                state.isAddFlightPresented = true
+                state.isTransportationSheetPresented = true
                 return .none
 
-            case .addFlightDismissed, .addFlight(.delegate(.dismiss)):
-                state.isAddFlightPresented = false
+            case .transportationSheetDismissed,
+                 .transportationSheet(.delegate(.dismiss)):
+                state.isTransportationSheetPresented = false
                 return .none
 
-            case let .addFlight(.delegate(.completed(registration))):
-                state.flightRegistration = registration
-                state.isAddFlightPresented = false
+            case let .transportationSheet(.delegate(.completed(selection))):
+                state.transportationSelection = selection
+                state.isTransportationSheetPresented = false
                 return .none
 
-            case .addFlight:
+            case .transportationSheet:
                 return .none
 
-            case .accommodationInfoButtonTapped:
-                if state.addAccommodation.selectedAccommodation == nil,
-                   let accommodation = state.accommodation {
-                    state.addAccommodation = TripSetUpAddAccommodationFeature.State(
-                        accommodation: accommodation
-                    )
-                }
-                state.isAddAccommodationPresented = true
-                return .none
-
-            case .addAccommodationDismissed,
-                 .addAccommodation(.delegate(.dismiss)):
-                state.isAddAccommodationPresented = false
-                return .none
-
-            case let .addAccommodation(.delegate(.completed(accommodation))):
-                state.accommodation = accommodation
-                state.isAddAccommodationPresented = false
-                return .none
-
-            case .addAccommodation:
-                return .none
-
-            case .backButtonTapped,
-                 .destinationChangeButtonTapped,
-                 .inviteFriendButtonTapped:
+            case .backButtonTapped:
                 return .none
             }
         }
 
-        Scope(state: \.addFlight, action: \.addFlight) {
-            TripSetUpAddFlightFeature()
-        }
-
-        Scope(state: \.addAccommodation, action: \.addAccommodation) {
-            TripSetUpAddAccommodationFeature()
+        Scope(state: \.transportationSheet, action: \.transportationSheet) {
+            TripSetUpTransportationFeature()
         }
     }
 }

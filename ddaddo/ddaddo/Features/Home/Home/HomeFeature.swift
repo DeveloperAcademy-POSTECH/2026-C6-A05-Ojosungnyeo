@@ -34,6 +34,8 @@ struct HomeFeature: Reducer {
         var mascotMessage = MascotMessage.welcome
         var upcomingTrips = UpcomingTripsPreviewData.state
         var isUpcomingTripsPresented = false
+        var tripItinerary = TripItineraryFeature.State()
+        var isTripItineraryPresented = false
         var isMenuPresented = false
         var isWithdrawalConfirmationPresented = false
         var isWithdrawing = false
@@ -45,6 +47,7 @@ struct HomeFeature: Reducer {
         case exploreTripsButtonTapped
         case homeSwipedUp
         case upcomingTrips(UpcomingTripsFeature.Action)
+        case tripItinerary(TripItineraryFeature.Action)
         case mascotTapped
         case menuButtonTapped
         case menuDismissed
@@ -70,7 +73,17 @@ struct HomeFeature: Reducer {
             case .upcomingTrips(.backButtonTapped):
                 state.isUpcomingTripsPresented = false
                 return .none
+            case .upcomingTrips(.viewScheduleButtonTapped):
+                state.tripItinerary = TripItineraryFeature.State()
+                state.isTripItineraryPresented = true
+                return .none
             case .upcomingTrips:
+                return .none
+            case .tripItinerary(.timeTable(.backButtonTapped)),
+                 .tripItinerary(.routeOverview(.backButtonTapped)):
+                state.isTripItineraryPresented = false
+                return .none
+            case .tripItinerary:
                 return .none
             case .mascotTapped:
                 state.mascotMessage = state.mascotMessage.next
@@ -156,6 +169,10 @@ struct HomeFeature: Reducer {
 
         Scope(state: \.upcomingTrips, action: \.upcomingTrips) {
             UpcomingTripsFeature()
+        }
+
+        Scope(state: \.tripItinerary, action: \.tripItinerary) {
+            TripItineraryFeature()
         }
     }
 }

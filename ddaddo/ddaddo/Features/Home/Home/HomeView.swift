@@ -57,8 +57,19 @@ struct HomeView: View {
                 )
                 .transition(.move(edge: .bottom))
             }
+
+            if store.isTripItineraryPresented {
+                TripItineraryView(
+                    store: store.scope(
+                        state: \.tripItinerary,
+                        action: \.tripItinerary
+                    )
+                )
+                .transition(.move(edge: .trailing))
+            }
         }
         .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
+        .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
         .preferredColorScheme(.dark)
         .confirmationDialog(
             "정말 탈퇴할까요?",

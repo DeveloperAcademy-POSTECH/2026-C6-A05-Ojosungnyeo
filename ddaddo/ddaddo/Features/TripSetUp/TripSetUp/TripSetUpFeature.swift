@@ -15,6 +15,9 @@ struct TripSetUpFeature: Reducer {
         var travelerCount = 1
         var tripStartDate: Date?
         var tripEndDate: Date?
+        var draftStartDate: Date?
+        var draftEndDate: Date?
+        var isDatePickerPresented = false
         var transportationSelection: TripSetUpTransportationFeature.Selection?
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
@@ -79,6 +82,10 @@ struct TripSetUpFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case backButtonTapped
+        case travelScheduleButtonTapped
+        case tripDateTapped(Date)
+        case tripDatePickerCloseButtonTapped
+        case tripDatePickerConfirmButtonTapped
         case travelerDecreaseButtonTapped
         case travelerIncreaseButtonTapped
         case transportationCardTapped
@@ -90,7 +97,6 @@ struct TripSetUpFeature: Reducer {
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-<<<<<<< HEAD
             case .travelScheduleButtonTapped:
                 state.draftStartDate = state.tripStartDate
                 state.draftEndDate = state.tripEndDate
@@ -140,8 +146,6 @@ struct TripSetUpFeature: Reducer {
                 state.isDatePickerPresented = false
                 return .none
 
-=======
->>>>>>> develop
             case .saveButtonTapped:
                 guard state.isSaveEnabled else { return .none }
                 return .none

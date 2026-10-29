@@ -32,14 +32,19 @@ struct HomeFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var mascotMessage = MascotMessage.welcome
+        var upcomingTrips = UpcomingTripsFeature.State()
+        var isUpcomingTripsPresented = false
         var isMenuPresented = false
         var isWithdrawalConfirmationPresented = false
         var isWithdrawing = false
         var withdrawalErrorMessage: String?
     }
 
+    @CasePathable
     enum Action {
         case exploreTripsButtonTapped
+        case homeSwipedUp
+        case upcomingTrips(UpcomingTripsFeature.Action)
         case mascotTapped
         case menuButtonTapped
         case menuDismissed
@@ -58,7 +63,14 @@ struct HomeFeature: Reducer {
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .exploreTripsButtonTapped:
+            case .exploreTripsButtonTapped, .homeSwipedUp:
+                state.isUpcomingTripsPresented = true
+                state.isMenuPresented = false
+                return .none
+            case .upcomingTrips(.backButtonTapped):
+                state.isUpcomingTripsPresented = false
+                return .none
+            case .upcomingTrips:
                 return .none
             case .mascotTapped:
                 state.mascotMessage = state.mascotMessage.next
@@ -140,6 +152,10 @@ struct HomeFeature: Reducer {
                 state.withdrawalErrorMessage = nil
                 return .none
             }
+        }
+
+        Scope(state: \.upcomingTrips, action: \.upcomingTrips) {
+            UpcomingTripsFeature()
         }
     }
 }

@@ -12,38 +12,53 @@ struct HomeView: View {
     let store: StoreOf<HomeFeature>
 
     var body: some View {
-        GeometryReader { proxy in
-            let scale = min(
-                proxy.size.width / Layout.designWidth,
-                proxy.size.height / Layout.designHeight
-            )
+        ZStack {
+            GeometryReader { proxy in
+                let scale = min(
+                    proxy.size.width / Layout.designWidth,
+                    proxy.size.height / Layout.designHeight
+                )
 
-            ZStack(alignment: .topLeading) {
-                DDColor.surfaceDefault
+                ZStack(alignment: .topLeading) {
+                    DDColor.surfaceDefault
 
-                moonSurface
-                mascot
-                sparkles
-                bottomGradient
-                speechBubble
-                menuButton
-                exploreTripsButton
+                    moonSurface
+                    mascot
+                    sparkles
+                    bottomGradient
+                    speechBubble
+                    menuButton
+                    exploreTripsButton
 
-                if store.isMenuPresented {
-                    menuDismissArea
-                    accountMenu
+                    if store.isMenuPresented {
+                        menuDismissArea
+                        accountMenu
+                    }
                 }
+                .frame(width: Layout.designWidth, height: Layout.designHeight)
+                .scaleEffect(scale, anchor: .top)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
+                .clipped()
             }
-            .frame(width: Layout.designWidth, height: Layout.designHeight)
-            .scaleEffect(scale, anchor: .top)
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity,
-                alignment: .top
-            )
-            .clipped()
+            .ignoresSafeArea()
+            .allowsHitTesting(!store.isUpcomingTripsPresented)
+            .gesture(homeSwipeGesture)
+
+            if store.isUpcomingTripsPresented {
+                UpcomingTripsView(
+                    store: store.scope(
+                        state: \.upcomingTrips,
+                        action: \.upcomingTrips
+                    )
+                )
+                .transition(.move(edge: .bottom))
+            }
         }
-        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
         .preferredColorScheme(.dark)
         .confirmationDialog(
             "정말 탈퇴할까요?",
@@ -83,6 +98,20 @@ struct HomeView: View {
         } message: {
             Text(store.withdrawalErrorMessage ?? "")
         }
+    }
+
+    private var homeSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                let verticalDistance = value.translation.height
+                let horizontalDistance = value.translation.width
+                guard
+                    verticalDistance < -60,
+                    abs(verticalDistance) > abs(horizontalDistance)
+                else { return }
+
+                store.send(.homeSwipedUp)
+            }
     }
 
     private var moonSurface: some View {

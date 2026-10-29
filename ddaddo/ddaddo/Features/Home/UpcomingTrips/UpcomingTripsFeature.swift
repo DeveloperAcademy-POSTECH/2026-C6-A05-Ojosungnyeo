@@ -20,6 +20,7 @@ struct UpcomingTripsFeature: Reducer {
     }
 
     enum Action {
+        case backButtonTapped
         case addTripButtonTapped
         case notificationButtonTapped
         case viewScheduleButtonTapped(Trip.ID)
@@ -29,7 +30,8 @@ struct UpcomingTripsFeature: Reducer {
     var body: some Reducer<State, Action> {
         Reduce { _, action in
             switch action {
-            case .addTripButtonTapped,
+            case .backButtonTapped,
+                 .addTripButtonTapped,
                  .notificationButtonTapped,
                  .viewScheduleButtonTapped,
                  .inviteButtonTapped:

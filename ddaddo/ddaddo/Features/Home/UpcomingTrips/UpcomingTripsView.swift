@@ -44,6 +44,12 @@ struct UpcomingTripsView: View {
 
     private var header: some View {
         HStack(spacing: DDSpacing.small) {
+            headerButton(
+                systemName: "chevron.left",
+                accessibilityLabel: "홈으로 돌아가기",
+                action: { store.send(.backButtonTapped) }
+            )
+
             HStack(spacing: DDSpacing.xSmall) {
                 Text("예정된 여행이 이따")
                     .ddTypography(.title24)

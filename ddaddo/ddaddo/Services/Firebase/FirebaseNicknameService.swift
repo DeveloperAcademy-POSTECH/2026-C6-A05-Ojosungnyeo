@@ -85,6 +85,32 @@ enum FirebaseNicknameService {
         }
     }
 
+    static func deleteProfile(userID: String) async throws {
+        guard FirebaseService.isConfigured else {
+            throw NicknameClientError.firebaseNotConfigured
+        }
+
+        let database = Firestore.firestore()
+        let userReference = database.collection("users").document(userID)
+
+        do {
+            let userDocument = try await userReference.getDocument()
+            let batch = database.batch()
+
+            if let nicknameKey = userDocument.get("nicknameKey") as? String {
+                let nicknameReference = database
+                    .collection("nicknames")
+                    .document(nicknameKey)
+                batch.deleteDocument(nicknameReference)
+            }
+
+            batch.deleteDocument(userReference)
+            try await batch.commit()
+        } catch {
+            throw map(error)
+        }
+    }
+
     private static func map(_ error: Error) -> NicknameClientError {
         let firebaseError = error as NSError
         if firebaseError.code == FirestoreErrorCode.unavailable.rawValue {

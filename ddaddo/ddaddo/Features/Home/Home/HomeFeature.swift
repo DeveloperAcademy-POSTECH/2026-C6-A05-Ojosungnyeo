@@ -28,6 +28,7 @@ struct HomeFeature: Reducer {
 
     @Dependency(\.appleSignInClient) var appleSignInClient
     @Dependency(\.authClient) var authClient
+    @Dependency(\.nicknameClient) var nicknameClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -61,7 +62,8 @@ struct HomeFeature: Reducer {
                 return .run { send in
                     do {
                         let appleResult = try await appleSignInClient.signIn()
-                        _ = try await authClient.signInWithApple(appleResult)
+                        let user = try await authClient.signInWithApple(appleResult)
+                        try await nicknameClient.deleteProfile(user.id)
                         try await authClient.deleteAccount(appleResult.authorizationCode)
                         await send(.withdrawalResponse(.success(())))
                     } catch {
@@ -74,6 +76,20 @@ struct HomeFeature: Reducer {
             case let .withdrawalResponse(.failure(error)):
                 state.isWithdrawing = false
                 if error as? AppleSignInError == .canceled {
+                    return .none
+                }
+
+                if let nicknameError = error as? NicknameClientError {
+                    switch nicknameError {
+                    case .firebaseNotConfigured:
+                        state.withdrawalErrorMessage = "Firebase 설정 파일을 확인해 주세요."
+                    case .networkUnavailable:
+                        state.withdrawalErrorMessage = "네트워크 연결을 확인해 주세요."
+                    case let .saveFailed(code, message):
+                        state.withdrawalErrorMessage = "Firestore 오류 \(code): \(message)"
+                    case .duplicateNickname:
+                        state.withdrawalErrorMessage = "탈퇴 데이터를 정리하지 못했어요."
+                    }
                     return .none
                 }
 

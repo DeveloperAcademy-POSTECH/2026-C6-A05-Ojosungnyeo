@@ -20,9 +20,7 @@ struct TimeTableView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     navigationBar
                     tripHeader
-                    memberProfiles
                     dayPicker
-                    groupSection
                     scheduleSection
                 }
                 .padding(.bottom, DDSpacing.large)
@@ -65,9 +63,12 @@ struct TimeTableView: View {
             Button("편집") {
                 store.send(.editButtonTapped)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .tint(DDColor.surfaceControl)
+            .ddTypography(.labelEmphasis14)
+            .foregroundStyle(DDColor.textPrimary)
+            .frame(width: 64, height: 40)
+            .background(DDColor.surfaceControl)
+            .clipShape(.capsule)
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, DDSpacing.small)
     }
@@ -89,16 +90,6 @@ struct TimeTableView: View {
                 .foregroundStyle(DDColor.textSecondary)
         }
         .padding(.horizontal, DDSpacing.large)
-    }
-
-    private var memberProfiles: some View {
-        HStack(spacing: DDSpacing.medium) {
-            ForEach(TripMember.allCases) { member in
-                DDMiniHeadAvatar(character: member.timeTableCharacter, size: 60)
-            }
-        }
-        .padding(.horizontal, DDSpacing.medium)
-        .padding(.top, DDSpacing.xSmall)
     }
 
     private var dayPicker: some View {
@@ -132,65 +123,76 @@ struct TimeTableView: View {
         .padding(.top, DDSpacing.small)
     }
 
-    private var groupSection: some View {
-        VStack(alignment: .leading, spacing: DDSpacing.small) {
-            sectionTitle("배치할 그룹")
-
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: DDSpacing.small) {
-                    ForEach(store.groups) { group in
-                        TimeTableGroupCard(group: group) {
-                            store.send(.groupAddButtonTapped(group.id))
-                        }
-                    }
-                }
-                .padding(.horizontal, DDSpacing.large)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .padding(.top, 26)
-    }
-
     private var scheduleSection: some View {
         VStack(alignment: .leading, spacing: DDSpacing.small) {
             sectionTitle("전체 여행 일정")
 
-            LazyVStack(spacing: 0) {
-                ForEach(store.schedules) { schedule in
-                    HStack(alignment: .top, spacing: DDSpacing.large) {
-                        timelineMarker
+            LazyVStack(spacing: 12) {
+                if !store.schedules.isEmpty {
+                    compactScheduleRow
+                }
 
+                ForEach(store.schedules) { schedule in
+                    scheduleRow(schedule)
+                }
+
+                HStack(alignment: .top, spacing: 20) {
+                    timelineMarker(height: 126, showsLine: false)
+
+                    Button {
+                        store.send(.addScheduleButtonTapped)
+                    } label: {
+                        Text("+ 일정 추가")
+                            .ddTypography(.body16)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .frame(maxWidth: .infinity, minHeight: 126)
+                            .background(DDColor.surfaceElevated)
+                            .clipShape(.rect(cornerRadius: 20))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(
+                                        DDColor.textTertiary,
+                                        style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, DDSpacing.large)
+            }
+        }
+        .padding(.top, 18)
+        .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
+    }
+
+    private var compactScheduleRow: some View {
+        HStack(alignment: .top, spacing: 20) {
+            timelineMarker(height: 126, showsLine: true)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: DDSpacing.small) {
+                    ForEach(store.schedules.prefix(2)) { schedule in
                         TimeTableScheduleCard(schedule: schedule) {
                             store.send(.scheduleTapped(schedule.id))
                         }
+                        .frame(width: 205)
                     }
                 }
+                .padding(.trailing, DDSpacing.large)
             }
-            .padding(.horizontal, DDSpacing.large)
-
-            Button {
-                store.send(.addScheduleButtonTapped)
-            } label: {
-                Text("+ 일정 추가")
-                    .ddTypography(.body16)
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(maxWidth: .infinity, minHeight: 126)
-                    .background(DDColor.surfaceElevated)
-                    .clipShape(.rect(cornerRadius: 20))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(
-                                DDColor.textTertiary,
-                                style: StrokeStyle(lineWidth: 1, dash: [3, 3])
-                            )
-                    }
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, -DDSpacing.small)
         }
-        .padding(.top, 34)
-        .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
+        .padding(.leading, DDSpacing.large)
+    }
+
+    private func scheduleRow(_ schedule: TimeTableSchedule) -> some View {
+        HStack(alignment: .top, spacing: 20) {
+            timelineMarker(height: 126, showsLine: true)
+
+            TimeTableScheduleCard(schedule: schedule) {
+                store.send(.scheduleTapped(schedule.id))
+            }
+        }
+        .padding(.horizontal, DDSpacing.large)
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -200,18 +202,20 @@ struct TimeTableView: View {
             .padding(.horizontal, DDSpacing.large)
     }
 
-    private var timelineMarker: some View {
-        VStack(spacing: 0) {
+    private func timelineMarker(height: CGFloat, showsLine: Bool) -> some View {
+        ZStack(alignment: .top) {
+            if showsLine {
+                Rectangle()
+                    .fill(DDColor.textTertiary)
+                    .frame(width: 5, height: height + 12)
+                    .offset(y: 7)
+            }
+
             Circle()
                 .fill(DDColor.actionPrimary)
-                .frame(width: 16, height: 16)
-
-            Rectangle()
-                .fill(DDColor.textTertiary)
-                .frame(width: 3, height: 138)
-                .padding(.bottom, -16)
+                .frame(width: 15, height: 15)
         }
-        .frame(width: 16)
+        .frame(width: 13, height: height, alignment: .top)
     }
 }
 
@@ -221,15 +225,4 @@ struct TimeTableView: View {
             TimeTableFeature()
         }
     )
-}
-
-private extension TripMember {
-    var timeTableCharacter: DDMiniHeadAvatar.Character {
-        switch self {
-        case .tae: .tae
-        case .header: .header
-        case .grae: .grae
-        case .juni: .juni
-        }
-    }
 }

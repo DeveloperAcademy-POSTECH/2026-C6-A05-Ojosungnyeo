@@ -10,28 +10,45 @@ struct TripSearchView: View {
     let store: StoreOf<TripSearchFeature>
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-                .padding(.horizontal, DDSpacing.large)
+        NavigationStack {
+            VStack(spacing: 0) {
+                header
+                    .padding(.horizontal, DDSpacing.large)
 
-            DDProgressBar(currentStep: 1)
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.bottom, DDSpacing.xLarge)
+                searchField
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.top, DDSpacing.large)
 
-            searchField
-                .padding(.horizontal, DDSpacing.large)
+                regionFilters
+                    .padding(.top, DDSpacing.large)
 
-            regionFilters
-                .padding(.top, 14)
-
-            cityList
-                .padding(.top, 14)
+                cityList
+                    .padding(.top, DDSpacing.xLarge)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                selectionArea
+            }
+            .background(DDColor.surfaceDefault.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .preferredColorScheme(.dark)
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { store.isTripSetUpPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.tripSetUpDismissed)
+                        }
+                    }
+                )
+            ) {
+                TripSetUpView(
+                    store: store.scope(
+                        state: \.tripSetUp,
+                        action: \.tripSetUp
+                    )
+                )
+            }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            selectionArea
-        }
-        .background(DDColor.surfaceDefault.ignoresSafeArea())
-        .preferredColorScheme(.dark)
     }
 
     private var header: some View {
@@ -48,14 +65,9 @@ struct TripSearchView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("뒤로 가기")
 
-            HStack(spacing: DDSpacing.xSmall) {
-                Text("여행지를 찾아보게따")
-                    .ddTypography(.title24)
-
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 20, weight: .semibold))
-            }
-            .foregroundStyle(DDColor.textPrimary)
+            Text("여행지 검색")
+                .ddTypography(.title24)
+                .foregroundStyle(DDColor.textPrimary)
 
             Spacer()
         }
@@ -70,17 +82,28 @@ struct TripSearchView: View {
                 set: { store.send(.searchTextChanged($0)) }
             )
         )
+        .overlay {
+            Capsule()
+                .stroke(DDColor.borderDefault.opacity(0.8), lineWidth: 1)
+        }
     }
 
     private var regionFilters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(TripSearchFeature.Region.allCases, id: \.self) { region in
-                    DDScheduleFilterChip(
-                        title: region.rawValue,
-                        isSelected: store.selectedRegion == region,
-                        action: { store.send(.regionFilterSelected(region)) }
-                    )
+                    Button {
+                        store.send(.regionFilterSelected(region))
+                    } label: {
+                        Text(region.rawValue)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(store.selectedRegion == region ? DDColor.textOnPrimary : DDColor.textPrimary)
+                            .padding(.horizontal, region == .americasAndOceania ? DDSpacing.xLarge : 18)
+                            .frame(height: 36)
+                            .background(store.selectedRegion == region ? DDColor.actionPrimary : DDColor.actionSecondary)
+                            .clipShape(.capsule)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, DDSpacing.large)
@@ -89,7 +112,7 @@ struct TripSearchView: View {
 
     private var cityList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: DDSpacing.medium) {
                 ForEach(groupedCities) { group in
                     Text(group.country)
                         .ddTypography(.caption12)
@@ -100,23 +123,10 @@ struct TripSearchView: View {
                         Button {
                             store.send(.cityTapped(city.id))
                         } label: {
-                            DDDestinationRow(
-                                title: city.name,
-                                isSelected: store.selectedCityIDs.contains(city.id)
-                            ) {
-                                if let thumbnail = UIImage(named: city.thumbnailName) {
-                                    Image(uiImage: thumbnail)
-                                        .resizable()
-                                        .scaledToFill()
-                                } else {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(DDColor.textSecondary)
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                }
-                            }
+                            cityRow(city)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
                     }
                 }
             }
@@ -127,7 +137,7 @@ struct TripSearchView: View {
     }
 
     private var selectionArea: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DDSpacing.medium) {
             Text("선택한 여행지 \(store.selectedCities.count)")
                 .ddTypography(.captionEmphasis12)
                 .foregroundStyle(DDColor.textSecondary)
@@ -148,8 +158,8 @@ struct TripSearchView: View {
             )
         }
         .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.medium)
-        .padding(.bottom, DDSpacing.medium)
+        .padding(.top, 5)
+        .padding(.bottom, 11)
         .background(DDColor.surfaceDefault)
     }
 
@@ -173,7 +183,44 @@ struct TripSearchView: View {
         .padding(.horizontal, DDSpacing.medium)
         .frame(height: 32)
         .background(DDColor.surfaceElevated)
-        .clipShape(.rect(cornerRadius: DDRadius.medium))
+        .clipShape(.capsule)
+    }
+
+    private func cityRow(_ city: TripSearchFeature.City) -> some View {
+        let isSelected = store.selectedCityIDs.contains(city.id)
+
+        return HStack(spacing: 23) {
+            Image(city.thumbnailName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 47, height: 47)
+                .clipped()
+                .background(.white)
+                .clipShape(.rect(cornerRadius: 12))
+
+            Text(city.name)
+                .ddTypography(.body16)
+                .foregroundStyle(isSelected ? DDColor.textPrimary : DDColor.textTertiary)
+
+            Spacer(minLength: 0)
+
+            ZStack {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DDColor.textOnPrimary)
+                }
+            }
+            .frame(width: 20, height: 20)
+            .background(isSelected ? DDColor.actionPrimary : .clear)
+            .clipShape(.rect(cornerRadius: 5))
+            .overlay {
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(isSelected ? DDColor.textOnPrimary : DDColor.borderDefault.opacity(0.8), lineWidth: 1)
+            }
+        }
+        .frame(height: 60)
+        .contentShape(Rectangle())
     }
 
     private var groupedCities: [TripSearchCountryGroup] {

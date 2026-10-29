@@ -35,22 +35,26 @@ struct TripSetUpView: View {
             .background(DDColor.surfaceDefault.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .preferredColorScheme(.dark)
-            .navigationDestination(
+            .sheet(
                 isPresented: Binding(
-                    get: { store.isAddAccommodationPresented },
+                    get: { store.isTransportationSheetPresented },
                     set: { isPresented in
                         if !isPresented {
-                            store.send(.addAccommodationDismissed)
+                            store.send(.transportationSheetDismissed)
                         }
                     }
                 )
             ) {
-                TripSetUpAddAccommodationView(
+                TripSetUpTransportationView(
                     store: store.scope(
-                        state: \.addAccommodation,
-                        action: \.addAccommodation
+                        state: \.transportationSheet,
+                        action: \.transportationSheet
                     )
                 )
+                .presentationDetents([.height(524)])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(40)
+                .presentationBackground(DDColor.surfaceDefault)
             }
         }
     }
@@ -102,10 +106,11 @@ struct TripSetUpView: View {
 
             navigationCard(
                 title: "이동 수단",
-                detail: store.flightRegistration == nil ? nil : store.flightSummary,
+                detail: store.transportationSummary,
+                detailColor: DDColor.actionPrimary,
                 height: 95
             ) {
-                // TODO: 이동 수단 선택 바텀 시트가 준비되면 연결합니다.
+                store.send(.transportationCardTapped)
             }
         }
     }
@@ -181,6 +186,7 @@ struct TripSetUpView: View {
     private func navigationCard(
         title: String,
         detail: String? = nil,
+        detailColor: Color = DDColor.textSecondary,
         height: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
@@ -194,7 +200,7 @@ struct TripSetUpView: View {
                     if let detail {
                         Text(detail)
                             .ddTypography(.label14)
-                            .foregroundStyle(DDColor.textSecondary)
+                            .foregroundStyle(detailColor)
                     }
                 }
 

@@ -16,17 +16,14 @@ struct TripSetUpView: View {
                     header
                         .padding(.horizontal, DDSpacing.large)
 
-                    DDProgressBar(currentStep: 2)
-                        .padding(.horizontal, DDSpacing.large)
-                        .padding(.bottom, DDSpacing.xxLarge)
-
                     ScrollView {
                         VStack(spacing: 0) {
                             tripSummary
                             setUpCards
-                                .padding(.top, 28)
+                                .padding(.top, DDSpacing.large)
                         }
                         .padding(.horizontal, DDSpacing.large)
+                        .padding(.top, 5)
                         .padding(.bottom, DDSpacing.large)
                     }
                     .scrollIndicators(.hidden)
@@ -34,43 +31,10 @@ struct TripSetUpView: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     bottomActionArea
                 }
-
-                if store.isDatePickerPresented {
-                    Color.black.opacity(0.7)
-                        .ignoresSafeArea()
-
-                    TripDatePickerView(
-                        selectedStartDate: store.draftStartDate,
-                        selectedEndDate: store.draftEndDate,
-                        onDateSelected: { store.send(.tripDateTapped($0)) },
-                        onClose: { store.send(.tripDatePickerCloseButtonTapped) },
-                        onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
-                    )
-                    .frame(maxHeight: 710)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
             }
-            .animation(.easeInOut(duration: 0.25), value: store.isDatePickerPresented)
             .background(DDColor.surfaceDefault.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .preferredColorScheme(.dark)
-            .navigationDestination(
-                isPresented: Binding(
-                    get: { store.isAddFlightPresented },
-                    set: { isPresented in
-                        if !isPresented {
-                            store.send(.addFlightDismissed)
-                        }
-                    }
-                )
-            ) {
-                TripSetUpAddFlightView(
-                    store: store.scope(
-                        state: \.addFlight,
-                        action: \.addFlight
-                    )
-                )
-            }
             .navigationDestination(
                 isPresented: Binding(
                     get: { store.isAddAccommodationPresented },
@@ -105,14 +69,9 @@ struct TripSetUpView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("뒤로 가기")
 
-            HStack(spacing: DDSpacing.xSmall) {
-                Text("여행지를 찾아보게따")
-                    .ddTypography(.title24)
-
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 20, weight: .semibold))
-            }
-            .foregroundStyle(DDColor.textPrimary)
+            Text("여행 정보 추가")
+                .ddTypography(.title24)
+                .foregroundStyle(DDColor.textPrimary)
 
             Spacer()
         }
@@ -120,149 +79,121 @@ struct TripSetUpView: View {
     }
 
     private var tripSummary: some View {
-        HStack(spacing: DDSpacing.large) {
-            VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
-                Text(store.tripTitle)
-                    .ddTypography(.heading20)
-                    .foregroundStyle(DDColor.textPrimary)
+        VStack(alignment: .leading, spacing: 1) {
+            Text(store.tripTitle)
+                .ddTypography(.heading20)
+                .foregroundStyle(DDColor.textPrimary)
 
-                Text(store.destinationSummary)
-                    .ddTypography(.caption12)
-                    .foregroundStyle(DDColor.textSecondary)
-            }
-
-            Spacer(minLength: 0)
-
-            DDCTAButton(
-                title: "여행지 변경",
-                style: .secondary,
-                layout: .compact
-            ) {
-                store.send(.destinationChangeButtonTapped)
-            }
+            Text(store.destinationSummary)
+                .ddTypography(.caption12)
+                .foregroundStyle(DDColor.textSecondary)
         }
+        .padding(.top, 3)
+        .frame(maxWidth: .infinity, minHeight: 57, alignment: .topLeading)
     }
 
     private var setUpCards: some View {
         VStack(spacing: DDSpacing.medium) {
-            navigationCard(
-                title: "여행 일정",
-                detail: store.tripDateSummary,
-                isRequired: true
-            ) {
-                store.send(.travelScheduleButtonTapped)
+            navigationCard(title: "여행 일정", detail: store.tripDateSummary, height: 83) {
+                // TODO: 새 여행 일정 선택 UI가 준비되면 연결합니다.
             }
 
             travelerCard
 
-            navigationCard(title: "항공권 정보", detail: store.flightSummary) {
-                store.send(.flightInfoButtonTapped)
-            }
-
-            navigationCard(title: "숙소 정보", detail: store.accommodationSummary) {
-                store.send(.accommodationInfoButtonTapped)
+            navigationCard(
+                title: "이동 수단",
+                detail: store.flightRegistration == nil ? nil : store.flightSummary,
+                height: 95
+            ) {
+                // TODO: 이동 수단 선택 바텀 시트가 준비되면 연결합니다.
             }
         }
     }
 
     private var travelerCard: some View {
-        VStack(alignment: .leading, spacing: DDSpacing.large) {
-            requiredTitle("여행 인원")
+        VStack(alignment: .leading, spacing: 6) {
+            Text("여행 인원")
+                .ddTypography(.heading18)
+                .foregroundStyle(DDColor.textPrimary)
 
-            HStack(spacing: 28) {
+            HStack(spacing: DDSpacing.small) {
                 Button {
                     store.send(.travelerDecreaseButtonTapped)
                 } label: {
                     Image(systemName: "minus")
                         .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 32, height: 32)
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .disabled(store.travelerCount == 1)
-                .foregroundStyle(
-                    store.travelerCount == 1
-                        ? DDColor.textTertiary
-                        : DDColor.textPrimary
-                )
+                .foregroundStyle(DDColor.textPrimary)
                 .accessibilityLabel("여행 인원 줄이기")
 
                 Text("\(store.travelerCount)명")
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textSecondary)
+                    .ddTypography(.label14)
+                    .foregroundStyle(DDColor.actionPrimary)
+                    .frame(width: 64)
 
                 Button {
                     store.send(.travelerIncreaseButtonTapped)
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 32, height: 32)
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .disabled(store.travelerCount == TripSetUpFeature.State.maximumTravelerCount)
-                .foregroundStyle(
-                    store.travelerCount == TripSetUpFeature.State.maximumTravelerCount
-                        ? DDColor.textTertiary
-                        : DDColor.textPrimary
-                )
+                .foregroundStyle(DDColor.textPrimary)
                 .accessibilityLabel("여행 인원 늘리기")
             }
-            .frame(maxWidth: .infinity)
         }
         .padding(DDSpacing.large)
-        .frame(maxWidth: .infinity, minHeight: 94, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 95, alignment: .leading)
         .background(DDColor.surfaceElevated)
-        .clipShape(.rect(cornerRadius: DDRadius.medium))
+        .clipShape(.rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(DDColor.borderDefault, lineWidth: 1)
+        }
     }
 
     private var bottomActionArea: some View {
-        VStack(spacing: DDSpacing.medium) {
-            Button {
-                store.send(.inviteFriendButtonTapped)
-            } label: {
-                Text("친구 초대하기")
-                    .ddTypography(.label14)
-                    .foregroundStyle(DDColor.textSecondary)
-            }
-            .buttonStyle(.plain)
-
-            DDCTAButton(
-                title: "이 일정으로 저장",
-                style: store.isSaveEnabled ? .primary : .secondary,
-                isEnabled: store.isSaveEnabled
-            ) {
-                store.send(.saveButtonTapped)
-            }
+        Button {
+            store.send(.saveButtonTapped)
+        } label: {
+            Text("친구 초대하러 가기")
+                .ddTypography(.heading20)
+                .foregroundStyle(DDColor.textOnPrimary)
+                .frame(maxWidth: .infinity, minHeight: 55)
+                .background(store.isSaveEnabled ? DDColor.actionPrimary : DDColor.textTertiary)
+                .clipShape(.rect(cornerRadius: DDRadius.medium))
         }
+        .buttonStyle(.plain)
+        .disabled(!store.isSaveEnabled)
         .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.medium)
-        .padding(.bottom, DDSpacing.medium)
+        .padding(.top, DDSpacing.xLarge)
+        .padding(.bottom, 11)
         .background(DDColor.surfaceDefault)
     }
 
     private func navigationCard(
         title: String,
         detail: String? = nil,
-        isRequired: Bool = false,
+        height: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: DDSpacing.small) {
-                HStack(spacing: DDSpacing.xSmall) {
+            HStack(alignment: .top, spacing: DDSpacing.small) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(title)
                         .ddTypography(.heading18)
                         .foregroundStyle(DDColor.textPrimary)
 
-                    if isRequired {
-                        Text("*")
-                            .ddTypography(.labelEmphasis14)
-                            .foregroundStyle(DDColor.actionPrimary)
-                    }
-
                     if let detail {
                         Text(detail)
-                            .ddTypography(.caption12)
+                            .ddTypography(.label14)
                             .foregroundStyle(DDColor.textSecondary)
                     }
                 }
@@ -272,26 +203,20 @@ struct TripSetUpView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 23, weight: .regular))
                     .foregroundStyle(DDColor.textPrimary)
+                    .frame(height: 50)
             }
             .padding(.horizontal, DDSpacing.large)
-            .frame(maxWidth: .infinity, minHeight: 82)
+            .padding(.top, 14)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .top)
             .background(DDColor.surfaceElevated)
-            .clipShape(.rect(cornerRadius: DDRadius.medium))
+            .clipShape(.rect(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(DDColor.borderDefault, lineWidth: 1)
+            }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-    }
-
-    private func requiredTitle(_ title: String) -> some View {
-        HStack(spacing: DDSpacing.xSmall) {
-            Text(title)
-                .ddTypography(.heading18)
-
-            Text("*")
-                .ddTypography(.labelEmphasis14)
-                .foregroundStyle(DDColor.actionPrimary)
-        }
-        .foregroundStyle(DDColor.textPrimary)
     }
 }
 

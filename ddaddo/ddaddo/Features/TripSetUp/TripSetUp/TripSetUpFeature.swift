@@ -39,6 +39,7 @@ struct TripSetUpFeature: Reducer {
             else { return false }
 
             return (1...Self.maximumTravelerCount).contains(travelerCount)
+                && flightRegistration != nil
         }
 
         var tripDateSummary: String? {

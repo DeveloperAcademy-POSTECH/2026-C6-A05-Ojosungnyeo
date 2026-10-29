@@ -15,61 +15,103 @@ struct UpcomingTripsView: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                LazyVStack(spacing: DDSpacing.large) {
+                LazyVStack(spacing: 15) {
+                    Image("DDUpcomingTripsBroadcast")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("한 달 내로 여행 일정이 있어요")
+                        .padding(.bottom, 8)
+
                     ForEach(store.trips) { trip in
-                        UpcomingTripCard(
+                        UpcomingTripTicketCard(
                             trip: trip,
-                            viewScheduleAction: {
+                            action: {
                                 store.send(.viewScheduleButtonTapped(trip.id))
-                            },
-                            inviteAction: {
-                                store.send(.inviteButtonTapped(trip.id))
                             }
                         )
                     }
                 }
                 .padding(.horizontal, DDSpacing.large)
-                .padding(.top, 32)
+                .padding(.top, DDSpacing.small)
                 .padding(.bottom, DDSpacing.xLarge)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 header
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.bottom, DDSpacing.xLarge)
+                    .padding(.horizontal, DDSpacing.small)
+                    .padding(.bottom, DDSpacing.small)
                     .background(DDColor.surfaceDefault)
             }
         }
+        .overlay {
+            if store.isAddTripMenuPresented {
+                GeometryReader { _ in
+                    ZStack(alignment: .topTrailing) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                store.send(.addTripMenuDismissed)
+                            }
+
+                        addTripMenu
+                            .padding(.trailing, DDSpacing.large)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: store.isAddTripMenuPresented)
+        .overlay {
+            if store.isInviteCodeModalPresented {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            store.send(.inviteCodeModalDismissed)
+                        }
+
+                    InviteCodeModal(
+                        code: Binding(
+                            get: { store.inviteCode },
+                            set: { store.send(.inviteCodeChanged($0)) }
+                        ),
+                        cancelAction: {
+                            store.send(.inviteCodeModalDismissed)
+                        },
+                        joinAction: {
+                            store.send(.joinTripButtonTapped)
+                        }
+                    )
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: store.isInviteCodeModalPresented)
         .preferredColorScheme(.dark)
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            HStack(spacing: DDSpacing.xSmall) {
-                Text("예정된 여행이 이따")
-                    .ddTypography(.title24)
+        HStack(spacing: 0) {
+            headerButton(
+                systemName: "chevron.left",
+                accessibilityLabel: "홈으로 돌아가기",
+                action: { store.send(.backButtonTapped) }
+            )
 
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 21, weight: .semibold))
-            }
-            .foregroundStyle(DDColor.textPrimary)
+            Text("예정된 여행")
+                .ddTypography(.title24)
+                .foregroundStyle(DDColor.textPrimary)
 
             Spacer(minLength: DDSpacing.small)
 
-            HStack(spacing: 2) {
-                headerButton(
-                    systemName: "plus",
-                    accessibilityLabel: "여행 추가",
-                    action: { store.send(.addTripButtonTapped) }
-                )
-
-                headerButton(
-                    systemName: "bell",
-                    accessibilityLabel: "알림",
-                    action: { store.send(.notificationButtonTapped) }
-                )
-            }
+            headerButton(
+                systemName: "plus",
+                accessibilityLabel: "여행 추가",
+                action: { store.send(.addTripButtonTapped) }
+            )
         }
-        .frame(height: 44)
+        .frame(height: 52)
     }
 
     private func headerButton(
@@ -87,72 +129,156 @@ struct UpcomingTripsView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
     }
-}
 
-private struct UpcomingTripCard: View {
-    let trip: UpcomingTripsFeature.Trip
-    let viewScheduleAction: () -> Void
-    let inviteAction: () -> Void
-
-    var body: some View {
+    private var addTripMenu: some View {
         VStack(spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                Image(trip.imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 193)
-                    .clipped()
-
-                DDColor.surfaceControl
-                    .opacity(0.82)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(trip.destination)
-                        .ddTypography(.heading18)
-                        .foregroundStyle(DDColor.textPrimary)
-
-                    Text("\(trip.dateText) · \(trip.participantCount)명")
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textSecondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 8)
+            addTripMenuButton("방 생성하기") {
+                store.send(.createTripButtonTapped)
             }
-            .frame(height: 193)
 
-            HStack(spacing: 0) {
-                cardButton(title: "일정 보기", action: viewScheduleAction)
+            Rectangle()
+                .fill(Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255))
+                .frame(height: 1)
 
-                Rectangle()
-                    .fill(DDColor.textPrimary)
-                    .frame(width: 1)
-
-                cardButton(title: "초대하기", action: inviteAction)
-            }
-            .frame(height: 53)
-            .background(DDColor.surfaceElevated)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(DDColor.textPrimary)
-                    .frame(height: 1)
+            addTripMenuButton("초대 코드 입력하기") {
+                store.send(.enterInviteCodeButtonTapped)
             }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 246)
-        .background(DDColor.surfaceControl)
-        .clipShape(.rect(cornerRadius: 20))
+        .frame(width: 180)
+        .background(Color.black)
+        .clipShape(.rect(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(
+                    Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
+                    lineWidth: 1
+                )
+        }
+        .accessibilityElement(children: .contain)
     }
 
-    private func cardButton(title: String, action: @escaping () -> Void) -> some View {
+    private func addTripMenuButton(
+        _ title: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Text(title)
-                .ddTypography(.bodyEmphasis16)
+                .ddTypography(.labelEmphasis14)
                 .foregroundStyle(DDColor.textPrimary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                .padding(.horizontal, DDSpacing.large)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+}
+
+private struct UpcomingTripTicketCard: View {
+    let trip: UpcomingTripsFeature.Trip
+    let action: () -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let trailingWidth = proxy.size.width * 0.378
+            let leadingWidth = proxy.size.width - trailingWidth
+
+            ZStack {
+                ticketBackground(
+                    width: proxy.size.width,
+                    trailingWidth: trailingWidth
+                )
+
+                Image("DDHomeTripCardMascot")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .mask {
+                        ZStack {
+                            Color.white
+
+                            Rectangle()
+                                .frame(width: 54, height: 48)
+                                .position(x: leadingWidth - 25, y: 48)
+                                .blendMode(.destinationOut)
+                        }
+                        .compositingGroup()
+                    }
+                    .allowsHitTesting(false)
+
+                Image(systemName: "airplane")
+                    .font(.system(size: 29, weight: .semibold))
+                    .foregroundStyle(DDColor.surfaceControl)
+                    .rotationEffect(.degrees(-20))
+                    .position(x: leadingWidth - 25, y: 48)
+                    .accessibilityHidden(true)
+
+                VStack(spacing: 0) {
+                    HStack(alignment: .top, spacing: DDSpacing.small) {
+                        Label("Flight Ticket", systemImage: "airplane.ticket.fill")
+                            .ddTypography(.heading20)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 0)
+
+                        Text(trip.dateText)
+                            .ddTypography(.label14)
+                            .foregroundStyle(
+                                Color(
+                                    red: 96 / 255,
+                                    green: 96 / 255,
+                                    blue: 96 / 255
+                                )
+                            )
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    HStack(alignment: .bottom, spacing: DDSpacing.small) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(trip.destination)
+                                .ddTypography(.title28)
+                                .foregroundStyle(DDColor.surfaceSelected)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+
+                            Text(trip.country)
+                                .ddTypography(.body16)
+                                .foregroundStyle(DDColor.textSecondary)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        Button("바로가기", action: action)
+                            .ddTypography(.bodyEmphasis16)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .padding(.horizontal, DDSpacing.large)
+                            .frame(height: 40)
+                            .background(DDColor.surfaceControl)
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.vertical, DDSpacing.medium)
+            }
+        }
+        .aspectRatio(377.6288757324219 / 146, contentMode: .fit)
+    }
+
+    private func ticketBackground(
+        width: CGFloat,
+        trailingWidth: CGFloat
+    ) -> some View {
+        HStack(spacing: 0) {
+            Color(red: 96 / 255, green: 96 / 255, blue: 96 / 255)
+                .frame(width: width - trailingWidth)
+
+            DDColor.surfaceSelected
+                .frame(width: trailingWidth)
+        }
+        .clipShape(.rect(cornerRadius: 20))
     }
 }
 

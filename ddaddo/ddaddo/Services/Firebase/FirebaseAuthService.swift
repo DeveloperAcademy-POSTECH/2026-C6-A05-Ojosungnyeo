@@ -81,6 +81,43 @@ enum FirebaseAuthService {
         try Auth.auth().signOut()
     }
 
+    static func deleteAccount(authorizationCode: Data?) async throws {
+        guard FirebaseService.isConfigured else {
+            throw AuthClientError.firebaseNotConfigured
+        }
+        guard let user = Auth.auth().currentUser else {
+            throw AuthClientError.userNotFound
+        }
+
+        do {
+            if
+                let authorizationCode,
+                let authorizationCodeString = String(
+                    data: authorizationCode,
+                    encoding: .utf8
+                )
+            {
+                try await Auth.auth().revokeToken(
+                    withAuthorizationCode: authorizationCodeString
+                )
+            }
+
+            try await user.delete()
+        } catch {
+            let firebaseError = error as NSError
+            if AuthErrorCode(rawValue: firebaseError.code) == .requiresRecentLogin {
+                throw AuthClientError.recentLoginRequired
+            }
+
+            let message = serverMessage(from: firebaseError)
+                ?? firebaseError.localizedDescription
+            throw AuthClientError.accountDeletionFailed(
+                code: firebaseError.code,
+                message: message
+            )
+        }
+    }
+
     private static func serverMessage(from error: NSError) -> String? {
         if let response = error.userInfo["FIRAuthErrorUserInfoDeserializedResponseKey"]
             as? [String: Any],

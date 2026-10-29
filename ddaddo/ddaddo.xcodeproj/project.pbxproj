@@ -12,6 +12,7 @@
 		B20000013085064E0024DF57 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B20000033085064E0024DF57 /* GooglePlaces */; };
 		C30000013085064E0024DF57 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = C30000043085064E0024DF57 /* FirebaseCore */; };
 		C30000023085064E0024DF57 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C30000053085064E0024DF57 /* FirebaseAuth */; };
+		D40000013085064E0024DF57 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = D40000023085064E0024DF57 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +54,7 @@
 				B20000013085064E0024DF57 /* GooglePlaces in Frameworks */,
 				C30000013085064E0024DF57 /* FirebaseCore in Frameworks */,
 				C30000023085064E0024DF57 /* FirebaseAuth in Frameworks */,
+				D40000013085064E0024DF57 /* FirebaseFirestore in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -99,6 +101,7 @@
 				B20000033085064E0024DF57 /* GooglePlaces */,
 				C30000043085064E0024DF57 /* FirebaseCore */,
 				C30000053085064E0024DF57 /* FirebaseAuth */,
+				D40000023085064E0024DF57 /* FirebaseFirestore */,
 			);
 			productName = ddaddo;
 			productReference = A4082CA73085064D0024DF57 /* ddaddo.app */;
@@ -444,6 +447,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		D40000023085064E0024DF57 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

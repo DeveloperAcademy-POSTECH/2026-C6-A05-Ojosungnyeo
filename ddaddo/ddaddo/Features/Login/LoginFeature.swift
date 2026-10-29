@@ -65,6 +65,8 @@ struct LoginFeature: Reducer {
                     state.errorMessage = "네트워크 연결을 확인한 뒤 다시 시도해 주세요."
                 case let .signInFailed(code, message):
                     state.errorMessage = "Firebase 오류 \(code): \(message)"
+                case .userNotFound, .recentLoginRequired, .accountDeletionFailed:
+                    state.errorMessage = "Apple 로그인에 실패했어요. 다시 시도해 주세요."
                 case nil:
                     if case let .authorizationFailed(code) = error as? AppleSignInError {
                         state.errorMessage = "Apple 인증 요청에 실패했어요. (Apple 오류 \(code))"

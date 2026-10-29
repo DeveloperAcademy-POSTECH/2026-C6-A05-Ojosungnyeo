@@ -142,6 +142,7 @@ iOSInjectionProject/
 ### Env
 *.xcconfig
 .env
+GoogleService-Info.plist
 
 
 # End of https://www.toptal.com/developers/gitignore/api/swift,xcode,macos,cocoapods

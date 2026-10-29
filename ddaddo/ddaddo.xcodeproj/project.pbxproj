@@ -10,6 +10,8 @@
 		A4082CB73085064E0024DF57 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A4082CB63085064E0024DF57 /* ComposableArchitecture */; };
 		B10000013085064E0024DF57 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B10000033085064E0024DF57 /* GoogleMaps */; };
 		B20000013085064E0024DF57 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B20000033085064E0024DF57 /* GooglePlaces */; };
+		C30000013085064E0024DF57 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = C30000043085064E0024DF57 /* FirebaseCore */; };
+		C30000023085064E0024DF57 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C30000053085064E0024DF57 /* FirebaseAuth */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 				A4082CB73085064E0024DF57 /* ComposableArchitecture in Frameworks */,
 				B10000013085064E0024DF57 /* GoogleMaps in Frameworks */,
 				B20000013085064E0024DF57 /* GooglePlaces in Frameworks */,
+				C30000013085064E0024DF57 /* FirebaseCore in Frameworks */,
+				C30000023085064E0024DF57 /* FirebaseAuth in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -96,6 +100,8 @@
 				A4082CB63085064E0024DF57 /* ComposableArchitecture */,
 				B10000033085064E0024DF57 /* GoogleMaps */,
 				B20000033085064E0024DF57 /* GooglePlaces */,
+				C30000043085064E0024DF57 /* FirebaseCore */,
+				C30000053085064E0024DF57 /* FirebaseAuth */,
 			);
 			productName = ddaddo;
 			productReference = A4082CA73085064D0024DF57 /* ddaddo.app */;
@@ -113,6 +119,11 @@
 				TargetAttributes = {
 					A4082CA63085064D0024DF57 = {
 						CreatedOnToolsVersion = 27.0;
+						SystemCapabilities = {
+							com.apple.SignInWithApple = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
@@ -129,6 +140,7 @@
 				A4082CB53085064E0024DF57 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
 				B10000023085064E0024DF57 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
 				B20000023085064E0024DF57 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
+				C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A4082CA83085064D0024DF57 /* Products */;
@@ -284,6 +296,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ddaddo/ddaddo.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6B47X24XTW;
@@ -322,6 +335,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ddaddo/ddaddo.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6B47X24XTW;
@@ -400,6 +414,14 @@
 				version = 11.1.0;
 			};
 		};
+		C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = exactVersion;
+				version = 13.1.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -417,6 +439,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B20000023085064E0024DF57 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
 			productName = GooglePlaces;
+		};
+		C30000043085064E0024DF57 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		C30000053085064E0024DF57 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -32,7 +32,7 @@ struct HomeFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var mascotMessage = MascotMessage.welcome
-        var upcomingTrips = UpcomingTripsFeature.State()
+        var upcomingTrips = UpcomingTripsPreviewData.state
         var isUpcomingTripsPresented = false
         var isMenuPresented = false
         var isWithdrawalConfirmationPresented = false

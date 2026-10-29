@@ -17,6 +17,12 @@ struct UpcomingTripsFeature: Reducer {
     struct State: Equatable {
         var trips: [Trip] = []
         var isAddTripMenuPresented = false
+        var isInviteCodeModalPresented = false
+        var inviteCode = ""
+
+        var isJoinButtonEnabled: Bool {
+            inviteCode.count == 6
+        }
     }
 
     enum Action {
@@ -25,6 +31,9 @@ struct UpcomingTripsFeature: Reducer {
         case addTripMenuDismissed
         case createTripButtonTapped
         case enterInviteCodeButtonTapped
+        case inviteCodeChanged(String)
+        case inviteCodeModalDismissed
+        case joinTripButtonTapped
         case viewScheduleButtonTapped(Trip.ID)
     }
 
@@ -43,9 +52,28 @@ struct UpcomingTripsFeature: Reducer {
                 state.isAddTripMenuPresented = false
                 return .none
 
-            case .createTripButtonTapped,
-                 .enterInviteCodeButtonTapped:
+            case .createTripButtonTapped:
                 state.isAddTripMenuPresented = false
+                return .none
+
+            case .enterInviteCodeButtonTapped:
+                state.isAddTripMenuPresented = false
+                state.inviteCode = ""
+                state.isInviteCodeModalPresented = true
+                return .none
+
+            case let .inviteCodeChanged(code):
+                state.inviteCode = String(code.filter(\.isNumber).prefix(6))
+                return .none
+
+            case .inviteCodeModalDismissed:
+                state.isInviteCodeModalPresented = false
+                state.inviteCode = ""
+                return .none
+
+            case .joinTripButtonTapped:
+                guard state.isJoinButtonEnabled else { return .none }
+                state.isInviteCodeModalPresented = false
                 return .none
 
             case .viewScheduleButtonTapped:

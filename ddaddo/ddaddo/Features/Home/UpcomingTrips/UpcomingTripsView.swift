@@ -61,6 +61,33 @@ struct UpcomingTripsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: store.isAddTripMenuPresented)
+        .overlay {
+            if store.isInviteCodeModalPresented {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            store.send(.inviteCodeModalDismissed)
+                        }
+
+                    InviteCodeModal(
+                        code: Binding(
+                            get: { store.inviteCode },
+                            set: { store.send(.inviteCodeChanged($0)) }
+                        ),
+                        cancelAction: {
+                            store.send(.inviteCodeModalDismissed)
+                        },
+                        joinAction: {
+                            store.send(.joinTripButtonTapped)
+                        }
+                    )
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: store.isInviteCodeModalPresented)
         .preferredColorScheme(.dark)
     }
 
@@ -144,6 +171,7 @@ struct UpcomingTripsView: View {
         }
         .buttonStyle(.plain)
     }
+
 }
 
 private struct UpcomingTripTicketCard: View {

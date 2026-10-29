@@ -16,6 +16,8 @@ struct AppleSignInResult: Equatable, Sendable {
     let identityToken: Data
     let authorizationCode: Data?
     let rawNonce: String
+    let givenName: String?
+    let familyName: String?
 }
 
 enum AppleSignInError: Error, Equatable {
@@ -23,7 +25,7 @@ enum AppleSignInError: Error, Equatable {
     case invalidCredential
     case invalidNonce
     case unavailablePresentationAnchor
-    case authorizationFailed
+    case authorizationFailed(code: Int)
 }
 
 struct AppleSignInClient: DependencyKey, Sendable {
@@ -38,7 +40,7 @@ struct AppleSignInClient: DependencyKey, Sendable {
     )
 
     static let testValue = Self(
-        signIn: { throw AppleSignInError.authorizationFailed }
+        signIn: { throw AppleSignInError.authorizationFailed(code: -1) }
     )
 }
 
@@ -99,7 +101,9 @@ extension AppleAuthorizationPerformer: ASAuthorizationControllerDelegate {
                     userIdentifier: credential.user,
                     identityToken: identityToken,
                     authorizationCode: credential.authorizationCode,
-                    rawNonce: rawNonce
+                    rawNonce: rawNonce,
+                    givenName: credential.fullName?.givenName,
+                    familyName: credential.fullName?.familyName
                 )
             )
         )
@@ -112,7 +116,11 @@ extension AppleAuthorizationPerformer: ASAuthorizationControllerDelegate {
         if (error as? ASAuthorizationError)?.code == .canceled {
             finish(with: .failure(AppleSignInError.canceled))
         } else {
-            finish(with: .failure(AppleSignInError.authorizationFailed))
+            finish(
+                with: .failure(
+                    AppleSignInError.authorizationFailed(code: (error as NSError).code)
+                )
+            )
         }
     }
 }

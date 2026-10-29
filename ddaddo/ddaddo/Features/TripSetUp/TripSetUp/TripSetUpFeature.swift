@@ -110,9 +110,12 @@ struct TripSetUpFeature: Reducer {
                     return .none
                 }
 
-                if state.draftEndDate != nil || selectedDate < draftStartDate {
+                if state.draftEndDate != nil {
                     state.draftStartDate = selectedDate
                     state.draftEndDate = nil
+                } else if selectedDate < draftStartDate {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = draftStartDate
                 } else if selectedDate > draftStartDate {
                     state.draftEndDate = selectedDate
                 }
@@ -127,7 +130,8 @@ struct TripSetUpFeature: Reducer {
             case .tripDatePickerConfirmButtonTapped:
                 guard
                     let draftStartDate = state.draftStartDate,
-                    let draftEndDate = state.draftEndDate
+                    let draftEndDate = state.draftEndDate,
+                    draftStartDate < draftEndDate
                 else { return .none }
 
                 state.tripStartDate = draftStartDate

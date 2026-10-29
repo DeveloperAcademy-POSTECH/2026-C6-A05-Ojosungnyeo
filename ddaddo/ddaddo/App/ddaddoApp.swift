@@ -20,7 +20,12 @@ struct ddaddoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(store: store)
+            //RootView(store: store)
+            TripSearchView(
+                        store: Store(initialState: TripSearchFeature.State()) {
+                            TripSearchFeature()
+                        }
+                    )
         }
     }
 }

@@ -10,25 +10,45 @@ struct TripSearchView: View {
     let store: StoreOf<TripSearchFeature>
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-                .padding(.horizontal, DDSpacing.large)
+        NavigationStack {
+            VStack(spacing: 0) {
+                header
+                    .padding(.horizontal, DDSpacing.large)
 
-            searchField
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.top, DDSpacing.large)
+                searchField
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.top, DDSpacing.large)
 
-            regionFilters
-                .padding(.top, DDSpacing.large)
+                regionFilters
+                    .padding(.top, DDSpacing.large)
 
-            cityList
-                .padding(.top, DDSpacing.xLarge)
+                cityList
+                    .padding(.top, DDSpacing.xLarge)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                selectionArea
+            }
+            .background(DDColor.surfaceDefault.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .preferredColorScheme(.dark)
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { store.isTripSetUpPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.tripSetUpDismissed)
+                        }
+                    }
+                )
+            ) {
+                TripSetUpView(
+                    store: store.scope(
+                        state: \.tripSetUp,
+                        action: \.tripSetUp
+                    )
+                )
+            }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            selectionArea
-        }
-        .background(DDColor.surfaceDefault.ignoresSafeArea())
-        .preferredColorScheme(.dark)
     }
 
     private var header: some View {

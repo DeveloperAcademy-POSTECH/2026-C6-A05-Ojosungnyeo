@@ -11,9 +11,7 @@ struct TripSetUpFeature: Reducer {
     struct State: Equatable {
         static let maximumTravelerCount = 4
 
-        var destinationName = "도쿄"
-        var countryName = "일본"
-        var cityCount = 1
+        var selectedCities: [TripSearchFeature.City] = []
         var travelerCount = 1
         var tripStartDate: Date?
         var tripEndDate: Date?
@@ -27,8 +25,20 @@ struct TripSetUpFeature: Reducer {
         var isAddAccommodationPresented = false
         var accommodation: TripSetUpAddAccommodationFeature.Accommodation?
 
-        var tripTitle: String { "\(destinationName) 여행" }
-        var destinationSummary: String { "\(countryName) · \(cityCount)개 도시" }
+        var tripTitle: String {
+            guard let firstCity = selectedCities.first else { return "" }
+            guard selectedCities.count > 1 else { return "\(firstCity.name) 여행" }
+            return "\(firstCity.name) 외 \(selectedCities.count - 1)개 도시 여행"
+        }
+
+        var destinationSummary: String {
+            guard !selectedCities.isEmpty else { return "" }
+            var countries: [String] = []
+            for city in selectedCities where !countries.contains(city.country) {
+                countries.append(city.country)
+            }
+            return "\(countries.joined(separator: ", ")) · \(selectedCities.count)개 도시"
+        }
         var flightSummary: String { flightRegistration?.outbound.flightNumber ?? "선택 사항" }
         var accommodationSummary: String { accommodation?.name ?? "선택 사항" }
         var isSaveEnabled: Bool {

@@ -37,7 +37,7 @@ struct LoginView: View {
                 .frame(width: Layout.designWidth, height: 178)
                 .offset(y: 696)
 
-                VStack(spacing: 0) {
+                VStack(spacing: 10) {
                     Image("DDLoginLogo_KR")
                         .resizable()
                         .frame(width: 165, height: 91)

@@ -15,12 +15,6 @@ struct TripSetUpFeature: Reducer {
         var travelerCount = 1
         var tripStartDate: Date?
         var tripEndDate: Date?
-        var draftStartDate: Date?
-        var draftEndDate: Date?
-        var isDatePickerPresented = false
-        var addFlight = TripSetUpAddFlightFeature.State()
-        var isAddFlightPresented = false
-        var flightRegistration: TripSetUpAddFlightFeature.FlightRegistration?
         var transportationSelection: TripSetUpTransportationFeature.Selection?
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
@@ -39,7 +33,6 @@ struct TripSetUpFeature: Reducer {
             }
             return "\(countries.joined(separator: ", ")) · \(selectedCities.count)개 도시"
         }
-        var flightSummary: String { flightRegistration?.outbound.flightNumber ?? "선택 사항" }
         var transportationSummary: String? {
             guard let transportationSelection else { return nil }
             return "\(transportationSelection.transportation.title) · \(transportationSelection.duration.title)"
@@ -86,71 +79,17 @@ struct TripSetUpFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case backButtonTapped
-        case destinationChangeButtonTapped
-        case travelScheduleButtonTapped
-        case tripDateTapped(Date)
-        case tripDatePickerCloseButtonTapped
-        case tripDatePickerConfirmButtonTapped
         case travelerDecreaseButtonTapped
         case travelerIncreaseButtonTapped
         case transportationCardTapped
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
-        case flightInfoButtonTapped
-        case addFlightDismissed
-        case addFlight(TripSetUpAddFlightFeature.Action)
-        case inviteFriendButtonTapped
         case saveButtonTapped
     }
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .travelScheduleButtonTapped:
-                state.draftStartDate = state.tripStartDate
-                state.draftEndDate = state.tripEndDate
-                state.isDatePickerPresented = true
-                return .none
-
-            case let .tripDateTapped(date):
-                let calendar = Calendar.autoupdatingCurrent
-                let selectedDate = calendar.startOfDay(for: date)
-                let today = calendar.startOfDay(for: Date())
-                guard selectedDate >= today else { return .none }
-
-                guard let draftStartDate = state.draftStartDate else {
-                    state.draftStartDate = selectedDate
-                    state.draftEndDate = nil
-                    return .none
-                }
-
-                if state.draftEndDate != nil || selectedDate < draftStartDate {
-                    state.draftStartDate = selectedDate
-                    state.draftEndDate = nil
-                } else if selectedDate > draftStartDate {
-                    state.draftEndDate = selectedDate
-                }
-                return .none
-
-            case .tripDatePickerCloseButtonTapped:
-                state.draftStartDate = nil
-                state.draftEndDate = nil
-                state.isDatePickerPresented = false
-                return .none
-
-            case .tripDatePickerConfirmButtonTapped:
-                guard
-                    let draftStartDate = state.draftStartDate,
-                    let draftEndDate = state.draftEndDate
-                else { return .none }
-
-                state.tripStartDate = draftStartDate
-                state.tripEndDate = draftEndDate
-                state.draftStartDate = nil
-                state.draftEndDate = nil
-                state.isDatePickerPresented = false
-                return .none
-
             case .saveButtonTapped:
                 guard state.isSaveEnabled else { return .none }
                 return .none
@@ -185,34 +124,9 @@ struct TripSetUpFeature: Reducer {
             case .transportationSheet:
                 return .none
 
-            case .flightInfoButtonTapped:
-                state.addFlight = TripSetUpAddFlightFeature.State(
-                    registration: state.flightRegistration
-                )
-                state.isAddFlightPresented = true
-                return .none
-
-            case .addFlightDismissed, .addFlight(.delegate(.dismiss)):
-                state.isAddFlightPresented = false
-                return .none
-
-            case let .addFlight(.delegate(.completed(registration))):
-                state.flightRegistration = registration
-                state.isAddFlightPresented = false
-                return .none
-
-            case .addFlight:
-                return .none
-
-            case .backButtonTapped,
-                 .destinationChangeButtonTapped,
-                 .inviteFriendButtonTapped:
+            case .backButtonTapped:
                 return .none
             }
-        }
-
-        Scope(state: \.addFlight, action: \.addFlight) {
-            TripSetUpAddFlightFeature()
         }
 
         Scope(state: \.transportationSheet, action: \.transportationSheet) {

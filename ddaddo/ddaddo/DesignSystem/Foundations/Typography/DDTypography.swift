@@ -11,6 +11,7 @@ enum DDTypography {
     case display64
     case display48
     case title28
+    case title26
     case title24
     case heading20
     case heading18
@@ -20,9 +21,14 @@ enum DDTypography {
     case labelEmphasis14
     case caption12
     case captionEmphasis12
+    case eyebrow13
 
     fileprivate var fontName: String {
         switch self {
+        case .title26:
+            "Pretendard-Bold"
+        case .eyebrow13:
+            "Pretendard-Medium"
         case .title28, .title24, .heading20, .heading18,
              .bodyEmphasis16, .labelEmphasis14, .captionEmphasis12:
             "Pretendard-SemiBold"
@@ -36,24 +42,26 @@ enum DDTypography {
         case .display64: 64
         case .display48: 48
         case .title28: 28
+        case .title26: 26
         case .title24: 24
         case .heading20: 20
         case .heading18: 18
         case .body16, .bodyEmphasis16: 16
         case .label14, .labelEmphasis14: 14
         case .caption12, .captionEmphasis12: 12
+        case .eyebrow13: 13
         }
     }
 
     fileprivate var relativeTo: Font.TextStyle {
         switch self {
         case .display64, .display48: .largeTitle
-        case .title28: .title
+        case .title28, .title26: .title
         case .title24: .title2
         case .heading20: .title3
         case .heading18: .headline
         case .body16, .bodyEmphasis16: .body
-        case .label14, .labelEmphasis14: .subheadline
+        case .label14, .labelEmphasis14, .eyebrow13: .subheadline
         case .caption12, .captionEmphasis12: .caption
         }
     }

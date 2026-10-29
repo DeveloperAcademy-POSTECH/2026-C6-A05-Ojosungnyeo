@@ -26,5 +26,7 @@ enum DDColor {
     static let borderSubtle = Color("DDBorderSubtle")
     static let iconDefault = Color("DDIconDefault")
     static let statusCritical = Color("DDStatusCritical")
+    static let statusError = Color("DDStatusError")
     static let avatarBackground = Color("DDAvatarBackground")
+    static let nicknameAvatarBackground = Color("DDNicknameAvatarBackground")
 }

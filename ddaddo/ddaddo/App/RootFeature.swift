@@ -11,6 +11,7 @@ import ComposableArchitecture
 struct RootFeature: Reducer {
     enum AuthenticationStatus: Equatable {
         case checking
+        case nicknameSetup
         case authenticated
         case unauthenticated
     }
@@ -19,6 +20,7 @@ struct RootFeature: Reducer {
     struct State: Equatable {
         var authenticationStatus = AuthenticationStatus.checking
         var login = LoginFeature.State()
+        var nicknameSetup = NicknameSetupFeature.State()
         var home = HomeFeature.State()
     }
 
@@ -26,11 +28,14 @@ struct RootFeature: Reducer {
     enum Action {
         case onAppear
         case authenticationStateChanged(AuthenticatedUser?)
+        case nicknameStatusResponse(Result<Bool, Error>)
         case login(LoginFeature.Action)
+        case nicknameSetup(NicknameSetupFeature.Action)
         case home(HomeFeature.Action)
     }
 
     @Dependency(\.authClient) var authClient
+    @Dependency(\.nicknameClient) var nicknameClient
 
     private nonisolated enum CancelID: Hashable, Sendable {
         case authenticationState
@@ -45,6 +50,10 @@ struct RootFeature: Reducer {
             HomeFeature()
         }
 
+        Scope(state: \.nicknameSetup, action: \.nicknameSetup) {
+            NicknameSetupFeature()
+        }
+
         Reduce { state, action in
             switch action {
             case .onAppear:
@@ -56,14 +65,40 @@ struct RootFeature: Reducer {
                 .cancellable(id: CancelID.authenticationState, cancelInFlight: true)
 
             case let .authenticationStateChanged(user):
-                state.authenticationStatus = user == nil ? .unauthenticated : .authenticated
+                guard let user else {
+                    state.authenticationStatus = .unauthenticated
+                    return .none
+                }
+
+                state.authenticationStatus = .checking
+                state.nicknameSetup = NicknameSetupFeature.State(userID: user.id)
+                return .run { send in
+                    await send(
+                        .nicknameStatusResponse(
+                            Result {
+                                try await nicknameClient.hasNickname(user.id)
+                            }
+                        )
+                    )
+                }
+
+            case let .nicknameStatusResponse(.success(hasNickname)):
+                state.authenticationStatus = hasNickname ? .authenticated : .nicknameSetup
+                return .none
+
+            case .nicknameStatusResponse(.failure):
+                state.authenticationStatus = .nicknameSetup
                 return .none
 
             case .login(.delegate(.signInSucceeded)):
+                state.authenticationStatus = .checking
+                return .none
+
+            case .nicknameSetup(.delegate(.completed)):
                 state.authenticationStatus = .authenticated
                 return .none
 
-            case .login, .home:
+            case .login, .nicknameSetup, .home:
                 return .none
             }
         }
@@ -88,6 +123,14 @@ struct RootView: View {
                     store: store.scope(
                         state: \.home,
                         action: \.home
+                    )
+                )
+
+            case .nicknameSetup:
+                NicknameSetupView(
+                    store: store.scope(
+                        state: \.nicknameSetup,
+                        action: \.nicknameSetup
                     )
                 )
 

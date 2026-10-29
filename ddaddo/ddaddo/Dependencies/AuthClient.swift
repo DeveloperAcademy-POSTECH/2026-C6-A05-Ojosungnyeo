@@ -15,6 +15,9 @@ enum AuthClientError: Error, Equatable {
     case appleProviderDisabled
     case invalidAppleCredential
     case networkUnavailable
+    case userNotFound
+    case recentLoginRequired
+    case accountDeletionFailed(code: Int, message: String)
     case signInFailed(code: Int, message: String)
 }
 
@@ -22,6 +25,7 @@ struct AuthClient: DependencyKey, Sendable {
     var authStateChanges: @MainActor @Sendable () -> AsyncStream<AuthenticatedUser?>
     var signInWithApple: @MainActor @Sendable (AppleSignInResult) async throws -> AuthenticatedUser
     var signOut: @MainActor @Sendable () throws -> Void
+    var deleteAccount: @MainActor @Sendable (Data?) async throws -> Void
 
     static let liveValue = Self(
         authStateChanges: {
@@ -32,6 +36,11 @@ struct AuthClient: DependencyKey, Sendable {
         },
         signOut: {
             try FirebaseAuthService.signOut()
+        },
+        deleteAccount: { authorizationCode in
+            try await FirebaseAuthService.deleteAccount(
+                authorizationCode: authorizationCode
+            )
         }
     )
 
@@ -45,7 +54,8 @@ struct AuthClient: DependencyKey, Sendable {
         signInWithApple: { _ in
             throw AuthClientError.firebaseNotConfigured
         },
-        signOut: {}
+        signOut: {},
+        deleteAccount: { _ in }
     )
 }
 

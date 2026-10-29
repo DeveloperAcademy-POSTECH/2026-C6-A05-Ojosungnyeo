@@ -45,6 +45,44 @@ struct HomeView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        .confirmationDialog(
+            "정말 탈퇴할까요?",
+            isPresented: Binding(
+                get: { store.isWithdrawalConfirmationPresented },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.withdrawalConfirmationDismissed)
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("탈퇴하기", role: .destructive) {
+                store.send(.withdrawalConfirmed)
+            }
+            Button("취소", role: .cancel) {
+                store.send(.withdrawalConfirmationDismissed)
+            }
+        } message: {
+            Text("계정을 삭제하면 다시 되돌릴 수 없어요.")
+        }
+        .alert(
+            "탈퇴할 수 없어요",
+            isPresented: Binding(
+                get: { store.withdrawalErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.withdrawalErrorDismissed)
+                    }
+                }
+            )
+        ) {
+            Button("확인") {
+                store.send(.withdrawalErrorDismissed)
+            }
+        } message: {
+            Text(store.withdrawalErrorMessage ?? "")
+        }
     }
 
     private var moonSurface: some View {
@@ -154,9 +192,10 @@ struct HomeView: View {
                 .fill(Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255))
                 .frame(height: 1)
 
-            accountMenuButton("탈퇴 아직 안함") {
+            accountMenuButton("탈퇴하기") {
                 store.send(.withdrawButtonTapped)
             }
+            .disabled(store.isWithdrawing)
         }
         .frame(width: 133)
         .background(Color.black)

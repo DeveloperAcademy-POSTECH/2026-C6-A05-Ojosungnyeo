@@ -36,6 +36,8 @@ struct HomeFeature: Reducer {
         var isUpcomingTripsPresented = false
         var tripItinerary = TripItineraryFeature.State()
         var isTripItineraryPresented = false
+        var tripSearch = TripSearchFeature.State()
+        var isTripSearchPresented = false
         var isMenuPresented = false
         var isWithdrawalConfirmationPresented = false
         var isWithdrawing = false
@@ -48,6 +50,7 @@ struct HomeFeature: Reducer {
         case homeSwipedUp
         case upcomingTrips(UpcomingTripsFeature.Action)
         case tripItinerary(TripItineraryFeature.Action)
+        case tripSearch(TripSearchFeature.Action)
         case mascotTapped
         case menuButtonTapped
         case menuDismissed
@@ -77,6 +80,10 @@ struct HomeFeature: Reducer {
                 state.tripItinerary = TripItineraryFeature.State()
                 state.isTripItineraryPresented = true
                 return .none
+            case .upcomingTrips(.createTripButtonTapped):
+                state.tripSearch = TripSearchFeature.State()
+                state.isTripSearchPresented = true
+                return .none
             case .upcomingTrips:
                 return .none
             case .tripItinerary(.timeTable(.backButtonTapped)),
@@ -84,6 +91,11 @@ struct HomeFeature: Reducer {
                 state.isTripItineraryPresented = false
                 return .none
             case .tripItinerary:
+                return .none
+            case .tripSearch(.backButtonTapped):
+                state.isTripSearchPresented = false
+                return .none
+            case .tripSearch:
                 return .none
             case .mascotTapped:
                 state.mascotMessage = state.mascotMessage.next
@@ -173,6 +185,10 @@ struct HomeFeature: Reducer {
 
         Scope(state: \.tripItinerary, action: \.tripItinerary) {
             TripItineraryFeature()
+        }
+
+        Scope(state: \.tripSearch, action: \.tripSearch) {
+            TripSearchFeature()
         }
     }
 }

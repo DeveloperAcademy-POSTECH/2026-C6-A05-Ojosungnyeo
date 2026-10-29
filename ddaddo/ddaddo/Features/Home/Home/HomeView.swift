@@ -97,16 +97,22 @@ struct HomeView: View {
     }
 
     private var mascot: some View {
-        Image("DDMascot")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 278, height: 365)
-            .position(x: 201, y: 480.5)
-            .accessibilityHidden(true)
+        Button {
+            store.send(.mascotTapped)
+        } label: {
+            Image("DDMascot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 278, height: 365)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(NoPressEffectButtonStyle())
+        .position(x: 201, y: 480.5)
+        .accessibilityLabel("따또 메시지 바꾸기")
     }
 
     private var speechBubble: some View {
-        Text("어서오세따. 저는 따또입니따.\n당신의 즐거운 지구 여행을 책임집니따.")
+        Text(store.mascotMessage.text)
             .ddTypography(.bodyEmphasis16)
             .foregroundStyle(DDColor.textOnPrimary)
             .lineSpacing(4)
@@ -135,6 +141,7 @@ struct HomeView: View {
         .frame(width: Layout.designWidth, height: Layout.designHeight)
         .foregroundStyle(DDColor.actionPrimary)
         .accessibilityHidden(true)
+        .allowsHitTesting(false)
     }
 
     private func sparkle(size: CGFloat, x: CGFloat, y: CGFloat) -> some View {
@@ -249,6 +256,12 @@ struct HomeView: View {
     private enum Layout {
         static let designWidth: CGFloat = 402
         static let designHeight: CGFloat = 874
+    }
+}
+
+private struct NoPressEffectButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
     }
 }
 

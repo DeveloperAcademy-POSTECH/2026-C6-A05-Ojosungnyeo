@@ -6,8 +6,32 @@
 import ComposableArchitecture
 
 struct HomeFeature: Reducer {
+    enum MascotMessage: Int, CaseIterable, Equatable {
+        case welcome
+        case destination
+        case friends
+
+        var text: String {
+            switch self {
+            case .welcome:
+                "어서오세따. 저는 따또입니따.\n당신의 즐거운 지구 여행을 책임집니따."
+            case .destination:
+                "어디로 여행을 가볼까따?\n말만 해주세따. 제가 다 도와드리게따."
+            case .friends:
+                "친구와 함께 가는 여행이라니 즐겁게따.\n내가 성심성의껏 도와주게따."
+            }
+        }
+
+        var next: Self {
+            let messages = Self.allCases
+            let nextIndex = (rawValue + 1) % messages.count
+            return messages[nextIndex]
+        }
+    }
+
     @ObservableState
     struct State: Equatable {
+        var mascotMessage = MascotMessage.welcome
         var isMenuPresented = false
         var isWithdrawalConfirmationPresented = false
         var isWithdrawing = false
@@ -16,6 +40,7 @@ struct HomeFeature: Reducer {
 
     enum Action {
         case exploreTripsButtonTapped
+        case mascotTapped
         case menuButtonTapped
         case menuDismissed
         case logoutButtonTapped
@@ -34,6 +59,9 @@ struct HomeFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .exploreTripsButtonTapped:
+                return .none
+            case .mascotTapped:
+                state.mascotMessage = state.mascotMessage.next
                 return .none
             case .menuButtonTapped:
                 state.isMenuPresented.toggle()

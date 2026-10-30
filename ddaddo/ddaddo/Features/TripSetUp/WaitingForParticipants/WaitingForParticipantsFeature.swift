@@ -16,9 +16,17 @@ struct WaitingForParticipantsFeature: Reducer {
 
     struct Invitation: Equatable {
         let code: String
-        let url: URL
+        let url: URL?
         let expiresAt: Date
         let participants: [Participant]
+
+        var shareURL: URL {
+            url ?? URL(string: "https://ddaddo-web.vercel.app/invite?code=\(code)")!
+        }
+
+        var shareText: String {
+            "따또에서 친구의 여행 초대가 도착했어요! 💌\n초대에 응하고 72시간 안에 가고 싶은 장소를 입력하세요.\n\(shareURL.absoluteString)"
+        }
     }
 
     @ObservableState
@@ -168,9 +176,8 @@ struct WaitingForParticipantsFeature: Reducer {
 private extension WaitingForParticipantsFeature.Invitation {
     static func mock(expiresAt: Date) -> Self {
         Self(
-            code: "999994",
-            // Replace with the server-provided web invitation URL when available.
-            url: URL(string: "https://ddaddo-web.vercel.app/invite")!,
+            code: "000000",
+            url: nil,
             expiresAt: expiresAt,
             participants: [
                 .init(id: 1, name: "테이", avatarName: "DDMiniHeadTae", hasJoined: true),

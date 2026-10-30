@@ -22,9 +22,6 @@ struct TripItineraryView: View {
                         action: \.timeTable
                     )
                 )
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    itineraryTabBar
-                }
 
             case .routeOverview:
                 RouteOverviewView(
@@ -34,6 +31,9 @@ struct TripItineraryView: View {
                     )
                 )
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            itineraryTabBar
         }
     }
 

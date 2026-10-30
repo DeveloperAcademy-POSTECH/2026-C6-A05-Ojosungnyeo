@@ -117,7 +117,11 @@ struct SettingsView: View {
                 Text("어떻게 불러드릴까따?").ddTypography(.title24).foregroundStyle(DDColor.textPrimary)
                 Text("친구들에게 표시되는 이름을 바꿔요.").ddTypography(.label14).foregroundStyle(DDColor.textSecondary)
             }.padding(.top, 22)
-            Text("닉네임").ddTypography(.label14).foregroundStyle(DDColor.textTertiary).padding(.top, 48)
+            Text("닉네임")
+                .ddTypography(.label14)
+                .foregroundStyle(DDColor.textTertiary)
+                .padding(.top, 48)
+                .padding(.bottom, 12)
             HStack {
                 TextField("닉네임", text: Binding(get: { store.nicknameDraft }, set: { store.send(.nicknameChanged($0)) }))
                     .ddTypography(.bodyEmphasis16).focused($nicknameFocused)

@@ -14,27 +14,29 @@ struct UpcomingTripsView: View {
             DDColor.surfaceDefault
                 .ignoresSafeArea()
 
-            ScrollView {
-                LazyVStack(spacing: 15) {
-                    Image("DDUpcomingTripsBroadcast")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity)
-                        .accessibilityLabel("한 달 내로 여행 일정이 있어요")
-                        .padding(.bottom, 8)
+            VStack(spacing: 0) {
+                UpcomingTripsBroadcastBanner(
+                    message: "한 달 내로\n여행 일정이 이따!"
+                )
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.top, DDSpacing.small)
+                    .padding(.bottom, 8)
 
-                    ForEach(store.trips) { trip in
-                        UpcomingTripTicketCard(
-                            trip: trip,
-                            action: {
-                                store.send(.viewScheduleButtonTapped(trip.id))
-                            }
-                        )
+                ScrollView {
+                    LazyVStack(spacing: 15) {
+                        ForEach(store.trips) { trip in
+                            UpcomingTripTicketCard(
+                                trip: trip,
+                                action: {
+                                    store.send(.viewScheduleButtonTapped(trip.id))
+                                }
+                            )
+                        }
                     }
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.top, 15)
+                    .padding(.bottom, DDSpacing.xLarge)
                 }
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.top, DDSpacing.small)
-                .padding(.bottom, DDSpacing.xLarge)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 header
@@ -201,6 +203,35 @@ struct UpcomingTripsView: View {
         .buttonStyle(.plain)
     }
 
+}
+
+private struct UpcomingTripsBroadcastBanner: View {
+    let message: String
+
+    var body: some View {
+        Image("DDUpcomingTripsBroadcast")
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .overlay {
+                GeometryReader { proxy in
+                    Text(message)
+                        .ddTypography(.labelEmphasis14)
+                        .tracking(0.6)
+                        .lineSpacing(2)
+                        .foregroundStyle(DDColor.textOnPrimary)
+                        .multilineTextAlignment(.leading)
+                        .frame(width: 96, height: 40, alignment: .leading)
+                        .background(Color.white)
+                        .position(
+                            x: proxy.size.width * 0.744,
+                            y: proxy.size.height * 0.32
+                        )
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(message)
+    }
 }
 
 private struct UpcomingTripTicketCard: View {

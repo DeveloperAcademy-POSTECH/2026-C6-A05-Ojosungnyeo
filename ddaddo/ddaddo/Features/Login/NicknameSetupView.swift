@@ -100,16 +100,11 @@ struct NicknameSetupView: View {
     }
 
     private var nicknameAvatar: some View {
-        ZStack {
-            Circle()
-                .fill(DDColor.nicknameAvatarBackground)
-
-            Image("DDMiniHeadGrae")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 85, height: 73)
-        }
-        .frame(width: 100, height: 100)
+        Image("DDNicknameSetupMascot")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 144, height: 170)
+            .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
     }
 

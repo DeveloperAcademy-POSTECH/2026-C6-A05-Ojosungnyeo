@@ -115,6 +115,21 @@ struct TripSetUpView: View {
                 }
             }
         }
+        .alert(
+            "여행을 만들지 못했어요",
+            isPresented: Binding(
+                get: { store.creationErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.creationErrorDismissed)
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(store.creationErrorMessage ?? "잠시 후 다시 시도해 주세요.")
+        }
     }
 
     private var header: some View {
@@ -226,7 +241,7 @@ struct TripSetUpView: View {
         Button {
             store.send(.saveButtonTapped)
         } label: {
-            Text("친구 초대하러 가기")
+            Text(store.isCreatingTrip ? "여행 만드는 중..." : "친구 초대하러 가기")
                 .ddTypography(.heading20)
                 .foregroundStyle(DDColor.textOnPrimary)
                 .frame(maxWidth: .infinity, minHeight: 55)
@@ -234,7 +249,7 @@ struct TripSetUpView: View {
                 .clipShape(.rect(cornerRadius: DDRadius.medium))
         }
         .buttonStyle(.plain)
-        .disabled(!store.isSaveEnabled)
+        .disabled(!store.isSaveEnabled || store.isCreatingTrip)
         .padding(.horizontal, DDSpacing.large)
         .padding(.top, DDSpacing.xLarge)
         .padding(.bottom, 11)

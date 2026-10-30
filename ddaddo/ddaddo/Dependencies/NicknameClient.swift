@@ -15,12 +15,16 @@ enum NicknameClientError: Error, Equatable {
 
 struct NicknameClient: DependencyKey, Sendable {
     var hasNickname: @MainActor @Sendable (String) async throws -> Bool
+    var fetchNickname: @MainActor @Sendable (String) async throws -> String
     var saveNickname: @MainActor @Sendable (String, String) async throws -> Void
     var deleteProfile: @MainActor @Sendable (String) async throws -> Void
 
     static let liveValue = Self(
         hasNickname: { userID in
             try await FirebaseNicknameService.hasNickname(userID: userID)
+        },
+        fetchNickname: { userID in
+            try await FirebaseNicknameService.fetchNickname(userID: userID)
         },
         saveNickname: { userID, nickname in
             try await FirebaseNicknameService.saveNickname(
@@ -35,6 +39,7 @@ struct NicknameClient: DependencyKey, Sendable {
 
     static let testValue = Self(
         hasNickname: { _ in false },
+        fetchNickname: { _ in "지구인" },
         saveNickname: { _, _ in },
         deleteProfile: { _ in }
     )

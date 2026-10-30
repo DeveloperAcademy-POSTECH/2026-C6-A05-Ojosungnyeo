@@ -49,6 +49,7 @@ struct TripSearchView: View {
                 )
             }
         }
+        .task { store.send(.onAppear) }
     }
 
     private var header: some View {
@@ -111,29 +112,51 @@ struct TripSearchView: View {
     }
 
     private var cityList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: DDSpacing.medium) {
-                ForEach(groupedCities) { group in
-                    Text(group.country)
-                        .ddTypography(.caption12)
+        Group {
+            if store.isLoading {
+                ProgressView()
+                    .tint(DDColor.actionPrimary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage = store.errorMessage {
+                VStack(spacing: DDSpacing.small) {
+                    Text("여행지를 불러오지 못했어요.")
+                        .ddTypography(.bodyEmphasis16)
+                        .foregroundStyle(DDColor.textPrimary)
+                    Text(errorMessage)
+                        .ddTypography(.label14)
                         .foregroundStyle(DDColor.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    ForEach(group.cities) { city in
-                        Button {
-                            store.send(.cityTapped(city.id))
-                        } label: {
-                            cityRow(city)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
-                    }
+                        .multilineTextAlignment(.center)
+                    Button("다시 시도") { store.send(.onAppear) }
+                        .foregroundStyle(DDColor.actionPrimary)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, DDSpacing.large)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: DDSpacing.medium) {
+                        ForEach(groupedCities) { group in
+                            Text(group.country)
+                                .ddTypography(.caption12)
+                                .foregroundStyle(DDColor.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            ForEach(group.cities) { city in
+                                Button {
+                                    store.send(.cityTapped(city.id))
+                                } label: {
+                                    cityRow(city)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
+                            }
+                        }
+                    }
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.bottom, DDSpacing.large)
+                }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.bottom, DDSpacing.large)
         }
-        .scrollDismissesKeyboard(.interactively)
     }
 
     private var selectionArea: some View {

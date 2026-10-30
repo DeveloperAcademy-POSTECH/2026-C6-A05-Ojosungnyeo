@@ -30,9 +30,11 @@ struct WaitingForParticipantsView: View {
                 participantsCard
                     .padding(.top, DDSpacing.large)
 
-                refreshButton
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, DDSpacing.xSmall)
+                if !store.haveAllParticipantsJoined {
+                    refreshButton
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, DDSpacing.xSmall)
+                }
             }
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, DDSpacing.small)
@@ -216,6 +218,7 @@ struct WaitingForParticipantsView: View {
                     .ddTypography(.captionEmphasis12)
                     .foregroundStyle(DDColor.actionPrimary)
             }
+            .frame(height: 24)
 
             HStack(spacing: DDSpacing.small) {
                 ForEach(store.invitation.participants) { participant in
@@ -223,9 +226,13 @@ struct WaitingForParticipantsView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 102, alignment: .top)
         }
-        .padding(DDSpacing.large)
-        .frame(maxWidth: .infinity, minHeight: 181, alignment: .topLeading)
+        .padding(.leading, 17)
+        .padding(.trailing, 15)
+        .padding(.top, 17)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, minHeight: 165, alignment: .topLeading)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(cornerRadius: DDRadius.medium))
         .overlay {
@@ -265,30 +272,32 @@ struct WaitingForParticipantsView: View {
                 .frame(width: 56, height: 56)
             }
 
-            Text(participant.name)
-                .ddTypography(.labelEmphasis14)
-                .foregroundStyle(DDColor.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            VStack(spacing: 6) {
+                Text(participant.displayName)
+                    .ddTypography(.labelEmphasis14)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(height: 20)
 
-            Text(participant.hasJoined ? "참여 완료" : "참여 대기")
-                .ddTypography(.caption12)
-                .foregroundStyle(DDColor.textSecondary)
-                .lineLimit(1)
+                Text(participant.hasJoined ? "참여 완료" : "참여 대기")
+                    .ddTypography(.caption12)
+                    .foregroundStyle(DDColor.textSecondary)
+                    .lineLimit(1)
+                    .frame(height: 16)
+            }
         }
+        .frame(width: 72, height: 102, alignment: .top)
         .multilineTextAlignment(.center)
         .accessibilityElement(children: .combine)
     }
 
     private func avatarBackgroundColor(for avatarName: String?) -> Color {
-        switch avatarName {
-        case DDMiniHeadAvatar.Character.tae.rawValue:
-            Color(red: 217 / 255, green: 149 / 255, blue: 126 / 255)
-        case DDMiniHeadAvatar.Character.header.rawValue:
-            Color(red: 152 / 255, green: 156 / 255, blue: 209 / 255)
-        default:
-            DDColor.avatarBackground
-        }
+        guard let avatarName,
+              let character = ParticipantAvatar(rawValue: avatarName)
+        else { return DDColor.avatarBackground }
+
+        return character.backgroundColor
     }
 
     private var refreshButton: some View {

@@ -38,6 +38,24 @@ enum FirebaseNicknameService {
         }
     }
 
+    static func fetchNickname(userID: String) async throws -> String {
+        guard FirebaseService.isConfigured else {
+            throw NicknameClientError.firebaseNotConfigured
+        }
+        do {
+            let document = try await Firestore.firestore()
+                .collection("users").document(userID).getDocument()
+            guard let nickname = document.get("nickname") as? String else {
+                throw NicknameClientError.saveFailed(code: 404, message: "닉네임을 찾을 수 없습니다.")
+            }
+            return nickname
+        } catch let error as NicknameClientError {
+            throw error
+        } catch {
+            throw map(error)
+        }
+    }
+
     static func saveNickname(userID: String, nickname: String) async throws {
         guard FirebaseService.isConfigured else {
             throw NicknameClientError.firebaseNotConfigured
@@ -58,6 +76,7 @@ enum FirebaseNicknameService {
             _ = try await database.runTransaction { transaction, errorPointer in
                 do {
                     let nicknameDocument = try transaction.getDocument(nicknameReference)
+                    let userDocument = try transaction.getDocument(userReference)
                     if nicknameDocument.exists,
                        nicknameDocument.get("uid") as? String != userID {
                         errorPointer?.pointee = NSError(
@@ -85,6 +104,12 @@ enum FirebaseNicknameService {
                         forDocument: userReference,
                         merge: true
                     )
+                    if let previousKey = userDocument.get("nicknameKey") as? String,
+                       previousKey != nicknameKey {
+                        transaction.deleteDocument(
+                            database.collection("nicknames").document(previousKey)
+                        )
+                    }
                     return nil
                 } catch {
                     errorPointer?.pointee = error as NSError
@@ -108,26 +133,22 @@ enum FirebaseNicknameService {
 
         do {
             let userDocument = try await userReference.getDocument()
-            let ownedNicknameDocuments = try await database
-                .collection("nicknames")
-                .whereField("uid", isEqualTo: userID)
-                .getDocuments()
             let batch = database.batch()
-            var nicknameReferences = Dictionary(
-                uniqueKeysWithValues: ownedNicknameDocuments.documents.map {
-                    ($0.reference.path, $0.reference)
-                }
-            )
 
             if let nicknameKey = userDocument.get("nicknameKey") as? String {
                 let nicknameReference = database
                     .collection("nicknames")
                     .document(nicknameKey)
-                nicknameReferences[nicknameReference.path] = nicknameReference
-            }
-
-            for nicknameReference in nicknameReferences.values {
                 batch.deleteDocument(nicknameReference)
+            } else {
+                // nicknameKey를 저장하기 전에 생성된 기존 계정만 UID 쿼리로 정리한다.
+                let ownedNicknameDocuments = try await database
+                    .collection("nicknames")
+                    .whereField("uid", isEqualTo: userID)
+                    .getDocuments()
+                for document in ownedNicknameDocuments.documents {
+                    batch.deleteDocument(document.reference)
+                }
             }
 
             batch.deleteDocument(userReference)

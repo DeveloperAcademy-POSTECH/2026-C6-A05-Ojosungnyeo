@@ -24,6 +24,7 @@ struct RootFeature: Reducer {
         var login = LoginFeature.State()
         var nicknameSetup = NicknameSetupFeature.State()
         var home = HomeFeature.State()
+        var isCompletingWithdrawal = false
     }
 
     @CasePathable
@@ -70,12 +71,15 @@ struct RootFeature: Reducer {
 
             case let .authenticationStateChanged(user):
                 guard let user else {
+                    if state.isCompletingWithdrawal { return .none }
                     state.authenticatedUserID = nil
                     state.authenticationStatus = .unauthenticated
                     return .none
                 }
 
                 state.authenticatedUserID = user.id
+                state.home.userID = user.id
+                state.home.settings.userID = user.id
                 state.authenticationStatus = .checking
                 state.nicknameSetup = NicknameSetupFeature.State(userID: user.id)
                 return checkNickname(userID: user.id)
@@ -104,6 +108,21 @@ struct RootFeature: Reducer {
 
             case .nicknameSetup(.delegate(.completed)):
                 state.authenticationStatus = .authenticated
+                return .none
+
+            case .home(.settings(.delegate(.withdrawalStarted))):
+                state.isCompletingWithdrawal = true
+                return .none
+
+            case .home(.settings(.withdrawalResponse(.failure(_)))):
+                state.isCompletingWithdrawal = false
+                return .none
+
+            case .home(.settings(.delegate(.returnToLogin))):
+                state.isCompletingWithdrawal = false
+                state.authenticatedUserID = nil
+                state.authenticationStatus = .unauthenticated
+                state.home = HomeFeature.State()
                 return .none
 
             case .login, .nicknameSetup, .home:

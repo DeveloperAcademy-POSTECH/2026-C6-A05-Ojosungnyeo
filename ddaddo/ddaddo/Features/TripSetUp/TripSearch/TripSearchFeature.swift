@@ -7,20 +7,12 @@ import ComposableArchitecture
 import Foundation
 
 struct TripSearchFeature: Reducer {
-    enum Region: String, CaseIterable, Equatable {
-        case asia = "아시아"
-        case southeastAsia = "동남아"
-        case europe = "유럽"
-        case americasAndOceania = "미주/오세아니아"
+    enum Delegate: Equatable {
+        case returnHome
     }
 
-    struct City: Equatable, Identifiable {
-        let id: String
-        let country: String
-        let name: String
-        let region: Region
-        let thumbnailName: String
-    }
+    typealias Region = TripDestination.Region
+    typealias City = TripDestination
 
     @ObservableState
     struct State: Equatable {
@@ -28,7 +20,9 @@ struct TripSearchFeature: Reducer {
         var selectedRegion: Region = .asia
         var selectedCityIDs: Set<City.ID> = []
         var selectedCityOrder: [City.ID] = []
-        var cities = TripSearchMockData.cities
+        var cities: [City] = []
+        var isLoading = false
+        var errorMessage: String?
         var tripSetUp = TripSetUpFeature.State()
         var isTripSetUpPresented = false
 
@@ -56,6 +50,9 @@ struct TripSearchFeature: Reducer {
 
     @CasePathable
     enum Action: Equatable {
+        case onAppear
+        case destinationsResponse([City])
+        case destinationsFailed(String)
         case backButtonTapped
         case searchTextChanged(String)
         case regionFilterSelected(Region)
@@ -64,11 +61,36 @@ struct TripSearchFeature: Reducer {
         case nextButtonTapped
         case tripSetUpDismissed
         case tripSetUp(TripSetUpFeature.Action)
+        case delegate(Delegate)
     }
+
+    @Dependency(\.destinationClient) var destinationClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                guard state.cities.isEmpty, !state.isLoading else { return .none }
+                state.isLoading = true
+                state.errorMessage = nil
+                return .run { send in
+                    do {
+                        await send(.destinationsResponse(try await destinationClient.fetchDestinations()))
+                    } catch {
+                        await send(.destinationsFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .destinationsResponse(cities):
+                state.cities = cities
+                state.isLoading = false
+                return .none
+
+            case let .destinationsFailed(message):
+                state.isLoading = false
+                state.errorMessage = message
+                return .none
+
             case .backButtonTapped:
                 return .none
 
@@ -83,7 +105,14 @@ struct TripSearchFeature: Reducer {
                 state.isTripSetUpPresented = false
                 return .none
 
+            case .tripSetUp(.delegate(.returnHome)):
+                state.isTripSetUpPresented = false
+                return .send(.delegate(.returnHome))
+
             case .tripSetUp:
+                return .none
+
+            case .delegate:
                 return .none
 
             case let .searchTextChanged(text):

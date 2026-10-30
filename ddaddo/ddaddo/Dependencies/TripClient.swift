@@ -10,6 +10,7 @@ import ComposableArchitecture
 struct TripClient: DependencyKey, Sendable {
     var createTrip: @MainActor @Sendable (TripCreationRequest) async throws -> TripInvitationSnapshot
     var fetchInvitation: @MainActor @Sendable (String) async throws -> TripInvitationSnapshot
+    var joinTrip: @MainActor @Sendable (String) async throws -> TripInvitationSnapshot
 
     static let liveValue = Self(
         createTrip: { request in
@@ -17,12 +18,16 @@ struct TripClient: DependencyKey, Sendable {
         },
         fetchInvitation: { tripID in
             try await FirebaseTripService.fetchInvitation(tripID: tripID)
+        },
+        joinTrip: { inviteCode in
+            try await FirebaseTripService.joinTrip(inviteCode: inviteCode)
         }
     )
 
     static let testValue = Self(
         createTrip: { _ in throw CancellationError() },
-        fetchInvitation: { _ in throw CancellationError() }
+        fetchInvitation: { _ in throw CancellationError() },
+        joinTrip: { _ in throw CancellationError() }
     )
 }
 

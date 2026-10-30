@@ -7,6 +7,10 @@ import ComposableArchitecture
 import Foundation
 
 struct TripSetUpFeature: Reducer {
+    enum Delegate: Equatable {
+        case returnHome
+    }
+
     @ObservableState
     struct State: Equatable {
         static let maximumTravelerCount = 4
@@ -108,6 +112,7 @@ struct TripSetUpFeature: Reducer {
         case creationErrorDismissed
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
+        case delegate(Delegate)
     }
 
     @Dependency(\.tripClient) var tripClient
@@ -220,7 +225,14 @@ struct TripSetUpFeature: Reducer {
                 state.isWaitingForParticipantsPresented = false
                 return .none
 
+            case .waitingForParticipants(.delegate(.returnHome)):
+                state.isWaitingForParticipantsPresented = false
+                return .send(.delegate(.returnHome))
+
             case .waitingForParticipants:
+                return .none
+
+            case .delegate:
                 return .none
 
             case .travelerDecreaseButtonTapped:

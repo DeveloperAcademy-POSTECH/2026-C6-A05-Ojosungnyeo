@@ -7,11 +7,24 @@ import ComposableArchitecture
 import Foundation
 
 struct WaitingForParticipantsFeature: Reducer {
+    enum Delegate: Equatable {
+        case returnHome
+    }
+
     struct Participant: Equatable, Identifiable {
         let id: Int
         let name: String
         let avatarName: String?
         let hasJoined: Bool
+
+        var displayName: String {
+            if name.hasPrefix("친구 "),
+               name.dropFirst(3).allSatisfy(\.isNumber) {
+                return name
+            }
+            guard name.count > 3 else { return name }
+            return "\(name.prefix(3))···"
+        }
     }
 
     struct Invitation: Equatable {
@@ -85,6 +98,11 @@ struct WaitingForParticipantsFeature: Reducer {
         var joinedCount: Int {
             invitation.participants.filter(\.hasJoined).count
         }
+
+        var haveAllParticipantsJoined: Bool {
+            !invitation.participants.isEmpty
+                && joinedCount == invitation.participants.count
+        }
     }
 
     @CasePathable
@@ -100,6 +118,7 @@ struct WaitingForParticipantsFeature: Reducer {
         case mapConfirmationConfirmButtonTapped
         case placeSelectionDismissed
         case placeSelection(PlaceSelectionFeature.Action)
+        case delegate(Delegate)
     }
 
     @Dependency(\.continuousClock) var clock
@@ -130,7 +149,7 @@ struct WaitingForParticipantsFeature: Reducer {
                 return .none
 
             case .refreshTapped:
-                guard !state.isRefreshing else { return .none }
+                guard !state.isRefreshing, !state.haveAllParticipantsJoined else { return .none }
                 state.isRefreshing = true
                 let tripID = state.invitation.tripID
                 let fallbackInvitation = state.invitation
@@ -151,16 +170,19 @@ struct WaitingForParticipantsFeature: Reducer {
                 return .none
 
             case .mapButtonTapped:
-                guard state.joinedCount < state.invitation.participants.count else {
+                if state.haveAllParticipantsJoined {
+                    state.isMapConfirmationPresented = false
                     state.isPlaceSelectionPresented = true
                     return .none
                 }
+
+                state.isPlaceSelectionPresented = false
                 state.isMapConfirmationPresented = true
                 return .none
 
             case .mapConfirmationCancelButtonTapped:
                 state.isMapConfirmationPresented = false
-                return .none
+                return .send(.delegate(.returnHome))
 
             case .mapConfirmationConfirmButtonTapped:
                 guard state.isMapConfirmationPresented else { return .none }
@@ -173,6 +195,9 @@ struct WaitingForParticipantsFeature: Reducer {
                 return .none
 
             case .placeSelection:
+                return .none
+
+            case .delegate:
                 return .none
 
             case .backButtonTapped:

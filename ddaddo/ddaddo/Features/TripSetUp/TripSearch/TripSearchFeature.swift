@@ -7,6 +7,10 @@ import ComposableArchitecture
 import Foundation
 
 struct TripSearchFeature: Reducer {
+    enum Delegate: Equatable {
+        case returnHome
+    }
+
     typealias Region = TripDestination.Region
     typealias City = TripDestination
 
@@ -57,6 +61,7 @@ struct TripSearchFeature: Reducer {
         case nextButtonTapped
         case tripSetUpDismissed
         case tripSetUp(TripSetUpFeature.Action)
+        case delegate(Delegate)
     }
 
     @Dependency(\.destinationClient) var destinationClient
@@ -100,7 +105,14 @@ struct TripSearchFeature: Reducer {
                 state.isTripSetUpPresented = false
                 return .none
 
+            case .tripSetUp(.delegate(.returnHome)):
+                state.isTripSetUpPresented = false
+                return .send(.delegate(.returnHome))
+
             case .tripSetUp:
+                return .none
+
+            case .delegate:
                 return .none
 
             case let .searchTextChanged(text):

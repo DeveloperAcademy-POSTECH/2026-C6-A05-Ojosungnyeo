@@ -86,9 +86,38 @@ struct UpcomingTripsView: View {
                 }
                 .transition(.opacity)
             }
+
+            if store.isWaitingForParticipantsPresented,
+               let waitingStore = store.scope(
+                   state: \.waitingForParticipants,
+                   action: \.waitingForParticipants
+               ) {
+                NavigationStack {
+                    WaitingForParticipantsView(store: waitingStore)
+                }
+                .transition(.move(edge: .trailing))
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: store.isInviteCodeModalPresented)
+        .animation(.easeInOut(duration: 0.3), value: store.isWaitingForParticipantsPresented)
         .preferredColorScheme(.dark)
+        .alert(
+            "여행에 참여할 수 없어요",
+            isPresented: Binding(
+                get: { store.joinErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.joinErrorDismissed)
+                    }
+                }
+            )
+        ) {
+            Button("확인", role: .cancel) {
+                store.send(.joinErrorDismissed)
+            }
+        } message: {
+            Text(store.joinErrorMessage ?? "")
+        }
     }
 
     private var header: some View {

@@ -108,26 +108,22 @@ enum FirebaseNicknameService {
 
         do {
             let userDocument = try await userReference.getDocument()
-            let ownedNicknameDocuments = try await database
-                .collection("nicknames")
-                .whereField("uid", isEqualTo: userID)
-                .getDocuments()
             let batch = database.batch()
-            var nicknameReferences = Dictionary(
-                uniqueKeysWithValues: ownedNicknameDocuments.documents.map {
-                    ($0.reference.path, $0.reference)
-                }
-            )
 
             if let nicknameKey = userDocument.get("nicknameKey") as? String {
                 let nicknameReference = database
                     .collection("nicknames")
                     .document(nicknameKey)
-                nicknameReferences[nicknameReference.path] = nicknameReference
-            }
-
-            for nicknameReference in nicknameReferences.values {
                 batch.deleteDocument(nicknameReference)
+            } else {
+                // nicknameKey를 저장하기 전에 생성된 기존 계정만 UID 쿼리로 정리한다.
+                let ownedNicknameDocuments = try await database
+                    .collection("nicknames")
+                    .whereField("uid", isEqualTo: userID)
+                    .getDocuments()
+                for document in ownedNicknameDocuments.documents {
+                    batch.deleteDocument(document.reference)
+                }
             }
 
             batch.deleteDocument(userReference)

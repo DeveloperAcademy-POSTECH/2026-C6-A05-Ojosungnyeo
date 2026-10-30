@@ -22,6 +22,8 @@ struct TripSetUpFeature: Reducer {
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
         var isConfirmationAlertPresented = false
+        var isCreatingTrip = false
+        var creationErrorMessage: String?
         var waitingForParticipants: WaitingForParticipantsFeature.State? = nil
         var isWaitingForParticipantsPresented = false
 
@@ -101,9 +103,14 @@ struct TripSetUpFeature: Reducer {
         case saveButtonTapped
         case confirmationCancelButtonTapped
         case confirmationConfirmButtonTapped
+        case tripCreationResponse(TripInvitationSnapshot)
+        case tripCreationFailed(String)
+        case creationErrorDismissed
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
     }
+
+    @Dependency(\.tripClient) var tripClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -169,10 +176,43 @@ struct TripSetUpFeature: Reducer {
             case .confirmationConfirmButtonTapped:
                 guard state.isSaveEnabled, state.isConfirmationAlertPresented else { return .none }
                 state.isConfirmationAlertPresented = false
-                if state.waitingForParticipants == nil {
-                    state.waitingForParticipants = .mock()
+                guard
+                    let startDate = state.tripStartDate,
+                    let endDate = state.tripEndDate,
+                    let transportation = state.transportationSelection
+                else { return .none }
+                state.isCreatingTrip = true
+                state.creationErrorMessage = nil
+                let request = TripCreationRequest(
+                    title: state.tripTitle,
+                    destinations: state.selectedCities,
+                    startDate: startDate,
+                    endDate: endDate,
+                    travelerCount: state.travelerCount,
+                    transportation: transportation.transportation.rawValue,
+                    maximumTravelMinutes: transportation.duration.rawValue
+                )
+                return .run { send in
+                    do {
+                        await send(.tripCreationResponse(try await tripClient.createTrip(request)))
+                    } catch {
+                        await send(.tripCreationFailed(error.localizedDescription))
+                    }
                 }
+
+            case let .tripCreationResponse(snapshot):
+                state.isCreatingTrip = false
+                state.waitingForParticipants = WaitingForParticipantsFeature.State(snapshot: snapshot)
                 state.isWaitingForParticipantsPresented = true
+                return .none
+
+            case let .tripCreationFailed(message):
+                state.isCreatingTrip = false
+                state.creationErrorMessage = message
+                return .none
+
+            case .creationErrorDismissed:
+                state.creationErrorMessage = nil
                 return .none
 
             case .waitingForParticipantsDismissed,

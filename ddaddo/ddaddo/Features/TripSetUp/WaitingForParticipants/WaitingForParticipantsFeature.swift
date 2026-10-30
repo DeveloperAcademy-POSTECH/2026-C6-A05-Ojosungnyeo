@@ -15,6 +15,7 @@ struct WaitingForParticipantsFeature: Reducer {
     }
 
     struct Invitation: Equatable {
+        let tripID: String
         let code: String
         let url: URL
         let expiresAt: Date
@@ -36,6 +37,12 @@ struct WaitingForParticipantsFeature: Reducer {
         init(invitation: Invitation, countdownDuration: TimeInterval, currentDate: Date = Date()) {
             self.invitation = invitation
             self.countdownDuration = countdownDuration
+            self.currentDate = currentDate
+        }
+
+        init(snapshot: TripInvitationSnapshot, currentDate: Date = Date()) {
+            invitation = Invitation(snapshot: snapshot)
+            countdownDuration = Self.mockDuration
             self.currentDate = currentDate
         }
 
@@ -88,6 +95,7 @@ struct WaitingForParticipantsFeature: Reducer {
     }
 
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.tripClient) var tripClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -116,10 +124,15 @@ struct WaitingForParticipantsFeature: Reducer {
             case .refreshTapped:
                 guard !state.isRefreshing else { return .none }
                 state.isRefreshing = true
-                let invitation = Invitation.mock(expiresAt: state.invitation.expiresAt)
+                let tripID = state.invitation.tripID
+                let fallbackInvitation = state.invitation
                 return .run { send in
-                    try await clock.sleep(for: .milliseconds(350))
-                    await send(.refreshCompleted(invitation, Date()))
+                    do {
+                        let snapshot = try await tripClient.fetchInvitation(tripID)
+                        await send(.refreshCompleted(Invitation(snapshot: snapshot), Date()))
+                    } catch {
+                        await send(.refreshCompleted(fallbackInvitation, Date()))
+                    }
                 }
                 .cancellable(id: "waiting-participants-refresh")
 
@@ -166,8 +179,26 @@ struct WaitingForParticipantsFeature: Reducer {
 }
 
 private extension WaitingForParticipantsFeature.Invitation {
+    init(snapshot: TripInvitationSnapshot) {
+        self.init(
+            tripID: snapshot.tripID,
+            code: snapshot.code,
+            url: snapshot.url,
+            expiresAt: snapshot.expiresAt,
+            participants: snapshot.participants.map {
+                .init(
+                    id: $0.id,
+                    name: $0.name,
+                    avatarName: $0.avatarName,
+                    hasJoined: $0.hasJoined
+                )
+            }
+        )
+    }
+
     static func mock(expiresAt: Date) -> Self {
         Self(
+            tripID: "preview-trip",
             code: "999994",
             // Replace with the server-provided web invitation URL when available.
             url: URL(string: "https://ddaddo-web.vercel.app/invite")!,

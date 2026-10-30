@@ -205,9 +205,9 @@ private extension WaitingForParticipantsFeature.Invitation {
             expiresAt: expiresAt,
             participants: [
                 .init(id: 1, name: "테이", avatarName: "DDMiniHeadTae", hasJoined: true),
-                .init(id: 2, name: "한아름…", avatarName: "DDMiniHeadHeader", hasJoined: true),
-                .init(id: 3, name: "친구 3", avatarName: nil, hasJoined: false),
-                .init(id: 4, name: "친구 4", avatarName: nil, hasJoined: false)
+                .init(id: 2, name: "헤더", avatarName: "DDMiniHeadHeader", hasJoined: true),
+                .init(id: 3, name: "그레", avatarName: "DDMiniHeadGrae", hasJoined: false),
+                .init(id: 4, name: "주니", avatarName: "DDMiniHeadJuni", hasJoined: false)
             ]
         )
     }

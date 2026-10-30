@@ -285,14 +285,11 @@ struct WaitingForParticipantsView: View {
     }
 
     private func avatarBackgroundColor(for avatarName: String?) -> Color {
-        switch avatarName {
-        case DDMiniHeadAvatar.Character.tae.rawValue:
-            Color(red: 217 / 255, green: 149 / 255, blue: 126 / 255)
-        case DDMiniHeadAvatar.Character.header.rawValue:
-            Color(red: 152 / 255, green: 156 / 255, blue: 209 / 255)
-        default:
-            DDColor.avatarBackground
-        }
+        guard let avatarName,
+              let character = ParticipantAvatar(rawValue: avatarName)
+        else { return DDColor.avatarBackground }
+
+        return character.backgroundColor
     }
 
     private var refreshButton: some View {

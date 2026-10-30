@@ -10,6 +10,7 @@ struct DDConfirmationAlert: View {
     let message: String
     let cancelTitle: String
     let confirmTitle: String
+    var confirmColor: Color = DDColor.actionPrimary
     let onCancel: () -> Void
     let onConfirm: () -> Void
 
@@ -42,7 +43,7 @@ struct DDConfirmationAlert: View {
 
                 dividerColor.frame(width: 0.5)
 
-                actionButton(title: confirmTitle, color: DDColor.actionPrimary, action: onConfirm)
+                actionButton(title: confirmTitle, color: confirmColor, action: onConfirm)
             }
             .frame(height: 48)
         }

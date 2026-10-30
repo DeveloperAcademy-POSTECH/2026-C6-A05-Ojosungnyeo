@@ -39,6 +39,8 @@ struct HomeFeature: Reducer {
         var tripSearch = TripSearchFeature.State()
         var isTripSearchPresented = false
         var isMenuPresented = false
+        var settings = SettingsFeature.State()
+        var isSettingsPresented = false
         var isWithdrawalConfirmationPresented = false
         var isWithdrawing = false
         var withdrawalErrorMessage: String?
@@ -53,6 +55,7 @@ struct HomeFeature: Reducer {
         case tripSearch(TripSearchFeature.Action)
         case mascotTapped
         case menuButtonTapped
+        case settings(SettingsFeature.Action)
         case menuDismissed
         case logoutButtonTapped
         case withdrawButtonTapped
@@ -101,7 +104,12 @@ struct HomeFeature: Reducer {
                 state.mascotMessage = state.mascotMessage.next
                 return .none
             case .menuButtonTapped:
-                state.isMenuPresented.toggle()
+                state.isSettingsPresented = true
+                return .none
+            case .settings(.delegate(.dismiss)):
+                state.isSettingsPresented = false
+                return .none
+            case .settings:
                 return .none
             case .menuDismissed:
                 state.isMenuPresented = false
@@ -189,6 +197,10 @@ struct HomeFeature: Reducer {
 
         Scope(state: \.tripSearch, action: \.tripSearch) {
             TripSearchFeature()
+        }
+
+        Scope(state: \.settings, action: \.settings) {
+            SettingsFeature()
         }
     }
 }

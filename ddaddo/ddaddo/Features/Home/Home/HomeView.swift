@@ -77,10 +77,16 @@ struct HomeView: View {
                 )
                 .transition(.move(edge: .trailing))
             }
+
+            if store.isSettingsPresented {
+                SettingsView(store: store.scope(state: \.settings, action: \.settings))
+                    .transition(.move(edge: .trailing))
+            }
         }
         .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripSearchPresented)
+        .animation(.easeInOut(duration: 0.3), value: store.isSettingsPresented)
         .preferredColorScheme(.dark)
         .confirmationDialog(
             "정말 탈퇴할까요?",
@@ -220,7 +226,7 @@ struct HomeView: View {
         Button {
             store.send(.menuButtonTapped)
         } label: {
-            Image(systemName: "line.3.horizontal")
+            Image(systemName: "gearshape.fill")
                 .font(.system(size: 28, weight: .regular))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)

@@ -134,11 +134,7 @@ struct WaitingForParticipantsView: View {
 
                 Spacer(minLength: DDSpacing.small)
 
-                ShareLink(
-                    item: store.invitation.url,
-                    subject: Text("따또 여행 초대"),
-                    message: Text("초대 코드: \(store.invitation.code)")
-                ) {
+                ShareLink(item: store.invitation.shareText) {
                     Text("공유하기")
                         .ddTypography(.labelEmphasis14)
                         .foregroundStyle(DDColor.textOnPrimary)

@@ -10,7 +10,14 @@ import GoogleMaps
 import GooglePlaces
 
 enum GoogleMapsService {
-    static func configure() {
+    private(set) static var isConfigured = false
+
+    @discardableResult
+    static func configure() -> Bool {
+        if isConfigured {
+            return true
+        }
+
         guard
             let apiKey = Bundle.main.object(
                 forInfoDictionaryKey: "GoogleMapsAPIKey"
@@ -19,10 +26,11 @@ enum GoogleMapsService {
             !apiKey.hasPrefix("$("),
             apiKey != "YOUR_GOOGLE_MAPS_API_KEY"
         else {
-            return
+            return false
         }
 
-        GMSServices.provideAPIKey(apiKey)
+        isConfigured = GMSServices.provideAPIKey(apiKey)
         GMSPlacesClient.provideAPIKey(apiKey)
+        return isConfigured
     }
 }

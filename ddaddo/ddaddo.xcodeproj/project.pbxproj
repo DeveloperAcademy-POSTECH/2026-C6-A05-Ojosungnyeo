@@ -17,6 +17,7 @@
 
 /* Begin PBXFileReference section */
 		A4082CA73085064D0024DF57 /* ddaddo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ddaddo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E50000013085064E0024DF57 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -292,6 +293,7 @@
 		};
 		A4082CB33085064E0024DF57 /* Debug configuration for PBXNativeTarget "ddaddo" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E50000013085064E0024DF57 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -335,6 +337,7 @@
 		};
 		A4082CB43085064E0024DF57 /* Release configuration for PBXNativeTarget "ddaddo" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E50000013085064E0024DF57 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

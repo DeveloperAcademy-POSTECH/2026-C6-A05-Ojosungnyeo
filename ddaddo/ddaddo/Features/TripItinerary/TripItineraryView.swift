@@ -22,6 +22,9 @@ struct TripItineraryView: View {
                         action: \.timeTable
                     )
                 )
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    itineraryTabBar
+                }
 
             case .routeOverview:
                 RouteOverviewView(
@@ -32,13 +35,14 @@ struct TripItineraryView: View {
                 )
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            DDCustomTabBar(
-                items: tabItems,
-                selection: store.selectedTab,
-                onSelect: { store.send(.tabSelected($0)) }
-            )
-        }
+    }
+
+    private var itineraryTabBar: some View {
+        DDCustomTabBar(
+            items: tabItems,
+            selection: store.selectedTab,
+            onSelect: { store.send(.tabSelected($0)) }
+        )
     }
 }
 

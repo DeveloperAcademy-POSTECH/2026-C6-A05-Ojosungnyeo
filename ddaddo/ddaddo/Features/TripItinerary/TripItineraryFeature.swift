@@ -34,6 +34,10 @@ struct TripItineraryFeature: Reducer {
                 state.selectedTab = tab
                 return .none
 
+            case .routeOverview(.backButtonTapped):
+                state.selectedTab = .dailyItinerary
+                return .none
+
             case .timeTable, .routeOverview:
                 return .none
             }

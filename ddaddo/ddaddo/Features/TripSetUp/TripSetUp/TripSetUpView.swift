@@ -35,6 +35,45 @@ struct TripSetUpView: View {
             .background(DDColor.surfaceDefault.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .preferredColorScheme(.dark)
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { store.isWaitingForParticipantsPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.waitingForParticipantsDismissed)
+                        }
+                    }
+                )
+            ) {
+                if let waitingStore = store.scope(
+                    state: \.waitingForParticipants,
+                    action: \.waitingForParticipants
+                ) {
+                    WaitingForParticipantsView(store: waitingStore)
+                }
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { store.isDatePickerPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.tripDatePickerCloseButtonTapped)
+                        }
+                    }
+                )
+            ) {
+                TripDatePickerView(
+                    selectedStartDate: store.draftStartDate,
+                    selectedEndDate: store.draftEndDate,
+                    onDateSelected: { store.send(.tripDateTapped($0)) },
+                    onClose: { store.send(.tripDatePickerCloseButtonTapped) },
+                    onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
+                )
+                .presentationDetents([.height(526)])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(36)
+                .presentationBackground(DDColor.surfaceDefault)
+            }
             .sheet(
                 isPresented: Binding(
                     get: { store.isTransportationSheetPresented },
@@ -55,6 +94,25 @@ struct TripSetUpView: View {
                 .presentationDragIndicator(.hidden)
                 .presentationCornerRadius(40)
                 .presentationBackground(DDColor.surfaceDefault)
+            }
+        }
+        .allowsHitTesting(!store.isConfirmationAlertPresented)
+        .overlay {
+            if store.isConfirmationAlertPresented {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: "친구를 초대할까요?",
+                        message: "여행 계획을 위한 모든 준비가 끝났어요.\n친구를 초대하러 가시겠어요?",
+                        cancelTitle: "아니요",
+                        confirmTitle: "네",
+                        onCancel: { store.send(.confirmationCancelButtonTapped) },
+                        onConfirm: { store.send(.confirmationConfirmButtonTapped) }
+                    )
+                }
             }
         }
     }
@@ -99,7 +157,7 @@ struct TripSetUpView: View {
     private var setUpCards: some View {
         VStack(spacing: DDSpacing.medium) {
             navigationCard(title: "여행 일정", detail: store.tripDateSummary, height: 83) {
-                // TODO: 새 여행 일정 선택 UI가 준비되면 연결합니다.
+                store.send(.travelScheduleButtonTapped)
             }
 
             travelerCard

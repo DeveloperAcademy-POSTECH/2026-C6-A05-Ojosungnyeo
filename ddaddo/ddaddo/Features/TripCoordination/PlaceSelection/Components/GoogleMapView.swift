@@ -24,7 +24,11 @@ struct GoogleMapView: UIViewRepresentable {
         Coordinator()
     }
 
-    func makeUIView(context: Context) -> GMSMapView {
+    func makeUIView(context: Context) -> UIView {
+        guard GoogleMapsService.configure() else {
+            return configurationErrorView
+        }
+
         let camera = GMSCameraPosition(
             latitude: latitude,
             longitude: longitude,
@@ -41,8 +45,20 @@ struct GoogleMapView: UIViewRepresentable {
         return mapView
     }
 
-    func updateUIView(_ mapView: GMSMapView, context: Context) {
+    func updateUIView(_ view: UIView, context: Context) {
+        guard let mapView = view as? GMSMapView else { return }
         updateSelection(on: mapView, coordinator: context.coordinator)
+    }
+
+    private var configurationErrorView: UIView {
+        let label = UILabel()
+        label.backgroundColor = UIColor(red: 0.14, green: 0.14, blue: 0.14, alpha: 1)
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 15, weight: .medium)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.text = "Google Maps API Key 설정을 확인해 주세요."
+        return label
     }
 
     private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {

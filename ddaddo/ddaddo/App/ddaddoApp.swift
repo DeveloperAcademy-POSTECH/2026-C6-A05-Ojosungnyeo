@@ -23,12 +23,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 struct ddaddoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    private let store = Store(initialState: RootFeature.State()) {
-        RootFeature()
-    }
+    private let store: StoreOf<RootFeature>
 
     init() {
         GoogleMapsService.configure()
+        FirebaseService.configure()
+        store = Store(initialState: RootFeature.State()) {
+            RootFeature()
+        }
     }
 
     var body: some Scene {

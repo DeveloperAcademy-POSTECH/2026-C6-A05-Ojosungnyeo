@@ -78,6 +78,7 @@ struct RootFeature: Reducer {
                 }
 
                 state.authenticatedUserID = user.id
+                state.home.userID = user.id
                 state.home.settings.userID = user.id
                 state.authenticationStatus = .checking
                 state.nicknameSetup = NicknameSetupFeature.State(userID: user.id)

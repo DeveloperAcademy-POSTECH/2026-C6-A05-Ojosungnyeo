@@ -87,6 +87,9 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripSearchPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isSettingsPresented)
+        .task {
+            store.send(.onAppear)
+        }
         .preferredColorScheme(.dark)
         .confirmationDialog(
             "정말 탈퇴할까요?",
@@ -169,11 +172,10 @@ struct HomeView: View {
     }
 
     private var speechBubble: some View {
-        Text(store.mascotMessage.text)
+        mascotMessageText
             .ddTypography(.bodyEmphasis16)
-            .foregroundStyle(DDColor.textOnPrimary)
             .lineSpacing(4)
-            .frame(width: 241, alignment: .leading)
+            .frame(width: 250, height: 48, alignment: .leading)
             .frame(width: 324, height: 92)
             .background(.white)
             .clipShape(.rect(cornerRadius: 46))
@@ -185,6 +187,34 @@ struct HomeView: View {
                     .offset(x: -54, y: 17)
             }
             .position(x: 203, y: 242)
+    }
+
+    private var mascotMessageText: Text {
+        let nickname = store.nickname.isEmpty ? "지구인" : store.nickname
+        let bodyColor = Color(red: 0.38, green: 0.38, blue: 0.38)
+        let nicknameColor = DDColor.textOnPrimary
+
+        switch store.mascotMessage {
+        case .welcome:
+            return Text("어서오세따. 저는 따또입니따.\n")
+                .foregroundColor(bodyColor)
+                + Text(nickname)
+                .foregroundColor(nicknameColor)
+                + Text("의 즐거운 지구 여행을 책임집니따.")
+                .foregroundColor(bodyColor)
+        case .destination:
+            return Text(nickname)
+                .foregroundColor(nicknameColor)
+                + Text(", 어디로 여행을 가볼까따?\n말만 해주세따. 제가 다 도와드리게따.")
+                .foregroundColor(bodyColor)
+        case .friends:
+            return Text("친구와 함께 가는 여행이라니 즐겁게따.\n")
+                .foregroundColor(bodyColor)
+                + Text(nickname)
+                .foregroundColor(nicknameColor)
+                + Text(", 내가 성심성의껏 도와주게따.")
+                .foregroundColor(bodyColor)
+        }
     }
 
     private var sparkles: some View {

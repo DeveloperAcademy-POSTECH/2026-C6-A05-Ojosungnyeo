@@ -1,13 +1,13 @@
 //
-//  PlaceGroupingView.swift
+//  PlaceGroupingDetailView.swift
 //  ddaddo
 //
 
 import ComposableArchitecture
 import SwiftUI
 
-struct PlaceGroupingView: View {
-    let store: StoreOf<PlaceGroupingFeature>
+struct PlaceGroupingDetailView: View {
+    let store: StoreOf<PlaceGroupingDetailFeature>
     var initiallyRevealedPlaceID: String?
 
     var body: some View {
@@ -146,7 +146,7 @@ private struct PlaceSwipeRow: View {
     private let actionWidth: CGFloat = 196
     private let revealOffset: CGFloat = 208
 
-    let place: PlaceGroupingFeature.Place
+    let place: PlaceGroupingDetailFeature.Place
     let onEdit: () -> Void
     let onDelete: () -> Void
 
@@ -154,7 +154,7 @@ private struct PlaceSwipeRow: View {
     @State private var settledOffset: CGFloat
 
     init(
-        place: PlaceGroupingFeature.Place,
+        place: PlaceGroupingDetailFeature.Place,
         isInitiallyRevealed: Bool,
         onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void
@@ -264,17 +264,17 @@ private struct PlaceSwipeRow: View {
 }
 
 #Preview("Place grouping") {
-    PlaceGroupingView(
-        store: Store(initialState: PlaceGroupingFeature.State()) {
-            PlaceGroupingFeature()
+    PlaceGroupingDetailView(
+        store: Store(initialState: PlaceGroupingDetailFeature.State()) {
+            PlaceGroupingDetailFeature()
         }
     )
 }
 
 #Preview("Place grouping - swipe actions") {
-    PlaceGroupingView(
-        store: Store(initialState: PlaceGroupingFeature.State()) {
-            PlaceGroupingFeature()
+    PlaceGroupingDetailView(
+        store: Store(initialState: PlaceGroupingDetailFeature.State()) {
+            PlaceGroupingDetailFeature()
         },
         initiallyRevealedPlaceID: "tokyo-station-shopping"
     )

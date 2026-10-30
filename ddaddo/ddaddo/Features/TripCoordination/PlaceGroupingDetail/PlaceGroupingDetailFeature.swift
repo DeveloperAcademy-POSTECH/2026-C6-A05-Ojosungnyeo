@@ -1,11 +1,11 @@
 //
-//  PlaceGroupingFeature.swift
+//  PlaceGroupingDetailFeature.swift
 //  ddaddo
 //
 
 import ComposableArchitecture
 
-struct PlaceGroupingFeature: Reducer {
+struct PlaceGroupingDetailFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var tripTitle = "도쿄 여행"
@@ -46,7 +46,7 @@ struct PlaceGroupingFeature: Reducer {
     }
 }
 
-extension PlaceGroupingFeature.Member {
+extension PlaceGroupingDetailFeature.Member {
     fileprivate static let preview: [Self] = [
         .init(id: "tae", character: .tae),
         .init(id: "header", character: .header),
@@ -55,7 +55,7 @@ extension PlaceGroupingFeature.Member {
     ]
 }
 
-extension PlaceGroupingFeature.Place {
+extension PlaceGroupingDetailFeature.Place {
     fileprivate static let preview: [Self] = [
         .init(
             id: "tokyo-station-shopping",

@@ -33,12 +33,16 @@ struct TripItineraryView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DDCustomTabBar(
-                items: tabItems,
-                selection: store.selectedTab,
-                onSelect: { store.send(.tabSelected($0)) }
-            )
+            itineraryTabBar
         }
+    }
+
+    private var itineraryTabBar: some View {
+        DDCustomTabBar(
+            items: tabItems,
+            selection: store.selectedTab,
+            onSelect: { store.send(.tabSelected($0)) }
+        )
     }
 }
 

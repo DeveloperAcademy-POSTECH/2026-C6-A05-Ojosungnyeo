@@ -11,8 +11,16 @@ import CoreGraphics
 struct RouteOverviewFeature: Reducer {
     @ObservableState
     struct State: Equatable {
+        var selectedDay = TripDay.day1
+        var visibleMembers = Set(TripMember.allCases)
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
         let places = RoutePlace.mockPlaces
+
+        var visibleStops: [RouteStop] {
+            RouteStop.stopsByDay[selectedDay, default: []].filter { stop in
+                !stop.members.isDisjoint(with: visibleMembers)
+            }
+        }
 
         var selectedPlace: RoutePlace {
             places.first { $0.id == selectedPlaceID } ?? places[0]
@@ -21,6 +29,9 @@ struct RouteOverviewFeature: Reducer {
 
     enum Action: Equatable {
         case backButtonTapped
+        case daySelected(TripDay)
+        case memberTapped(TripMember)
+        case editButtonTapped
         case placeChanged(RoutePlace.ID?)
         case addressCopyButtonTapped(String)
     }
@@ -29,6 +40,21 @@ struct RouteOverviewFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .backButtonTapped:
+                return .none
+
+            case let .daySelected(day):
+                state.selectedDay = day
+                return .none
+
+            case let .memberTapped(member):
+                if state.visibleMembers.contains(member) {
+                    state.visibleMembers.remove(member)
+                } else {
+                    state.visibleMembers.insert(member)
+                }
+                return .none
+
+            case .editButtonTapped:
                 return .none
 
             case let .placeChanged(placeID):
@@ -41,6 +67,39 @@ struct RouteOverviewFeature: Reducer {
             }
         }
     }
+}
+
+struct RouteStop: Equatable, Identifiable {
+    let id: Int
+    let name: String
+    let category: String
+    let latitude: Double
+    let longitude: Double
+    let members: Set<TripMember>
+
+    static let stopsByDay: [TripDay: [RouteStop]] = [
+        .day1: [
+            RouteStop(id: 0, name: "도쿄역 근처 쇼핑", category: "쇼핑", latitude: 35.6812, longitude: 139.7671, members: Set(TripMember.allCases)),
+            RouteStop(id: 1, name: "도쿄역", category: "관광", latitude: 35.6896, longitude: 139.7006, members: [.header, .grae]),
+            RouteStop(id: 2, name: "도쿄 국립박물관", category: "문화", latitude: 35.7188, longitude: 139.7765, members: Set(TripMember.allCases)),
+            RouteStop(id: 3, name: "아사쿠사", category: "관광", latitude: 35.7148, longitude: 139.7967, members: [.tae, .juni])
+        ],
+        .day2: [
+            RouteStop(id: 10, name: "메이지 신궁", category: "관광", latitude: 35.6764, longitude: 139.6993, members: Set(TripMember.allCases)),
+            RouteStop(id: 11, name: "하라주쿠", category: "쇼핑", latitude: 35.6702, longitude: 139.7027, members: [.tae, .header]),
+            RouteStop(id: 12, name: "시부야 스카이", category: "전망", latitude: 35.6585, longitude: 139.7013, members: Set(TripMember.allCases))
+        ],
+        .day3: [
+            RouteStop(id: 20, name: "도쿄 타워", category: "관광", latitude: 35.6586, longitude: 139.7454, members: Set(TripMember.allCases)),
+            RouteStop(id: 21, name: "긴자", category: "쇼핑", latitude: 35.6717, longitude: 139.7650, members: [.grae, .juni]),
+            RouteStop(id: 22, name: "오다이바", category: "관광", latitude: 35.6272, longitude: 139.7768, members: Set(TripMember.allCases))
+        ],
+        .day4: [
+            RouteStop(id: 30, name: "우에노 공원", category: "산책", latitude: 35.7148, longitude: 139.7732, members: Set(TripMember.allCases)),
+            RouteStop(id: 31, name: "아키하바라", category: "쇼핑", latitude: 35.6984, longitude: 139.7731, members: Set(TripMember.allCases)),
+            RouteStop(id: 32, name: "도쿄역", category: "이동", latitude: 35.6812, longitude: 139.7671, members: Set(TripMember.allCases))
+        ]
+    ]
 }
 
 struct RoutePlace: Equatable, Identifiable {

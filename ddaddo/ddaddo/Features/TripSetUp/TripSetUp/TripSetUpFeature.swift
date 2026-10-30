@@ -21,6 +21,7 @@ struct TripSetUpFeature: Reducer {
         var transportationSelection: TripSetUpTransportationFeature.Selection?
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
+        var isConfirmationAlertPresented = false
 
         var tripTitle: String {
             guard let firstCity = selectedCities.first else { return "" }
@@ -92,6 +93,8 @@ struct TripSetUpFeature: Reducer {
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
         case saveButtonTapped
+        case confirmationCancelButtonTapped
+        case confirmationConfirmButtonTapped
     }
 
     var body: some Reducer<State, Action> {
@@ -148,6 +151,11 @@ struct TripSetUpFeature: Reducer {
 
             case .saveButtonTapped:
                 guard state.isSaveEnabled else { return .none }
+                state.isConfirmationAlertPresented = true
+                return .none
+
+            case .confirmationCancelButtonTapped, .confirmationConfirmButtonTapped:
+                state.isConfirmationAlertPresented = false
                 return .none
 
             case .travelerDecreaseButtonTapped:

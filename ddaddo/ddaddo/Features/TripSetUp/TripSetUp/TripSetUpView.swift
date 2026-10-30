@@ -35,6 +35,23 @@ struct TripSetUpView: View {
             .background(DDColor.surfaceDefault.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .preferredColorScheme(.dark)
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { store.isWaitingForParticipantsPresented },
+                    set: { isPresented in
+                        if !isPresented {
+                            store.send(.waitingForParticipantsDismissed)
+                        }
+                    }
+                )
+            ) {
+                if let waitingStore = store.scope(
+                    state: \.waitingForParticipants,
+                    action: \.waitingForParticipants
+                ) {
+                    WaitingForParticipantsView(store: waitingStore)
+                }
+            }
             .sheet(
                 isPresented: Binding(
                     get: { store.isDatePickerPresented },

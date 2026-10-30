@@ -22,6 +22,12 @@ struct TripSetUpFeature: Reducer {
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
         var isConfirmationAlertPresented = false
+        var waitingForParticipants: WaitingForParticipantsFeature.State? = nil
+        var isWaitingForParticipantsPresented = false
+
+        init(selectedCities: [TripSearchFeature.City] = []) {
+            self.selectedCities = selectedCities
+        }
 
         var tripTitle: String {
             guard let firstCity = selectedCities.first else { return "" }
@@ -95,6 +101,8 @@ struct TripSetUpFeature: Reducer {
         case saveButtonTapped
         case confirmationCancelButtonTapped
         case confirmationConfirmButtonTapped
+        case waitingForParticipantsDismissed
+        case waitingForParticipants(WaitingForParticipantsFeature.Action)
     }
 
     var body: some Reducer<State, Action> {
@@ -154,8 +162,25 @@ struct TripSetUpFeature: Reducer {
                 state.isConfirmationAlertPresented = true
                 return .none
 
-            case .confirmationCancelButtonTapped, .confirmationConfirmButtonTapped:
+            case .confirmationCancelButtonTapped:
                 state.isConfirmationAlertPresented = false
+                return .none
+
+            case .confirmationConfirmButtonTapped:
+                guard state.isSaveEnabled, state.isConfirmationAlertPresented else { return .none }
+                state.isConfirmationAlertPresented = false
+                if state.waitingForParticipants == nil {
+                    state.waitingForParticipants = .mock()
+                }
+                state.isWaitingForParticipantsPresented = true
+                return .none
+
+            case .waitingForParticipantsDismissed,
+                 .waitingForParticipants(.backButtonTapped):
+                state.isWaitingForParticipantsPresented = false
+                return .none
+
+            case .waitingForParticipants:
                 return .none
 
             case .travelerDecreaseButtonTapped:
@@ -191,6 +216,9 @@ struct TripSetUpFeature: Reducer {
             case .backButtonTapped:
                 return .none
             }
+        }
+        .ifLet(\.waitingForParticipants, action: \.waitingForParticipants) {
+            WaitingForParticipantsFeature()
         }
 
         Scope(state: \.transportationSheet, action: \.transportationSheet) {

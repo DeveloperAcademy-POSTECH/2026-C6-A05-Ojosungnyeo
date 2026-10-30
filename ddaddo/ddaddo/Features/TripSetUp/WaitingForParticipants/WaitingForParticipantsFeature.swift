@@ -23,12 +23,15 @@ struct WaitingForParticipantsFeature: Reducer {
 
     @ObservableState
     struct State: Equatable {
-        static let mockDuration: TimeInterval = 65 * 60 + 14
+        static let mockDuration: TimeInterval = 72 * 60 * 60
 
         var invitation: Invitation
         var countdownDuration: TimeInterval
         var currentDate: Date
         var isRefreshing = false
+        var isMapConfirmationPresented = false
+        var placeSelection = PlaceSelectionFeature.State()
+        var isPlaceSelectionPresented = false
 
         init(invitation: Invitation, countdownDuration: TimeInterval, currentDate: Date = Date()) {
             self.invitation = invitation
@@ -54,9 +57,9 @@ struct WaitingForParticipantsFeature: Reducer {
         }
 
         var timerText: String {
-            let minutes = remainingSeconds / 60
-            let seconds = remainingSeconds % 60
-            return String(format: "%02d:%02d", minutes, seconds)
+            let hours = remainingSeconds / 3_600
+            let minutes = remainingSeconds % 3_600 / 60
+            return String(format: "%02d:%02d", hours, minutes)
         }
 
         var timerProgress: Double {
@@ -78,6 +81,10 @@ struct WaitingForParticipantsFeature: Reducer {
         case refreshTapped
         case refreshCompleted(Invitation, Date)
         case mapButtonTapped
+        case mapConfirmationCancelButtonTapped
+        case mapConfirmationConfirmButtonTapped
+        case placeSelectionDismissed
+        case placeSelection(PlaceSelectionFeature.Action)
     }
 
     @Dependency(\.continuousClock) var clock
@@ -122,9 +129,38 @@ struct WaitingForParticipantsFeature: Reducer {
                 state.isRefreshing = false
                 return .none
 
-            case .backButtonTapped, .mapButtonTapped:
+            case .mapButtonTapped:
+                guard state.joinedCount < state.invitation.participants.count else {
+                    state.isPlaceSelectionPresented = true
+                    return .none
+                }
+                state.isMapConfirmationPresented = true
+                return .none
+
+            case .mapConfirmationCancelButtonTapped:
+                state.isMapConfirmationPresented = false
+                return .none
+
+            case .mapConfirmationConfirmButtonTapped:
+                guard state.isMapConfirmationPresented else { return .none }
+                state.isMapConfirmationPresented = false
+                state.isPlaceSelectionPresented = true
+                return .none
+
+            case .placeSelectionDismissed, .placeSelection(.backButtonTapped):
+                state.isPlaceSelectionPresented = false
+                return .none
+
+            case .placeSelection:
+                return .none
+
+            case .backButtonTapped:
                 return .none
             }
+        }
+
+        Scope(state: \.placeSelection, action: \.placeSelection) {
+            PlaceSelectionFeature()
         }
     }
 }

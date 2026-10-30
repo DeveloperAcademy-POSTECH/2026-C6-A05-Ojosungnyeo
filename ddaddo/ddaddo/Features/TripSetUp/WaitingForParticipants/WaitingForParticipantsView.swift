@@ -51,8 +51,44 @@ struct WaitingForParticipantsView: View {
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
+        .navigationDestination(
+            isPresented: Binding(
+                get: { store.isPlaceSelectionPresented },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.placeSelectionDismissed)
+                    }
+                }
+            )
+        ) {
+            PlaceSelectionView(
+                store: store.scope(
+                    state: \.placeSelection,
+                    action: \.placeSelection
+                )
+            )
+        }
         .onAppear { store.send(.onAppear) }
         .onDisappear { store.send(.onDisappear) }
+        .allowsHitTesting(!store.isMapConfirmationPresented)
+        .overlay {
+            if store.isMapConfirmationPresented {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: "먼저 여행 준비하기",
+                        message: "지도에 핀을 찍으러 이동하시겠어요?",
+                        cancelTitle: "아니요",
+                        confirmTitle: "네",
+                        onCancel: { store.send(.mapConfirmationCancelButtonTapped) },
+                        onConfirm: { store.send(.mapConfirmationConfirmButtonTapped) }
+                    )
+                }
+            }
+        }
     }
 
     private var header: some View {
@@ -313,18 +349,18 @@ private struct WaitingTimerProgressArc: Shape {
     )
 }
 
-#Preview("원형 진행률 100% · 50% · 0%") {
+#Preview("타이머 72:00 · 36:00 · 01:30 · 00:00") {
     let initialState = WaitingForParticipantsFeature.State.mock(
         now: Date(timeIntervalSince1970: 0)
     )
 
-    HStack(spacing: DDSpacing.xLarge) {
-        ForEach([1.0, 0.5, 0.0], id: \.self) { remainingFraction in
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: DDSpacing.large) {
+        ForEach([259_200, 129_600, 5_400, 0], id: \.self) { remainingSeconds in
             let state = WaitingForParticipantsFeature.State(
                 invitation: initialState.invitation,
                 countdownDuration: initialState.countdownDuration,
                 currentDate: initialState.invitation.expiresAt.addingTimeInterval(
-                    -initialState.countdownDuration * remainingFraction
+                    -TimeInterval(remainingSeconds)
                 )
             )
 

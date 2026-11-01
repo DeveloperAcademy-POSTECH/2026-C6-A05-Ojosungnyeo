@@ -16,6 +16,23 @@ struct PlaceSelectionFeature: Reducer {
         let name: String
         let hasJoined: Bool
         let isCurrentUser: Bool
+        var isConfirmed: Bool
+
+        init(
+            id: Int,
+            member: TripMember,
+            name: String,
+            hasJoined: Bool,
+            isCurrentUser: Bool,
+            isConfirmed: Bool = false
+        ) {
+            self.id = id
+            self.member = member
+            self.name = name
+            self.hasJoined = hasJoined
+            self.isCurrentUser = isCurrentUser
+            self.isConfirmed = isConfirmed
+        }
     }
 
     @ObservableState
@@ -37,6 +54,7 @@ struct PlaceSelectionFeature: Reducer {
         var remainingSeconds: Int
         var isTimerRunning = false
         var hasSelectionEnded = false
+        var isEditingConfirmedPlaces = false
         var placeSearch = PlaceSearchFeature.State()
 
         init(
@@ -96,7 +114,30 @@ struct PlaceSelectionFeature: Reducer {
         }
 
         var canConfirmPlaceSelection: Bool {
-            !memberPlaces[currentMember, default: []].isEmpty && !hasSelectionEnded
+            !memberPlaces[currentMember, default: []].isEmpty
+                && !isCurrentUserConfirmed
+                && !hasSelectionEnded
+        }
+
+        var isCurrentUserConfirmed: Bool {
+            participants.first(where: \.isCurrentUser)?.isConfirmed == true
+        }
+
+        var isShowingConfirmedPlaces: Bool {
+            isCurrentUserConfirmed || hasSelectionEnded
+        }
+
+        var confirmedPlaces: [PinnedPlace] {
+            var placeIDs = Set<String>()
+
+            return participants
+                .filter { $0.hasJoined && $0.isConfirmed }
+                .flatMap { memberPlaces[$0.member, default: []] }
+                .filter { placeIDs.insert($0.id).inserted }
+        }
+
+        var mapPlaces: [PinnedPlace] {
+            isShowingConfirmedPlaces ? confirmedPlaces : displayedPlaces
         }
 
         var isSelectedPlaceAlreadyAdded: Bool {
@@ -261,6 +302,8 @@ struct PlaceSelectionFeature: Reducer {
         case deletePinnedPlaceButtonTapped(String)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
+        case confirmedPlacesEditButtonTapped
+        case deleteConfirmedPlaceButtonTapped(String)
         case timerTicked
         case moveCriteriaButtonTapped
         case placeDetailsResponse(PlaceDetails)
@@ -422,6 +465,30 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .confirmButtonTapped:
+                guard state.canConfirmPlaceSelection else { return .none }
+                guard let index = state.participants.firstIndex(where: \.isCurrentUser) else {
+                    return .none
+                }
+
+                state.participants[index].isConfirmed = true
+                state.selectedPlace = nil
+                state.selectedPinnedPlace = nil
+                state.searchText = ""
+                state.isMemberPlacesSheetPresented = false
+                state.isBottomSheetExpanded = true
+                state.isEditingConfirmedPlaces = false
+                return .none
+
+            case .confirmedPlacesEditButtonTapped:
+                guard state.isShowingConfirmedPlaces else { return .none }
+                state.isEditingConfirmedPlaces.toggle()
+                return .none
+
+            case let .deleteConfirmedPlaceButtonTapped(placeID):
+                guard state.isEditingConfirmedPlaces else { return .none }
+                for member in state.memberPlaces.keys {
+                    state.memberPlaces[member, default: []].removeAll { $0.id == placeID }
+                }
                 return .none
 
             case .timerTicked:

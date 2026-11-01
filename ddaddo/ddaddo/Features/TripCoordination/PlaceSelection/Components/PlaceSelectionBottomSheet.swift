@@ -82,11 +82,26 @@ struct PlaceSelectionParticipantAvatar: View {
     let isSelected: Bool
 
     var body: some View {
-        Group {
+        ZStack(alignment: .topTrailing) {
             if participant.hasJoined {
                 DDMiniHeadAvatar(character: participant.member.avatar, size: 40)
                     .saturation(isSelected ? 1 : 0.25)
                     .opacity(isSelected ? 1 : 0.5)
+
+                if participant.isConfirmed {
+                    Circle()
+                        .fill(participant.member.avatar.backgroundColor)
+                        .frame(width: 14, height: 14)
+                        .overlay {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(DDColor.textOnPrimary)
+                        }
+                        .overlay {
+                            Circle().stroke(DDColor.surfaceDefault, lineWidth: 1.5)
+                        }
+                        .offset(x: 2, y: -2)
+                }
             } else {
                 ZStack {
                     Circle()

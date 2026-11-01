@@ -17,7 +17,8 @@ struct PlaceSelectionView: View {
             GoogleMapView(
                 selectedPlace: store.selectedPlace,
                 showsSelectedPlaceMarker: false,
-                pinnedPlaces: store.displayedPlaces,
+                pinnedPlaces: store.mapPlaces,
+                showsPinnedPlaceNumbers: store.isShowingConfirmedPlaces,
                 onPinnedPlaceTapped: { place in
                     store.send(.pinnedPlaceTapped(place))
                 }
@@ -26,7 +27,7 @@ struct PlaceSelectionView: View {
 
             VStack(spacing: 0) {
                 navigationBar
-                if !store.hasSelectionEnded {
+                if !store.isShowingConfirmedPlaces {
                     searchField
                 }
                 Spacer()
@@ -44,7 +45,22 @@ struct PlaceSelectionView: View {
 
             }
 
-            if let selectedPlace = store.selectedPlace {
+            if store.isShowingConfirmedPlaces {
+                ConfirmedPlacesBottomSheet(
+                    participants: store.participants,
+                    places: store.confirmedPlaces,
+                    isEditing: store.isEditingConfirmedPlaces,
+                    editButtonTapped: {
+                        store.send(.confirmedPlacesEditButtonTapped)
+                    },
+                    deletePlace: { place in
+                        store.send(.deleteConfirmedPlaceButtonTapped(place.id))
+                    }
+                )
+                .frame(height: 413, alignment: .top)
+                .clipped()
+                .ignoresSafeArea(edges: .bottom)
+            } else if let selectedPlace = store.selectedPlace {
                 SelectedPlaceBottomSheet(
                     place: selectedPlace,
                     isLoading: store.isPlaceDetailsLoading,
@@ -102,12 +118,9 @@ struct PlaceSelectionView: View {
                 .gesture(sheetDragGesture)
             }
 
-            if store.hasSelectionEnded {
-                completionCTA
-            }
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
-        .animation(.easeOut(duration: 0.22), value: store.hasSelectionEnded)
+        .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -134,6 +147,38 @@ struct PlaceSelectionView: View {
     }
 
     private var navigationBar: some View {
+        Group {
+            if store.isShowingConfirmedPlaces {
+                confirmedNavigationBar
+            } else {
+                placeSelectionNavigationBar
+            }
+        }
+    }
+
+    private var confirmedNavigationBar: some View {
+        ZStack {
+            Text(store.navigationTitle)
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+
+            HStack {
+                Button {
+                    store.send(.backButtonTapped)
+                } label: {
+                    PlaceSelectionBackIcon()
+                        .frame(width: 24, height: 40)
+                }
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .frame(height: 62)
+    }
+
+    private var placeSelectionNavigationBar: some View {
         HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
@@ -240,15 +285,6 @@ struct PlaceSelectionView: View {
     private var currentMemberSheetHeight: CGFloat {
         let restingHeight: CGFloat = store.isBottomSheetExpanded ? 413 : 110
         return min(413, max(110, restingHeight - sheetDragTranslation))
-    }
-
-    private var completionCTA: some View {
-        DDCTAButton(title: "이동 기준 정하기") {
-            store.send(.moveCriteriaButtonTapped)
-        }
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.bottom, 20)
-        .background(DDColor.surfaceDefault)
     }
 
     private var sheetDragGesture: some Gesture {

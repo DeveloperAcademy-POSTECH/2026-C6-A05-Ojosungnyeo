@@ -2,84 +2,76 @@
 //  PlaceGroupingFeature.swift
 //  ddaddo
 //
+//  Created by sun on 10/31/26.
+//
 
 import ComposableArchitecture
 
 struct PlaceGroupingFeature: Reducer {
-    @ObservableState
-    struct State: Equatable {
-        var tripTitle = "도쿄 여행"
-        var tripDates = "11월 22일 ~ 25일"
-        var groupTitle = "도쿄 쇼핑을 즐기게따!"
-        var members: [Member] = Member.preview
-        var places: [Place] = Place.preview
+    enum Tab: Equatable {
+        case preferences
+        case recommendedGroups
     }
 
     struct Member: Equatable, Identifiable {
         let id: String
-        let character: DDMiniHeadAvatar.Character
-
-        static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.id == rhs.id && lhs.character.rawValue == rhs.character.rawValue
-        }
+        let name: String
+        let preferences: String
+        let avatar: ParticipantAvatar
     }
 
-    struct Place: Equatable, Identifiable {
+    struct RecommendedGroup: Equatable, Identifiable {
         let id: String
         let title: String
-        let address: String
-        let imageName: String
+        let participantSummary: String
     }
 
-    enum Action {
-        case backButtonTapped
-        case menuButtonTapped
-        case editPlaceTapped(String)
-        case deletePlaceTapped(String)
-        case nextButtonTapped
+    @ObservableState
+    struct State: Equatable {
+        var tripTitle = PlaceGroupingPreviewData.tripTitle
+        var tripDates = PlaceGroupingPreviewData.tripDates
+        var travelCriteria = PlaceGroupingPreviewData.travelCriteria
+        var selectedTab = Tab.preferences
+        var members = PlaceGroupingPreviewData.members
+        var placeGroups = PlaceGroupingPreviewData.placeGroups
+        var recommendedGroups = PlaceGroupingPreviewData.recommendedGroups
+        var waitingForConfirmation = WaitingForConfirmationFeature.State()
+        var isWaitingForConfirmationPresented = false
+    }
+
+    @CasePathable
+    enum Action: Equatable {
+        case travelCriteriaChangeTapped
+        case tabSelected(Tab)
+        case memberTapped(String)
+        case recommendedGroupTapped(String)
+        case confirmButtonTapped
+        case waitingForConfirmation(WaitingForConfirmationFeature.Action)
     }
 
     var body: some Reducer<State, Action> {
-        Reduce { _, _ in
-            .none
+        Reduce { state, action in
+            switch action {
+            case .travelCriteriaChangeTapped,
+                 .memberTapped,
+                 .recommendedGroupTapped:
+                return .none
+            case .confirmButtonTapped:
+                state.isWaitingForConfirmationPresented = true
+                return .none
+            case .waitingForConfirmation(.backButtonTapped):
+                state.isWaitingForConfirmationPresented = false
+                return .none
+            case .waitingForConfirmation:
+                return .none
+            case let .tabSelected(tab):
+                state.selectedTab = tab
+                return .none
+            }
+        }
+
+        Scope(state: \.waitingForConfirmation, action: \.waitingForConfirmation) {
+            WaitingForConfirmationFeature()
         }
     }
-}
-
-extension PlaceGroupingFeature.Member {
-    fileprivate static let preview: [Self] = [
-        .init(id: "tae", character: .tae),
-        .init(id: "header", character: .header),
-        .init(id: "juni", character: .juni),
-        .init(id: "grae", character: .grae),
-    ]
-}
-
-extension PlaceGroupingFeature.Place {
-    fileprivate static let preview: [Self] = [
-        .init(
-            id: "tokyo-station-shopping",
-            title: "도쿄역 근처 쇼핑",
-            address: "2 Chome-1004 Tokyo, Chuo\nWard, 福岡市 福岡県 810-0001",
-            imageName: "DDPlaceTokyoStation"
-        ),
-        .init(
-            id: "tokyo-market-street",
-            title: "도쿄 시장 거리 구경",
-            address: "89G2+WH, Tsushima, Nagasaki\n817-1105",
-            imageName: "DDPlaceTokyoMarket"
-        ),
-        .init(
-            id: "stussy-tokyo",
-            title: "스투시 도쿄점",
-            address: "89G2+WH, Tsushima, Nagasaki\n817-1105",
-            imageName: "DDPlaceStussyTokyo"
-        ),
-        .init(
-            id: "matcha-frappe-park",
-            title: "더 말차 프라페 파크",
-            address: "〒150-0001 Tokyo, Shibuya,\n6 Chome−20−10 South 2F",
-            imageName: "DDPlaceMatchaPark"
-        ),
-    ]
 }

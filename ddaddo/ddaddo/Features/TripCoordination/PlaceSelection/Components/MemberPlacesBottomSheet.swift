@@ -36,8 +36,10 @@ struct MemberPlacesBottomSheet: View {
                     Text("아직 핀 찍힌 장소가 없어요")
                         .ddTypography(.body16)
                         .foregroundStyle(DDColor.textPrimary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.bottom, bottomContentInset)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 139)
+
+                    Spacer(minLength: bottomContentInset)
                 } else {
                     placeList
                 }
@@ -81,36 +83,109 @@ struct MemberPlacesBottomSheet: View {
     }
 
     private var placeList: some View {
-        List {
-            ForEach(places) { place in
-                Button {
-                    placeTapped(place)
-                } label: {
-                    PlacePinCard(place: place)
+        ScrollView {
+            LazyVStack(spacing: DDSpacing.medium) {
+                ForEach(places) { place in
+                    SwipeToDeletePlaceRow(
+                        place: place,
+                        canDelete: canDeletePlaces,
+                        placeTapped: { placeTapped(place) },
+                        deleteTapped: { deletePlace(place) }
+                    )
                 }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: DDSpacing.medium, trailing: 0))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    if canDeletePlaces {
-                        Button(role: .destructive) {
-                            deletePlace(place)
-                        } label: {
-                            Label("삭제", systemImage: "trash")
-                        }
-                    }
-                }
+
+                Color.clear
+                    .frame(height: bottomContentInset)
+            }
+            .padding(.top, 25)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct SwipeToDeletePlaceRow: View {
+    private let actionWidth: CGFloat = 72
+    private let revealOffset: CGFloat = 84
+
+    let place: PinnedPlace
+    let canDelete: Bool
+    let placeTapped: () -> Void
+    let deleteTapped: () -> Void
+
+    @State private var horizontalOffset: CGFloat = 0
+    @State private var settledOffset: CGFloat = 0
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            if canDelete {
+                deleteButton
             }
 
-            Color.clear
-                .frame(height: bottomContentInset)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
+            PlacePinCard(place: place)
+                .contentShape(.rect)
+                .offset(x: horizontalOffset)
+                .simultaneousGesture(swipeGesture)
+                .onTapGesture {
+                    if settledOffset == 0 {
+                        placeTapped()
+                    } else {
+                        closeActions()
+                    }
+                }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .padding(.top, DDSpacing.medium)
+        .frame(height: 72)
+        .clipped()
+    }
+
+    private var deleteButton: some View {
+        Button {
+            closeActions()
+            deleteTapped()
+        } label: {
+            Image(systemName: "trash")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(DDColor.surfaceSelected)
+                .frame(width: actionWidth, height: 72)
+                .background(DDColor.actionSecondary)
+                .clipShape(.rect(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                guard canDelete,
+                      abs(value.translation.width) > abs(value.translation.height) else {
+                    return
+                }
+
+                horizontalOffset = min(
+                    0,
+                    max(-revealOffset, settledOffset + value.translation.width)
+                )
+            }
+            .onEnded { value in
+                guard canDelete else {
+                    return
+                }
+
+                let predictedOffset = settledOffset + value.predictedEndTranslation.width
+                let shouldReveal = horizontalOffset < -(revealOffset / 3)
+                    || predictedOffset < -(revealOffset / 2)
+                let destination = shouldReveal ? -revealOffset : 0
+
+                withAnimation(.snappy(duration: 0.25)) {
+                    horizontalOffset = destination
+                    settledOffset = destination
+                }
+            }
+    }
+
+    private func closeActions() {
+        withAnimation(.snappy(duration: 0.2)) {
+            horizontalOffset = 0
+            settledOffset = 0
+        }
     }
 }

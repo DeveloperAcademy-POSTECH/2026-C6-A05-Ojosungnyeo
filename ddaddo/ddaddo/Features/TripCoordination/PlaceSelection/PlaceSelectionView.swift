@@ -76,7 +76,12 @@ struct PlaceSelectionView: View {
                 .frame(height: currentMemberSheetHeight, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
-                .simultaneousGesture(sheetDragGesture)
+                .overlay(alignment: .top) {
+                    Color.clear
+                        .contentShape(.rect)
+                        .frame(height: 44)
+                        .gesture(sheetDragGesture)
+                }
             } else {
                 PlaceSelectionBottomSheet(
                     isExpanded: store.isBottomSheetExpanded,
@@ -103,6 +108,8 @@ struct PlaceSelectionView: View {
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .animation(.easeOut(duration: 0.22), value: store.hasSelectionEnded)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
         .task {
             await store.send(.onAppear).finish()
@@ -127,14 +134,11 @@ struct PlaceSelectionView: View {
     }
 
     private var navigationBar: some View {
-        HStack(spacing: DDSpacing.large) {
+        HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(DDColor.iconDefault)
-                    .frame(width: 24, height: 24)
+                PlaceSelectionBackIcon()
             }
             .buttonStyle(.plain)
 
@@ -150,16 +154,18 @@ struct PlaceSelectionView: View {
                 } else {
                     HStack(spacing: DDSpacing.small) {
                         Image(systemName: "timer")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 15, weight: .regular))
+                            .frame(width: 17, height: 19)
 
                         Text(store.timerText)
                             .ddTypography(.captionEmphasis12)
                     }
-                    .foregroundStyle(DDColor.textPrimary)
+                    .foregroundStyle(DDColor.textSecondary)
+                    .frame(height: 19, alignment: .bottom)
                 }
             }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42, alignment: .leading)
+            .clipped()
 
             PlaceCountProgressView(
                 count: store.selectedPlaceCount,
@@ -167,6 +173,7 @@ struct PlaceSelectionView: View {
             )
         }
         .padding(.horizontal, DDSpacing.large)
+        .frame(maxWidth: .infinity)
         .frame(height: 62)
     }
 
@@ -278,11 +285,27 @@ private struct PlaceCountProgressView: View {
                 .rotationEffect(.degrees(-90))
 
             Text("\(count)/\(maximumCount)")
-                .ddTypography(.captionEmphasis12)
+                .font(.custom("Pretendard-SemiBold", size: 11))
                 .foregroundStyle(DDColor.textPrimary)
         }
+        .frame(width: 36, height: 36)
         .frame(width: 44, height: 44)
         .animation(.easeOut(duration: 0.2), value: count)
+    }
+}
+
+private struct PlaceSelectionBackIcon: View {
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: 17, y: 3))
+            path.addLine(to: CGPoint(x: 7, y: 12))
+            path.addLine(to: CGPoint(x: 17, y: 21))
+        }
+        .stroke(
+            DDColor.textPrimary,
+            style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
+        )
+        .frame(width: 24, height: 24)
     }
 }
 

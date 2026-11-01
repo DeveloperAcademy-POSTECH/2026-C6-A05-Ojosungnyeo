@@ -9,6 +9,17 @@ struct TimeTableEditFeature: Reducer {
         var placeSearchResults: [PlaceSearchResult] = []
         var isPlaceSearchLoading = false
         var placeSearchErrorMessage: String?
+        var editingScheduleID: TimeTableSchedule.ID?
+        var editingDay: TripDay?
+        var selectedMinuteOfDay: Int?
+
+        var isTimeSelectionPresented: Bool { editingScheduleID != nil }
+
+        mutating func dismissTimeSelection() {
+            editingScheduleID = nil
+            editingDay = nil
+            selectedMinuteOfDay = nil
+        }
     }
 
     enum Action: Equatable {
@@ -16,6 +27,10 @@ struct TimeTableEditFeature: Reducer {
         case saveButtonTapped
         case addScheduleButtonTapped
         case addScheduleDismissed
+        case scheduleTapped(TimeTableSchedule.ID)
+        case timeSelectionChanged(Int)
+        case timeSelectionDoneTapped
+        case timeSelectionDismissed
         case placeSearchTextChanged(String)
         case placeSearchResponse([PlaceSearchResult])
         case placeSearchFailed(String)
@@ -30,9 +45,20 @@ struct TimeTableEditFeature: Reducer {
             switch action {
             case .backButtonTapped:
                 state.isAddSchedulePresented = false
+                state.dismissTimeSelection()
                 return .cancel(id: "time-table-place-search")
 
-            case .saveButtonTapped, .placeSearchResultTapped:
+            case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped, .timeSelectionDoneTapped:
+                return .none
+
+            case let .timeSelectionChanged(minuteOfDay):
+                guard state.isTimeSelectionPresented, (0..<1440).contains(minuteOfDay)
+                else { return .none }
+                state.selectedMinuteOfDay = minuteOfDay
+                return .none
+
+            case .timeSelectionDismissed:
+                state.dismissTimeSelection()
                 return .none
 
             case .addScheduleButtonTapped:

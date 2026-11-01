@@ -19,7 +19,9 @@ struct TimeTableFeature: Reducer {
         var edit = TimeTableEditFeature.State()
 
         var schedules: [TimeTableSchedule] {
-            schedulesByDay[selectedDay, default: []]
+            schedulesByDay[selectedDay, default: []].sorted {
+                $0.timing.startMinuteOfDay < $1.timing.startMinuteOfDay
+            }
         }
     }
 
@@ -45,6 +47,25 @@ struct TimeTableFeature: Reducer {
 
             case .edit(.backButtonTapped), .edit(.saveButtonTapped):
                 state.isEditing = false
+                return .none
+
+            case let .edit(.scheduleTapped(id)):
+                guard let schedule = state.schedulesByDay[state.selectedDay]?.first(where: { $0.id == id })
+                else { return .none }
+                state.edit.editingScheduleID = id
+                state.edit.editingDay = state.selectedDay
+                state.edit.selectedMinuteOfDay = schedule.timing.startMinuteOfDay
+                return .none
+
+            case .edit(.timeSelectionDoneTapped):
+                guard let day = state.edit.editingDay,
+                      day == state.selectedDay,
+                      let id = state.edit.editingScheduleID,
+                      let minute = state.edit.selectedMinuteOfDay,
+                      let index = state.schedulesByDay[day]?.firstIndex(where: { $0.id == id })
+                else { return .none }
+                state.schedulesByDay[day]?[index].timing.startMinuteOfDay = minute
+                state.edit.dismissTimeSelection()
                 return .none
 
             case .edit:
@@ -94,10 +115,12 @@ struct TimeTableSchedule: Equatable, Identifiable {
     let id: Int
     let title: String
     let placeCount: Int
-    let time: String
+    var timing: TimeTableScheduleTiming
     let placeNames: [String]
     let members: [TripMember]
     var branchGroupID: Int?
+
+    var time: String { timing.displayText }
 
     func kind(among tripMembers: [TripMember]) -> Kind? {
         let tripMemberIDs = tripMembers.map(\.id)
@@ -124,25 +147,48 @@ struct TimeTableSchedule: Equatable, Identifiable {
 
     static let mockSchedulesByDay: [TripDay: [TimeTableSchedule]] = [
         .day1: [
-            TimeTableSchedule(id: 0, title: "도쿄역 쇼핑 코스", placeCount: 4, time: "22일 10:00 ~ 14:00", placeNames: ["TK 빈티지샵", "HABARI"], members: [.tae, .header]),
-            TimeTableSchedule(id: 1, title: "치이카와 뮤지엄 코스", placeCount: 4, time: "22일 10:00 ~ 14:00", placeNames: ["치이카와랜드"], members: [.grae, .juni]),
-            TimeTableSchedule(id: 2, title: "파르페 먹방 코스", placeCount: 4, time: "22일 14:30 ~ 18:00", placeNames: ["말차 파르페 센터"], members: [.grae, .header, .juni, .tae])
+            TimeTableSchedule(id: 0, title: "도쿄역 쇼핑 코스", placeCount: 4, timing: .init(dayOfMonth: 22, startHour: 10, startMinute: 0, durationMinutes: 240), placeNames: ["TK 빈티지샵", "HABARI"], members: [.tae, .header]),
+            TimeTableSchedule(id: 1, title: "치이카와 뮤지엄 코스", placeCount: 4, timing: .init(dayOfMonth: 22, startHour: 10, startMinute: 0, durationMinutes: 240), placeNames: ["치이카와랜드"], members: [.grae, .juni]),
+            TimeTableSchedule(id: 2, title: "파르페 먹방 코스", placeCount: 4, timing: .init(dayOfMonth: 22, startHour: 14, startMinute: 30, durationMinutes: 210), placeNames: ["말차 파르페 센터"], members: [.grae, .header, .juni, .tae])
         ],
         .day2: [
-            TimeTableSchedule(id: 100, title: "아사쿠사 산책 코스", placeCount: 3, time: "23일 09:30 ~ 12:30", placeNames: ["센소지", "나카미세도리"], members: [.tae, .juni]),
-            TimeTableSchedule(id: 101, title: "우에노 문화 코스", placeCount: 4, time: "23일 13:00 ~ 17:00", placeNames: ["우에노 공원", "도쿄 국립박물관"], members: [.header, .grae]),
-            TimeTableSchedule(id: 102, title: "아키하바라 야경 코스", placeCount: 3, time: "23일 18:00 ~ 21:00", placeNames: ["아키하바라 전자상가"], members: TripMember.allCases)
+            TimeTableSchedule(id: 100, title: "아사쿠사 산책 코스", placeCount: 3, timing: .init(dayOfMonth: 23, startHour: 9, startMinute: 30, durationMinutes: 180), placeNames: ["센소지", "나카미세도리"], members: [.tae, .juni]),
+            TimeTableSchedule(id: 101, title: "우에노 문화 코스", placeCount: 4, timing: .init(dayOfMonth: 23, startHour: 13, startMinute: 0, durationMinutes: 240), placeNames: ["우에노 공원", "도쿄 국립박물관"], members: [.header, .grae]),
+            TimeTableSchedule(id: 102, title: "아키하바라 야경 코스", placeCount: 3, timing: .init(dayOfMonth: 23, startHour: 18, startMinute: 0, durationMinutes: 180), placeNames: ["아키하바라 전자상가"], members: TripMember.allCases)
         ],
         .day3: [
-            TimeTableSchedule(id: 200, title: "하라주쿠 쇼핑 코스", placeCount: 4, time: "24일 10:00 ~ 14:00", placeNames: ["타케시타도리", "캐트스트리트"], members: [.tae, .grae]),
-            TimeTableSchedule(id: 201, title: "시부야 디저트 코스", placeCount: 3, time: "24일 14:30 ~ 17:30", placeNames: ["하치 카페"], members: [.header, .juni]),
-            TimeTableSchedule(id: 202, title: "시부야 야경 코스", placeCount: 3, time: "24일 19:00 ~ 22:00", placeNames: ["시부야 스카이"], members: TripMember.allCases)
+            TimeTableSchedule(id: 200, title: "하라주쿠 쇼핑 코스", placeCount: 4, timing: .init(dayOfMonth: 24, startHour: 10, startMinute: 0, durationMinutes: 240), placeNames: ["타케시타도리", "캐트스트리트"], members: [.tae, .grae]),
+            TimeTableSchedule(id: 201, title: "시부야 디저트 코스", placeCount: 3, timing: .init(dayOfMonth: 24, startHour: 14, startMinute: 30, durationMinutes: 180), placeNames: ["하치 카페"], members: [.header, .juni]),
+            TimeTableSchedule(id: 202, title: "시부야 야경 코스", placeCount: 3, timing: .init(dayOfMonth: 24, startHour: 19, startMinute: 0, durationMinutes: 180), placeNames: ["시부야 스카이"], members: TripMember.allCases)
         ],
         .day4: [
-            TimeTableSchedule(id: 302, title: "긴자 브런치 코스", placeCount: 2, time: "25일 09:00 ~ 11:00", placeNames: ["긴자 카페"], members: [.tae], branchGroupID: 0),
-            TimeTableSchedule(id: 303, title: "도쿄역 마지막 쇼핑", placeCount: 3, time: "25일 09:00 ~ 11:00", placeNames: ["도쿄 캐릭터스트리트"], members: [.header, .grae, .juni], branchGroupID: 0),
-            TimeTableSchedule(id: 300, title: "긴자 브런치 코스", placeCount: 2, time: "25일 09:00 ~ 11:00", placeNames: ["긴자 카페"], members: TripMember.allCases),
-            TimeTableSchedule(id: 301, title: "도쿄역 마지막 쇼핑", placeCount: 3, time: "25일 11:30 ~ 14:30", placeNames: ["도쿄 캐릭터스트리트"], members: TripMember.allCases)
+            TimeTableSchedule(id: 302, title: "긴자 브런치 코스", placeCount: 2, timing: .init(dayOfMonth: 25, startHour: 9, startMinute: 0, durationMinutes: 120), placeNames: ["긴자 카페"], members: [.tae], branchGroupID: 0),
+            TimeTableSchedule(id: 303, title: "도쿄역 마지막 쇼핑", placeCount: 3, timing: .init(dayOfMonth: 25, startHour: 9, startMinute: 0, durationMinutes: 120), placeNames: ["도쿄 캐릭터스트리트"], members: [.header, .grae, .juni], branchGroupID: 0),
+            TimeTableSchedule(id: 300, title: "긴자 브런치 코스", placeCount: 2, timing: .init(dayOfMonth: 25, startHour: 9, startMinute: 0, durationMinutes: 120), placeNames: ["긴자 카페"], members: TripMember.allCases),
+            TimeTableSchedule(id: 301, title: "도쿄역 마지막 쇼핑", placeCount: 3, timing: .init(dayOfMonth: 25, startHour: 11, startMinute: 30, durationMinutes: 180), placeNames: ["도쿄 캐릭터스트리트"], members: TripMember.allCases)
         ]
     ]
+}
+
+struct TimeTableScheduleTiming: Equatable {
+    let dayOfMonth: Int
+    var startMinuteOfDay: Int
+    let durationMinutes: Int
+
+    init(dayOfMonth: Int, startHour: Int, startMinute: Int, durationMinutes: Int) {
+        self.dayOfMonth = dayOfMonth
+        self.startMinuteOfDay = startHour * 60 + startMinute
+        self.durationMinutes = durationMinutes
+    }
+
+    var displayText: String {
+        let endMinuteOfDay = startMinuteOfDay + durationMinutes
+        let endDayOffset = endMinuteOfDay / 1440
+        let endDay = endDayOffset == 0 ? "" : "\(dayOfMonth + endDayOffset)일 "
+        return "\(dayOfMonth)일 \(formatted(startMinuteOfDay)) ~ \(endDay)\(formatted(endMinuteOfDay % 1440))"
+    }
+
+    private func formatted(_ minuteOfDay: Int) -> String {
+        String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
+    }
 }

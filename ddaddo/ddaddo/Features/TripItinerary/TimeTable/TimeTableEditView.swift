@@ -11,6 +11,7 @@ struct TimeTableEditView: View {
             onBack: { store.send(.backButtonTapped) },
             onSave: { store.send(.saveButtonTapped) },
             onAddSchedule: { store.send(.addScheduleButtonTapped) },
+            onScheduleTapped: { store.send(.scheduleTapped($0)) },
             groups: timeTableStore.groups
         )
         .sheet(
@@ -28,6 +29,28 @@ struct TimeTableEditView: View {
                 .presentationDragIndicator(.hidden)
                 .presentationCornerRadius(40)
                 .presentationBackground(DDColor.surfaceDefault)
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { store.isTimeSelectionPresented },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.timeSelectionDismissed)
+                    }
+                }
+            )
+        ) {
+            TimeSelectionBottomSheet(
+                selectedMinuteOfDay: Binding(
+                    get: { store.selectedMinuteOfDay ?? 0 },
+                    set: { store.send(.timeSelectionChanged($0)) }
+                ),
+                onDone: { store.send(.timeSelectionDoneTapped) }
+            )
+            .presentationDetents([.height(424)])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(28)
+            .presentationBackground(DDColor.surfaceDefault)
         }
     }
 }

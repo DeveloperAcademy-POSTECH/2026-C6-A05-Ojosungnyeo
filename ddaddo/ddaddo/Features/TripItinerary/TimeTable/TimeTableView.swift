@@ -33,6 +33,7 @@ struct TimeTableContent: View {
     var onEdit: (() -> Void)?
     var onSave: (() -> Void)?
     var onAddSchedule: (() -> Void)?
+    var onScheduleTapped: ((TimeTableSchedule.ID) -> Void)?
     var groups: [TimeTableGroup]?
 
     var body: some View {
@@ -166,16 +167,12 @@ struct TimeTableContent: View {
             sectionTitle("전체 여행 일정")
 
             LazyVStack(spacing: 12) {
-                if !store.schedules.isEmpty {
-                    compactScheduleRow(
-                        branchSchedules.isEmpty
-                            ? Array(store.schedules.prefix(2))
-                            : branchSchedules
-                    )
-                }
-
-                ForEach(regularSchedules) { schedule in
-                    scheduleRow(schedule)
+                ForEach(timelineRows) { row in
+                    if row.isCompact {
+                        compactScheduleRow(row.schedules)
+                    } else if let schedule = row.schedules.first {
+                        scheduleRow(schedule)
+                    }
                 }
 
                 if let onAddSchedule {
@@ -207,14 +204,39 @@ struct TimeTableContent: View {
         .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
     }
 
-    private var branchSchedules: [TimeTableSchedule] {
-        store.schedules.filter { $0.branchGroupID != nil }
-    }
+    private var timelineRows: [TimelineRow] {
+        let schedules = store.schedules
+        let originalSchedules = store.schedulesByDay[store.selectedDay, default: []]
+        var rows: [TimelineRow] = []
+        var seenBranchGroups: Set<Int> = []
 
-    private var regularSchedules: [TimeTableSchedule] {
-        branchSchedules.isEmpty
-            ? store.schedules
-            : store.schedules.filter { $0.branchGroupID == nil }
+        if schedules.contains(where: { $0.branchGroupID != nil }) {
+            for schedule in schedules {
+                if let groupID = schedule.branchGroupID {
+                    guard seenBranchGroups.insert(groupID).inserted else { continue }
+                    rows.append(TimelineRow(
+                        id: "branch-\(groupID)",
+                        schedules: originalSchedules.filter { $0.branchGroupID == groupID },
+                        isCompact: true
+                    ))
+                } else {
+                    rows.append(TimelineRow(id: "schedule-\(schedule.id)", schedules: [schedule], isCompact: false))
+                }
+            }
+        } else {
+            if !schedules.isEmpty {
+                rows.append(TimelineRow(id: "compact", schedules: Array(schedules.prefix(2)), isCompact: true))
+            }
+            for schedule in schedules.dropFirst(2) {
+                rows.append(TimelineRow(id: "schedule-\(schedule.id)", schedules: [schedule], isCompact: false))
+            }
+        }
+
+        return rows.enumerated().sorted {
+            let lhsMinute = $0.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
+            let rhsMinute = $1.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
+            return lhsMinute == rhsMinute ? $0.offset < $1.offset : lhsMinute < rhsMinute
+        }.map(\.element)
     }
 
     private func compactScheduleRow(_ schedules: [TimeTableSchedule]) -> some View {
@@ -225,7 +247,7 @@ struct TimeTableContent: View {
                 LazyHStack(spacing: DDSpacing.small) {
                     ForEach(schedules) { schedule in
                         TimeTableScheduleCard(schedule: schedule, tripMembers: store.tripMembers) {
-                            store.send(.scheduleTapped(schedule.id))
+                            scheduleTapped(schedule.id)
                         }
                         .frame(width: 205)
                     }
@@ -241,10 +263,18 @@ struct TimeTableContent: View {
             timelineMarker(height: 126, showsLine: true)
 
             TimeTableScheduleCard(schedule: schedule, tripMembers: store.tripMembers) {
-                store.send(.scheduleTapped(schedule.id))
+                scheduleTapped(schedule.id)
             }
         }
         .padding(.horizontal, DDSpacing.large)
+    }
+
+    private func scheduleTapped(_ id: TimeTableSchedule.ID) {
+        if let onScheduleTapped {
+            onScheduleTapped(id)
+        } else {
+            store.send(.scheduleTapped(id))
+        }
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -269,6 +299,12 @@ struct TimeTableContent: View {
         }
         .frame(width: 13, height: height, alignment: .top)
     }
+}
+
+private struct TimelineRow: Identifiable {
+    let id: String
+    let schedules: [TimeTableSchedule]
+    let isCompact: Bool
 }
 
 #Preview {

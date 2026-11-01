@@ -9,7 +9,7 @@ import ComposableArchitecture
 import SwiftUI
 
 struct AddScheduleBottomSheet: View {
-    let store: StoreOf<TimeTableFeature>
+    let store: StoreOf<TimeTableEditFeature>
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -157,8 +157,8 @@ struct AddScheduleBottomSheet: View {
 
 #Preview {
     AddScheduleBottomSheet(
-        store: Store(initialState: TimeTableFeature.State()) {
-            TimeTableFeature()
+        store: Store(initialState: TimeTableEditFeature.State()) {
+            TimeTableEditFeature()
         }
     )
 }

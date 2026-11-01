@@ -9,33 +9,43 @@ import SwiftUI
 
 struct TimeTableGroupCard: View {
     let group: TimeTableGroup
-    let addButtonTapped: () -> Void
+    let participantSummary: String
+    let onAdd: () -> Void
 
     var body: some View {
-        Button(action: addButtonTapped) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(group.city)
-                    .ddTypography(.label14)
-                    .foregroundStyle(DDColor.textPrimary)
-                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
 
-                Text(group.memberNames)
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textSecondary)
-                    .lineLimit(1)
+            Text(group.name)
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textOnPrimary)
+                .lineLimit(1)
 
-                Text(group.placeName)
-                    .ddTypography(.label14)
-                    .foregroundStyle(DDColor.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .padding(.horizontal, 15)
-            .padding(.vertical, 6)
-            .frame(width: 134, height: 72, alignment: .leading)
-            .background(DDColor.actionPrimary)
-            .clipShape(.rect(cornerRadius: 20))
+            Text(participantSummary)
+                .ddTypography(.caption12)
+                .foregroundStyle(DDColor.textTertiary)
+                .lineLimit(1)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 9)
+        .frame(width: 100, height: 72, alignment: .leading)
+        .background(DDColor.textPrimary)
+        .clipShape(.rect(cornerRadius: 20))
+        .overlay(alignment: .topTrailing) {
+            Button(action: onAdd) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(DDColor.textTertiary)
+                    .frame(width: 30, height: 30)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(group.name) 그룹 일정 배치")
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(DDColor.borderDefault, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
     }
 }

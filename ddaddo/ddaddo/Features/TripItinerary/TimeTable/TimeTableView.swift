@@ -12,6 +12,32 @@ struct TimeTableView: View {
     let store: StoreOf<TimeTableFeature>
 
     var body: some View {
+        if store.isEditing {
+            TimeTableEditView(
+                timeTableStore: store,
+                store: store.scope(state: \.edit, action: \.edit)
+            )
+        } else {
+            TimeTableContent(
+                store: store,
+                onBack: { store.send(.backButtonTapped) },
+                onEdit: { store.send(.editButtonTapped) }
+            )
+        }
+    }
+}
+
+struct TimeTableContent: View {
+    let store: StoreOf<TimeTableFeature>
+    let onBack: () -> Void
+    var onEdit: (() -> Void)?
+    var onSave: (() -> Void)?
+    var onAddSchedule: (() -> Void)?
+    var onScheduleTapped: ((TimeTableSchedule.ID) -> Void)?
+    var onGroupAdd: ((TimeTableGroup.ID) -> Void)?
+    var groups: [TimeTableGroup]?
+
+    var body: some View {
         ZStack {
             DDColor.surfaceDefault
                 .ignoresSafeArea()
@@ -21,6 +47,9 @@ struct TimeTableView: View {
                     navigationBar
                     tripHeader
                     dayPicker
+                    if let groups, !groups.isEmpty {
+                        groupSection(groups)
+                    }
                     scheduleSection
                 }
                 .padding(.bottom, DDSpacing.large)
@@ -28,28 +57,12 @@ struct TimeTableView: View {
             .scrollIndicators(.hidden)
         }
         .preferredColorScheme(.dark)
-        .sheet(
-            isPresented: Binding(
-                get: { store.isAddSchedulePresented },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.addScheduleDismissed)
-                    }
-                }
-            )
-        ) {
-            AddScheduleBottomSheet(store: store)
-                .presentationDetents([.height(395), .large])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(40)
-                .presentationBackground(DDColor.surfaceDefault)
-        }
     }
 
     private var navigationBar: some View {
         HStack {
             Button {
-                store.send(.backButtonTapped)
+                onBack()
             } label: {
                 Image(systemName: "chevron.backward")
                     .font(.system(size: 24, weight: .regular))
@@ -60,17 +73,32 @@ struct TimeTableView: View {
 
             Spacer()
 
-            Button("편집") {
-                store.send(.editButtonTapped)
+            if let onEdit {
+                Button("편집") {
+                    onEdit()
+                }
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(DDColor.textPrimary)
+                .frame(width: 64, height: 40)
+                .background(DDColor.surfaceControl)
+                .clipShape(.capsule)
+                .buttonStyle(.plain)
             }
-            .ddTypography(.labelEmphasis14)
-            .foregroundStyle(DDColor.textPrimary)
-            .frame(width: 64, height: 40)
-            .background(DDColor.surfaceControl)
-            .clipShape(.capsule)
-            .buttonStyle(.plain)
+
+            if let onSave {
+                Button("저장") {
+                    onSave()
+                }
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(DDColor.textOnPrimary)
+                .frame(width: 64, height: 40)
+                .background(DDColor.actionPrimary)
+                .clipShape(.capsule)
+                .buttonStyle(.plain)
+            }
         }
-        .padding(.horizontal, DDSpacing.small)
+        .padding(.leading, DDSpacing.small)
+        .padding(.trailing, DDSpacing.large)
     }
 
     private var tripHeader: some View {
@@ -123,59 +151,112 @@ struct TimeTableView: View {
         .padding(.top, DDSpacing.small)
     }
 
+    private func groupSection(_ groups: [TimeTableGroup]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DDSpacing.medium) {
+                ForEach(groups) { group in
+                    TimeTableGroupCard(
+                        group: group,
+                        participantSummary: group.participantSummary(in: store.coursesByID),
+                        onAdd: { onGroupAdd?(group.id) }
+                    )
+                }
+            }
+            .padding(.horizontal, DDSpacing.large)
+        }
+        .padding(.top, 36)
+    }
+
     private var scheduleSection: some View {
         VStack(alignment: .leading, spacing: DDSpacing.small) {
             sectionTitle("전체 여행 일정")
 
             LazyVStack(spacing: 12) {
-                if !store.schedules.isEmpty {
-                    compactScheduleRow
-                }
-
-                ForEach(store.schedules) { schedule in
-                    scheduleRow(schedule)
-                }
-
-                HStack(alignment: .top, spacing: 20) {
-                    timelineMarker(height: 126, showsLine: false)
-
-                    Button {
-                        store.send(.addScheduleButtonTapped)
-                    } label: {
-                        Text("+ 일정 추가")
-                            .ddTypography(.body16)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 126)
-                            .background(DDColor.surfaceElevated)
-                            .clipShape(.rect(cornerRadius: 20))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(
-                                        DDColor.textTertiary,
-                                        style: StrokeStyle(lineWidth: 1, dash: [3, 3])
-                                    )
-                            }
+                ForEach(timelineRows) { row in
+                    if row.isCompact {
+                        compactScheduleRow(row.schedules)
+                    } else if let schedule = row.schedules.first {
+                        scheduleRow(schedule)
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, DDSpacing.large)
+
+                if let onAddSchedule {
+                    HStack(alignment: .top, spacing: 20) {
+                        timelineMarker(height: 126, showsLine: false)
+
+                        Button(action: onAddSchedule) {
+                            Text("+ 일정 추가")
+                                .ddTypography(.body16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(maxWidth: .infinity, minHeight: 126)
+                                .background(DDColor.surfaceElevated)
+                                .clipShape(.rect(cornerRadius: 20))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(
+                                            DDColor.textTertiary,
+                                            style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                                        )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, DDSpacing.large)
+                }
             }
         }
-        .padding(.top, 18)
+        .padding(.top, groups?.isEmpty == false ? 14 : 18)
         .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
     }
 
-    private var compactScheduleRow: some View {
+    private var timelineRows: [TimelineRow] {
+        let originalSchedules = store.placements.filter {
+            $0.day == store.selectedDay &&
+            store.coursesByID[$0.courseID] != nil &&
+            store.dayOfMonthByDay[$0.day] != nil
+        }
+        var rows: [TimelineRow] = []
+        var seenBranchGroups: Set<Int> = []
+
+        for schedule in originalSchedules {
+            if let groupID = schedule.branchGroupID {
+                guard seenBranchGroups.insert(groupID).inserted else { continue }
+                rows.append(TimelineRow(
+                    id: "branch-\(groupID)",
+                    schedules: originalSchedules.filter { $0.branchGroupID == groupID },
+                    isCompact: true
+                ))
+            } else {
+                rows.append(TimelineRow(id: "schedule-\(schedule.id)", schedules: [schedule], isCompact: false))
+            }
+        }
+
+        return rows.enumerated().sorted {
+            let lhsMinute = $0.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
+            let rhsMinute = $1.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
+            return lhsMinute == rhsMinute ? $0.offset < $1.offset : lhsMinute < rhsMinute
+        }.map(\.element)
+    }
+
+    private func compactScheduleRow(_ schedules: [TimeTableSchedule]) -> some View {
         HStack(alignment: .top, spacing: 20) {
             timelineMarker(height: 126, showsLine: true)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: DDSpacing.small) {
-                    ForEach(store.schedules.prefix(2)) { schedule in
-                        TimeTableScheduleCard(schedule: schedule) {
-                            store.send(.scheduleTapped(schedule.id))
+                    ForEach(schedules) { schedule in
+                        if let course = store.coursesByID[schedule.courseID],
+                           let dayOfMonth = store.dayOfMonthByDay[schedule.day] {
+                            TimeTableScheduleCard(
+                                schedule: schedule,
+                                course: course,
+                                dayOfMonth: dayOfMonth,
+                                tripMembers: store.tripMembers
+                            ) {
+                                scheduleTapped(schedule.id)
+                            }
+                            .frame(width: 205)
                         }
-                        .frame(width: 205)
                     }
                 }
                 .padding(.trailing, DDSpacing.large)
@@ -188,11 +269,27 @@ struct TimeTableView: View {
         HStack(alignment: .top, spacing: 20) {
             timelineMarker(height: 126, showsLine: true)
 
-            TimeTableScheduleCard(schedule: schedule) {
-                store.send(.scheduleTapped(schedule.id))
+            if let course = store.coursesByID[schedule.courseID],
+               let dayOfMonth = store.dayOfMonthByDay[schedule.day] {
+                TimeTableScheduleCard(
+                    schedule: schedule,
+                    course: course,
+                    dayOfMonth: dayOfMonth,
+                    tripMembers: store.tripMembers
+                ) {
+                    scheduleTapped(schedule.id)
+                }
             }
         }
         .padding(.horizontal, DDSpacing.large)
+    }
+
+    private func scheduleTapped(_ id: TimeTableSchedule.ID) {
+        if let onScheduleTapped {
+            onScheduleTapped(id)
+        } else {
+            store.send(.scheduleTapped(id))
+        }
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -217,6 +314,12 @@ struct TimeTableView: View {
         }
         .frame(width: 13, height: height, alignment: .top)
     }
+}
+
+private struct TimelineRow: Identifiable {
+    let id: String
+    let schedules: [TimeTableSchedule]
+    let isCompact: Bool
 }
 
 #Preview {

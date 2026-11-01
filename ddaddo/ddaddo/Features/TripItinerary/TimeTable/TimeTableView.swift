@@ -12,6 +12,30 @@ struct TimeTableView: View {
     let store: StoreOf<TimeTableFeature>
 
     var body: some View {
+        if store.isEditing {
+            TimeTableEditView(
+                timeTableStore: store,
+                store: store.scope(state: \.edit, action: \.edit)
+            )
+        } else {
+            TimeTableContent(
+                store: store,
+                onBack: { store.send(.backButtonTapped) },
+                onEdit: { store.send(.editButtonTapped) }
+            )
+        }
+    }
+}
+
+struct TimeTableContent: View {
+    let store: StoreOf<TimeTableFeature>
+    let onBack: () -> Void
+    var onEdit: (() -> Void)?
+    var onSave: (() -> Void)?
+    var onAddSchedule: (() -> Void)?
+    var groups: [TimeTableGroup]?
+
+    var body: some View {
         ZStack {
             DDColor.surfaceDefault
                 .ignoresSafeArea()
@@ -21,6 +45,9 @@ struct TimeTableView: View {
                     navigationBar
                     tripHeader
                     dayPicker
+                    if let groups {
+                        groupSection(groups)
+                    }
                     scheduleSection
                 }
                 .padding(.bottom, DDSpacing.large)
@@ -28,28 +55,12 @@ struct TimeTableView: View {
             .scrollIndicators(.hidden)
         }
         .preferredColorScheme(.dark)
-        .sheet(
-            isPresented: Binding(
-                get: { store.isAddSchedulePresented },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.addScheduleDismissed)
-                    }
-                }
-            )
-        ) {
-            AddScheduleBottomSheet(store: store)
-                .presentationDetents([.height(395), .large])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(40)
-                .presentationBackground(DDColor.surfaceDefault)
-        }
     }
 
     private var navigationBar: some View {
         HStack {
             Button {
-                store.send(.backButtonTapped)
+                onBack()
             } label: {
                 Image(systemName: "chevron.backward")
                     .font(.system(size: 24, weight: .regular))
@@ -60,17 +71,32 @@ struct TimeTableView: View {
 
             Spacer()
 
-            Button("편집") {
-                store.send(.editButtonTapped)
+            if let onEdit {
+                Button("편집") {
+                    onEdit()
+                }
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(DDColor.textPrimary)
+                .frame(width: 64, height: 40)
+                .background(DDColor.surfaceControl)
+                .clipShape(.capsule)
+                .buttonStyle(.plain)
             }
-            .ddTypography(.labelEmphasis14)
-            .foregroundStyle(DDColor.textPrimary)
-            .frame(width: 64, height: 40)
-            .background(DDColor.surfaceControl)
-            .clipShape(.capsule)
-            .buttonStyle(.plain)
+
+            if let onSave {
+                Button("저장") {
+                    onSave()
+                }
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(DDColor.textOnPrimary)
+                .frame(width: 64, height: 40)
+                .background(DDColor.actionPrimary)
+                .clipShape(.capsule)
+                .buttonStyle(.plain)
+            }
         }
-        .padding(.horizontal, DDSpacing.small)
+        .padding(.leading, DDSpacing.small)
+        .padding(.trailing, DDSpacing.large)
     }
 
     private var tripHeader: some View {
@@ -123,6 +149,18 @@ struct TimeTableView: View {
         .padding(.top, DDSpacing.small)
     }
 
+    private func groupSection(_ groups: [TimeTableGroup]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DDSpacing.medium) {
+                ForEach(groups) { group in
+                    TimeTableGroupCard(group: group)
+                }
+            }
+            .padding(.horizontal, DDSpacing.large)
+        }
+        .padding(.top, 36)
+    }
+
     private var scheduleSection: some View {
         VStack(alignment: .leading, spacing: DDSpacing.small) {
             sectionTitle("전체 여행 일정")
@@ -136,32 +174,32 @@ struct TimeTableView: View {
                     scheduleRow(schedule)
                 }
 
-                HStack(alignment: .top, spacing: 20) {
-                    timelineMarker(height: 126, showsLine: false)
+                if let onAddSchedule {
+                    HStack(alignment: .top, spacing: 20) {
+                        timelineMarker(height: 126, showsLine: false)
 
-                    Button {
-                        store.send(.addScheduleButtonTapped)
-                    } label: {
-                        Text("+ 일정 추가")
-                            .ddTypography(.body16)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 126)
-                            .background(DDColor.surfaceElevated)
-                            .clipShape(.rect(cornerRadius: 20))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(
-                                        DDColor.textTertiary,
-                                        style: StrokeStyle(lineWidth: 1, dash: [3, 3])
-                                    )
-                            }
+                        Button(action: onAddSchedule) {
+                            Text("+ 일정 추가")
+                                .ddTypography(.body16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(maxWidth: .infinity, minHeight: 126)
+                                .background(DDColor.surfaceElevated)
+                                .clipShape(.rect(cornerRadius: 20))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(
+                                            DDColor.textTertiary,
+                                            style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                                        )
+                                }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, DDSpacing.large)
                 }
-                .padding(.horizontal, DDSpacing.large)
             }
         }
-        .padding(.top, 18)
+        .padding(.top, groups == nil ? 18 : 14)
         .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
     }
 

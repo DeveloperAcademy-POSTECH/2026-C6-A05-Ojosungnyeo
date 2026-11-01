@@ -37,7 +37,7 @@ struct TimeTableScheduleCard: View {
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
 
-                Text(schedule.places)
+                Text(schedule.placesSummary)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
                     .lineLimit(1)

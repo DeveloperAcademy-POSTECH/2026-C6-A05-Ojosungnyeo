@@ -33,7 +33,9 @@ struct TripItineraryView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            itineraryTabBar
+            if !(store.selectedTab == .dailyItinerary && store.timeTable.isEditing) {
+                itineraryTabBar
+            }
         }
     }
 

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TimeSelectionBottomSheet: View {
     @Binding var selectedMinuteOfDay: Int
+    let canConfirm: Bool
+    let showsOverlapError: Bool
     let onDone: () -> Void
 
     var body: some View {
@@ -20,11 +22,12 @@ struct TimeSelectionBottomSheet: View {
 
                 Button("완료", action: onDone)
                     .ddTypography(.labelEmphasis14)
-                    .foregroundStyle(DDColor.textOnPrimary)
+                    .foregroundStyle(canConfirm ? DDColor.textOnPrimary : DDColor.textSecondary)
                     .frame(width: 64, height: 40)
-                    .background(DDColor.actionPrimary)
+                    .background(canConfirm ? DDColor.actionPrimary : DDColor.actionSecondary)
                     .clipShape(.capsule)
                     .buttonStyle(.plain)
+                    .disabled(!canConfirm)
             }
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, 17)
@@ -55,6 +58,15 @@ struct TimeSelectionBottomSheet: View {
             .frame(height: 216)
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, 18)
+
+            if showsOverlapError {
+                Text("다른 일정과 시간이 겹쳐요.\n시간을 다시 선택해 주세요.")
+                    .ddTypography(.label14)
+                    .foregroundStyle(DDColor.actionPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.top, 7)
+            }
 
             Spacer(minLength: 0)
         }

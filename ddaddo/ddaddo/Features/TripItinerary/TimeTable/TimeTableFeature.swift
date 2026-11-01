@@ -30,6 +30,51 @@ struct TimeTableFeature: Reducer {
             }
         }
 
+        var timeSelectionCourseIDs: [TimeTableCourse.ID]? {
+            guard let day = edit.editingDay, day == selectedDay else { return nil }
+
+            if let scheduleID = edit.editingScheduleID {
+                return placements.first(where: { $0.id == scheduleID && $0.day == day })
+                    .map { [$0.courseID] }
+            }
+            if let groupID = edit.placingGroupID {
+                return unplacedGroups.first(where: { $0.id == groupID })?.courseIDs
+            }
+            return nil
+        }
+
+        var hasTimeSelectionConflict: Bool {
+            guard let day = edit.editingDay,
+                  let minute = edit.selectedMinuteOfDay,
+                  let courseIDs = timeSelectionCourseIDs
+            else { return false }
+
+            return TimeTableSchedule.hasTimeConflict(
+                courseIDs: courseIDs,
+                startingAt: minute,
+                on: day,
+                excluding: edit.editingScheduleID,
+                placements: placements,
+                coursesByID: coursesByID
+            )
+        }
+
+        var canConfirmTimeSelection: Bool {
+            guard edit.editingDay == selectedDay,
+                  let minute = edit.selectedMinuteOfDay,
+                  (0..<1440).contains(minute),
+                  let courseIDs = timeSelectionCourseIDs,
+                  !courseIDs.isEmpty,
+                  Set(courseIDs).count == courseIDs.count,
+                  courseIDs.allSatisfy({ id in
+                      guard let course = coursesByID[id] else { return false }
+                      return course.durationMinutes > 0 && !course.members.isEmpty
+                  })
+            else { return false }
+
+            return !hasTimeSelectionConflict
+        }
+
     }
 
     @CasePathable
@@ -79,7 +124,8 @@ struct TimeTableFeature: Reducer {
                 return .none
 
             case .edit(.timeSelectionDoneTapped):
-                guard let day = state.edit.editingDay,
+                guard state.canConfirmTimeSelection,
+                      let day = state.edit.editingDay,
                       day == state.selectedDay,
                       let minute = state.edit.selectedMinuteOfDay
                 else { return .none }
@@ -218,6 +264,45 @@ struct TimeTableSchedule: Equatable, Identifiable {
     var timing: TimeTableScheduleTiming
     let branchGroupID: Int?
 
+    static func hasTimeConflict(
+        courseIDs: [TimeTableCourse.ID],
+        startingAt minute: Int,
+        on day: TripDay,
+        excluding scheduleID: ID?,
+        placements: [Self],
+        coursesByID: [TimeTableCourse.ID: TimeTableCourse]
+    ) -> Bool {
+        let proposed = courseIDs.compactMap { courseID in
+            coursesByID[courseID].map {
+                TimeTableOccupiedInterval(start: minute, course: $0)
+            }
+        }
+        guard proposed.count == courseIDs.count else { return false }
+
+        let existing = placements.compactMap { schedule -> TimeTableOccupiedInterval? in
+            guard schedule.day == day,
+                  schedule.id != scheduleID,
+                  let course = coursesByID[schedule.courseID]
+            else { return nil }
+            return TimeTableOccupiedInterval(
+                start: schedule.timing.startMinuteOfDay,
+                course: course
+            )
+        }
+
+        for index in proposed.indices {
+            if existing.contains(where: { proposed[index].conflicts(with: $0) }) {
+                return true
+            }
+            for otherIndex in proposed.indices where otherIndex > index {
+                if proposed[index].conflicts(with: proposed[otherIndex]) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     static let mockPlacements: [Self] = [
         .init(id: 0, courseID: 0, day: .day1, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
         .init(id: 1, courseID: 1, day: .day1, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
@@ -233,6 +318,23 @@ struct TimeTableSchedule: Equatable, Identifiable {
         .init(id: 300, courseID: 300, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: nil),
         .init(id: 301, courseID: 301, day: .day4, timing: .init(startHour: 11, startMinute: 30), branchGroupID: nil)
     ]
+}
+
+private struct TimeTableOccupiedInterval {
+    let start: Int
+    let end: Int
+    let memberIDs: Set<TripMember.ID>
+
+    init(start: Int, course: TimeTableCourse) {
+        self.start = start
+        end = start + course.durationMinutes
+        memberIDs = Set(course.members.map(\.id))
+    }
+
+    func conflicts(with other: Self) -> Bool {
+        start < other.end && other.start < end &&
+        !memberIDs.isDisjoint(with: other.memberIDs)
+    }
 }
 
 struct TimeTableScheduleTiming: Equatable {

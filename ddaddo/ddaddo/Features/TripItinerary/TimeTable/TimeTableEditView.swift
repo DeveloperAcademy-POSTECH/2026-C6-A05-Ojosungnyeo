@@ -46,6 +46,8 @@ struct TimeTableEditView: View {
                     get: { store.selectedMinuteOfDay ?? 0 },
                     set: { store.send(.timeSelectionChanged($0)) }
                 ),
+                canConfirm: timeTableStore.canConfirmTimeSelection,
+                showsOverlapError: timeTableStore.hasTimeSelectionConflict,
                 onDone: { store.send(.timeSelectionDoneTapped) }
             )
             .presentationDetents([.height(424)])

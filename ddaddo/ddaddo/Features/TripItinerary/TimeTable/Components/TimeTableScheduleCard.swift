@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TimeTableScheduleCard: View {
     let schedule: TimeTableSchedule
+    let tripMembers: [TripMember]
     let action: () -> Void
 
     var body: some View {
@@ -28,7 +29,9 @@ struct TimeTableScheduleCard: View {
 
                     Spacer(minLength: 0)
 
-                    memberAvatars
+                    if schedule.kind(among: tripMembers) == .separate {
+                        memberAvatars
+                    }
                 }
 
                 Spacer(minLength: DDSpacing.xSmall)

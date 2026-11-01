@@ -167,10 +167,14 @@ struct TimeTableContent: View {
 
             LazyVStack(spacing: 12) {
                 if !store.schedules.isEmpty {
-                    compactScheduleRow
+                    compactScheduleRow(
+                        branchSchedules.isEmpty
+                            ? Array(store.schedules.prefix(2))
+                            : branchSchedules
+                    )
                 }
 
-                ForEach(store.schedules) { schedule in
+                ForEach(regularSchedules) { schedule in
                     scheduleRow(schedule)
                 }
 
@@ -203,14 +207,24 @@ struct TimeTableContent: View {
         .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
     }
 
-    private var compactScheduleRow: some View {
+    private var branchSchedules: [TimeTableSchedule] {
+        store.schedules.filter { $0.branchGroupID != nil }
+    }
+
+    private var regularSchedules: [TimeTableSchedule] {
+        branchSchedules.isEmpty
+            ? store.schedules
+            : store.schedules.filter { $0.branchGroupID == nil }
+    }
+
+    private func compactScheduleRow(_ schedules: [TimeTableSchedule]) -> some View {
         HStack(alignment: .top, spacing: 20) {
             timelineMarker(height: 126, showsLine: true)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: DDSpacing.small) {
-                    ForEach(store.schedules.prefix(2)) { schedule in
-                        TimeTableScheduleCard(schedule: schedule) {
+                    ForEach(schedules) { schedule in
+                        TimeTableScheduleCard(schedule: schedule, tripMembers: store.tripMembers) {
                             store.send(.scheduleTapped(schedule.id))
                         }
                         .frame(width: 205)
@@ -226,7 +240,7 @@ struct TimeTableContent: View {
         HStack(alignment: .top, spacing: 20) {
             timelineMarker(height: 126, showsLine: true)
 
-            TimeTableScheduleCard(schedule: schedule) {
+            TimeTableScheduleCard(schedule: schedule, tripMembers: store.tripMembers) {
                 store.send(.scheduleTapped(schedule.id))
             }
         }

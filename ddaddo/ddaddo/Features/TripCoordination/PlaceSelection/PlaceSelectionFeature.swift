@@ -10,22 +10,111 @@ import CoreGraphics
 import Foundation
 
 struct PlaceSelectionFeature: Reducer {
+    struct Participant: Equatable, Identifiable, Sendable {
+        let id: Int
+        let member: TripMember
+        let name: String
+        let hasJoined: Bool
+        let isCurrentUser: Bool
+    }
+
     @ObservableState
     struct State: Equatable {
+        var tripTitle: String
+        var destinationName: String
+        var tripStartDate: Date
+        var tripEndDate: Date
+        var participants: [Participant]
         var searchText = ""
         var isBottomSheetExpanded = true
         var isSearchPresented = false
         var selectedPlace: PlaceDetails?
         var isPlaceDetailsLoading = false
-        var selectedMember: TripMember = .tae
-        var memberPlaces = Self.mockMemberPlaces
-        var remainingSeconds = 5
+        var selectedMember: TripMember
+        var memberPlaces: [TripMember: [PinnedPlace]]
+        var remainingSeconds: Int
         var isTimerRunning = false
         var hasSelectionEnded = false
         var placeSearch = PlaceSearchFeature.State()
 
+        init(
+            tripTitle: String = "도쿄 여행",
+            destinationName: String = "도쿄",
+            tripStartDate: Date = Date(),
+            tripEndDate: Date? = nil,
+            participants: [Participant] = Self.mockParticipants,
+            memberPlaces: [TripMember: [PinnedPlace]] = [:],
+            remainingSeconds: Int = 72 * 60 * 60
+        ) {
+            let resolvedEndDate = tripEndDate
+                ?? Calendar.current.date(byAdding: .day, value: 3, to: tripStartDate)!
+            let selectedMember = participants.first(where: \.isCurrentUser)?.member
+                ?? participants.first(where: \.hasJoined)?.member
+                ?? .tae
+
+            self.tripTitle = tripTitle
+            self.destinationName = destinationName
+            self.tripStartDate = tripStartDate
+            self.tripEndDate = resolvedEndDate
+            self.participants = participants
+            self.selectedMember = selectedMember
+            self.memberPlaces = memberPlaces
+            self.remainingSeconds = remainingSeconds
+        }
+
+        var numberOfNights: Int {
+            let calendar = Calendar(identifier: .gregorian)
+            let start = calendar.startOfDay(for: tripStartDate)
+            let end = calendar.startOfDay(for: tripEndDate)
+            return max(1, calendar.dateComponents([.day], from: start, to: end).day ?? 1)
+        }
+
+        var maximumPlaceCount: Int {
+            numberOfNights * 2
+        }
+
+        var navigationTitle: String {
+            "\(numberOfNights)박 \(numberOfNights + 1)일 \(destinationName)여행"
+        }
+
+        var currentMember: TripMember {
+            participants.first(where: \.isCurrentUser)?.member ?? selectedMember
+        }
+
+        var selectedPlaceCount: Int {
+            memberPlaces[selectedMember]?.count ?? 0
+        }
+
+        var currentParticipant: Participant? {
+            participants.first(where: { $0.member == selectedMember })
+        }
+
         var displayedPlaces: [PinnedPlace] {
-            memberPlaces[selectedMember] ?? []
+            guard currentParticipant?.hasJoined != false else { return [] }
+            return memberPlaces[selectedMember] ?? []
+        }
+
+        mutating func updateTripContext(
+            tripTitle: String,
+            destinationName: String,
+            tripStartDate: Date,
+            tripEndDate: Date,
+            participants: [Participant],
+            remainingSeconds: Int
+        ) {
+            self.tripTitle = tripTitle
+            self.destinationName = destinationName
+            self.tripStartDate = tripStartDate
+            self.tripEndDate = tripEndDate
+            self.participants = participants
+            self.remainingSeconds = remainingSeconds
+
+            let selectableMembers = participants.filter(\.hasJoined).map(\.member)
+            if !selectableMembers.contains(selectedMember) {
+                selectedMember = participants.first(where: \.isCurrentUser)?.member
+                    ?? selectableMembers.first
+                    ?? .tae
+            }
         }
 
         var timerText: String {
@@ -35,7 +124,14 @@ struct PlaceSelectionFeature: Reducer {
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }
 
-        private static let mockMemberPlaces: [TripMember: [PinnedPlace]] = [
+        private static let mockParticipants: [Participant] = [
+            .init(id: 0, member: .tae, name: "테이", hasJoined: true, isCurrentUser: true),
+            .init(id: 1, member: .header, name: "헤더", hasJoined: true, isCurrentUser: false),
+            .init(id: 2, member: .grae, name: "그레", hasJoined: true, isCurrentUser: false),
+            .init(id: 3, member: .juni, name: "주니", hasJoined: false, isCurrentUser: false)
+        ]
+
+        static let mockMemberPlaces: [TripMember: [PinnedPlace]] = [
             .tae: [
                 PinnedPlace(
                     id: "tae-restaurant",
@@ -186,6 +282,9 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case let .memberProfileTapped(member):
+                guard state.participants.contains(where: {
+                    $0.member == member && $0.hasJoined
+                }) else { return .none }
                 state.selectedMember = member
                 state.selectedPlace = nil
                 state.searchText = ""

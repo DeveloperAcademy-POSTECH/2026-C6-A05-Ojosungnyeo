@@ -35,14 +35,18 @@ struct PlaceGroupingFeature: Reducer {
         var members = PlaceGroupingPreviewData.members
         var placeGroups = PlaceGroupingPreviewData.placeGroups
         var recommendedGroups = PlaceGroupingPreviewData.recommendedGroups
+        var waitingForConfirmation = WaitingForConfirmationFeature.State()
+        var isWaitingForConfirmationPresented = false
     }
 
+    @CasePathable
     enum Action: Equatable {
         case travelCriteriaChangeTapped
         case tabSelected(Tab)
         case memberTapped(String)
         case recommendedGroupTapped(String)
         case confirmButtonTapped
+        case waitingForConfirmation(WaitingForConfirmationFeature.Action)
     }
 
     var body: some Reducer<State, Action> {
@@ -50,13 +54,24 @@ struct PlaceGroupingFeature: Reducer {
             switch action {
             case .travelCriteriaChangeTapped,
                  .memberTapped,
-                 .recommendedGroupTapped,
-                 .confirmButtonTapped:
+                 .recommendedGroupTapped:
+                return .none
+            case .confirmButtonTapped:
+                state.isWaitingForConfirmationPresented = true
+                return .none
+            case .waitingForConfirmation(.backButtonTapped):
+                state.isWaitingForConfirmationPresented = false
+                return .none
+            case .waitingForConfirmation:
                 return .none
             case let .tabSelected(tab):
                 state.selectedTab = tab
                 return .none
             }
+        }
+
+        Scope(state: \.waitingForConfirmation, action: \.waitingForConfirmation) {
+            WaitingForConfirmationFeature()
         }
     }
 }

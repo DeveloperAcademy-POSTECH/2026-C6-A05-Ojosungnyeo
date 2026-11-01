@@ -28,7 +28,21 @@ struct PlaceGroupingView: View {
             }
 
             bottomSheet
+
+            if store.isWaitingForConfirmationPresented {
+                WaitingForConfirmationView(
+                    store: store.scope(
+                        state: \.waitingForConfirmation,
+                        action: \.waitingForConfirmation
+                    )
+                )
+                .transition(.move(edge: .trailing))
+            }
         }
+        .animation(
+            .easeInOut(duration: 0.3),
+            value: store.isWaitingForConfirmationPresented
+        )
         .preferredColorScheme(.dark)
     }
 

@@ -9,6 +9,8 @@ import SwiftUI
 
 struct TimeTableGroupCard: View {
     let group: TimeTableGroup
+    let participantSummary: String
+    let onAdd: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -19,7 +21,7 @@ struct TimeTableGroupCard: View {
                 .foregroundStyle(DDColor.textOnPrimary)
                 .lineLimit(1)
 
-            Text(group.participantSummary)
+            Text(participantSummary)
                 .ddTypography(.caption12)
                 .foregroundStyle(DDColor.textTertiary)
                 .lineLimit(1)
@@ -30,17 +32,20 @@ struct TimeTableGroupCard: View {
         .background(DDColor.textPrimary)
         .clipShape(.rect(cornerRadius: 20))
         .overlay(alignment: .topTrailing) {
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(DDColor.textTertiary)
-                .padding(.top, 8)
-                .padding(.trailing, 9)
-                .accessibilityHidden(true)
+            Button(action: onAdd) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(DDColor.textTertiary)
+                    .frame(width: 30, height: 30)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(group.name) 그룹 일정 배치")
         }
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(DDColor.borderDefault, lineWidth: 1)
+                .allowsHitTesting(false)
         }
-        .accessibilityElement(children: .combine)
     }
 }

@@ -34,6 +34,7 @@ struct TimeTableContent: View {
     var onSave: (() -> Void)?
     var onAddSchedule: (() -> Void)?
     var onScheduleTapped: ((TimeTableSchedule.ID) -> Void)?
+    var onGroupAdd: ((TimeTableGroup.ID) -> Void)?
     var groups: [TimeTableGroup]?
 
     var body: some View {
@@ -46,7 +47,7 @@ struct TimeTableContent: View {
                     navigationBar
                     tripHeader
                     dayPicker
-                    if let groups {
+                    if let groups, !groups.isEmpty {
                         groupSection(groups)
                     }
                     scheduleSection
@@ -154,7 +155,11 @@ struct TimeTableContent: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DDSpacing.medium) {
                 ForEach(groups) { group in
-                    TimeTableGroupCard(group: group)
+                    TimeTableGroupCard(
+                        group: group,
+                        participantSummary: group.participantSummary(in: store.coursesByID),
+                        onAdd: { onGroupAdd?(group.id) }
+                    )
                 }
             }
             .padding(.horizontal, DDSpacing.large)
@@ -200,34 +205,28 @@ struct TimeTableContent: View {
                 }
             }
         }
-        .padding(.top, groups == nil ? 18 : 14)
+        .padding(.top, groups?.isEmpty == false ? 14 : 18)
         .animation(.easeInOut(duration: 0.2), value: store.selectedDay)
     }
 
     private var timelineRows: [TimelineRow] {
-        let schedules = store.schedules
-        let originalSchedules = store.schedulesByDay[store.selectedDay, default: []]
+        let originalSchedules = store.placements.filter {
+            $0.day == store.selectedDay &&
+            store.coursesByID[$0.courseID] != nil &&
+            store.dayOfMonthByDay[$0.day] != nil
+        }
         var rows: [TimelineRow] = []
         var seenBranchGroups: Set<Int> = []
 
-        if schedules.contains(where: { $0.branchGroupID != nil }) {
-            for schedule in schedules {
-                if let groupID = schedule.branchGroupID {
-                    guard seenBranchGroups.insert(groupID).inserted else { continue }
-                    rows.append(TimelineRow(
-                        id: "branch-\(groupID)",
-                        schedules: originalSchedules.filter { $0.branchGroupID == groupID },
-                        isCompact: true
-                    ))
-                } else {
-                    rows.append(TimelineRow(id: "schedule-\(schedule.id)", schedules: [schedule], isCompact: false))
-                }
-            }
-        } else {
-            if !schedules.isEmpty {
-                rows.append(TimelineRow(id: "compact", schedules: Array(schedules.prefix(2)), isCompact: true))
-            }
-            for schedule in schedules.dropFirst(2) {
+        for schedule in originalSchedules {
+            if let groupID = schedule.branchGroupID {
+                guard seenBranchGroups.insert(groupID).inserted else { continue }
+                rows.append(TimelineRow(
+                    id: "branch-\(groupID)",
+                    schedules: originalSchedules.filter { $0.branchGroupID == groupID },
+                    isCompact: true
+                ))
+            } else {
                 rows.append(TimelineRow(id: "schedule-\(schedule.id)", schedules: [schedule], isCompact: false))
             }
         }
@@ -246,10 +245,18 @@ struct TimeTableContent: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: DDSpacing.small) {
                     ForEach(schedules) { schedule in
-                        TimeTableScheduleCard(schedule: schedule, tripMembers: store.tripMembers) {
-                            scheduleTapped(schedule.id)
+                        if let course = store.coursesByID[schedule.courseID],
+                           let dayOfMonth = store.dayOfMonthByDay[schedule.day] {
+                            TimeTableScheduleCard(
+                                schedule: schedule,
+                                course: course,
+                                dayOfMonth: dayOfMonth,
+                                tripMembers: store.tripMembers
+                            ) {
+                                scheduleTapped(schedule.id)
+                            }
+                            .frame(width: 205)
                         }
-                        .frame(width: 205)
                     }
                 }
                 .padding(.trailing, DDSpacing.large)
@@ -262,8 +269,16 @@ struct TimeTableContent: View {
         HStack(alignment: .top, spacing: 20) {
             timelineMarker(height: 126, showsLine: true)
 
-            TimeTableScheduleCard(schedule: schedule, tripMembers: store.tripMembers) {
-                scheduleTapped(schedule.id)
+            if let course = store.coursesByID[schedule.courseID],
+               let dayOfMonth = store.dayOfMonthByDay[schedule.day] {
+                TimeTableScheduleCard(
+                    schedule: schedule,
+                    course: course,
+                    dayOfMonth: dayOfMonth,
+                    tripMembers: store.tripMembers
+                ) {
+                    scheduleTapped(schedule.id)
+                }
             }
         }
         .padding(.horizontal, DDSpacing.large)

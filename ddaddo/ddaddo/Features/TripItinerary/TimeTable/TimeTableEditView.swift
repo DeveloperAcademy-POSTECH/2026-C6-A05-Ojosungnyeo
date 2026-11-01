@@ -12,7 +12,8 @@ struct TimeTableEditView: View {
             onSave: { store.send(.saveButtonTapped) },
             onAddSchedule: { store.send(.addScheduleButtonTapped) },
             onScheduleTapped: { store.send(.scheduleTapped($0)) },
-            groups: timeTableStore.groups
+            onGroupAdd: { store.send(.groupAddButtonTapped($0)) },
+            groups: timeTableStore.unplacedGroups
         )
         .sheet(
             isPresented: Binding(

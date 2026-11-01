@@ -10,13 +10,17 @@ struct TimeTableEditFeature: Reducer {
         var isPlaceSearchLoading = false
         var placeSearchErrorMessage: String?
         var editingScheduleID: TimeTableSchedule.ID?
+        var placingGroupID: TimeTableGroup.ID?
         var editingDay: TripDay?
         var selectedMinuteOfDay: Int?
 
-        var isTimeSelectionPresented: Bool { editingScheduleID != nil }
+        var isTimeSelectionPresented: Bool {
+            editingScheduleID != nil || placingGroupID != nil
+        }
 
         mutating func dismissTimeSelection() {
             editingScheduleID = nil
+            placingGroupID = nil
             editingDay = nil
             selectedMinuteOfDay = nil
         }
@@ -28,6 +32,7 @@ struct TimeTableEditFeature: Reducer {
         case addScheduleButtonTapped
         case addScheduleDismissed
         case scheduleTapped(TimeTableSchedule.ID)
+        case groupAddButtonTapped(TimeTableGroup.ID)
         case timeSelectionChanged(Int)
         case timeSelectionDoneTapped
         case timeSelectionDismissed
@@ -48,7 +53,8 @@ struct TimeTableEditFeature: Reducer {
                 state.dismissTimeSelection()
                 return .cancel(id: "time-table-place-search")
 
-            case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped, .timeSelectionDoneTapped:
+            case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
+                 .groupAddButtonTapped, .timeSelectionDoneTapped:
                 return .none
 
             case let .timeSelectionChanged(minuteOfDay):

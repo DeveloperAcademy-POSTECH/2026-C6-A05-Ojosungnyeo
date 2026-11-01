@@ -9,6 +9,11 @@ import SwiftUI
 
 struct PlaceSelectionBottomSheet: View {
     let isExpanded: Bool
+    let selectedMember: TripMember
+    let participants: [PlaceSelectionFeature.Participant]
+    let destinationName: String
+    let maximumPlaceCount: Int
+    let memberTapped: (TripMember) -> Void
     let searchButtonTapped: () -> Void
 
     var body: some View {
@@ -28,7 +33,7 @@ struct PlaceSelectionBottomSheet: View {
                     .foregroundStyle(DDColor.textPrimary)
                     .padding(.top, DDSpacing.large)
 
-                Text("도쿄에서 꼭 가고 싶은 장소를\n8개까지 추가해 보세요.")
+                Text("\(destinationName)에서 꼭 가고 싶은 장소를\n\(maximumPlaceCount)개까지 추가해 보세요.")
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textSecondary)
                     .lineSpacing(0)
@@ -56,10 +61,47 @@ struct PlaceSelectionBottomSheet: View {
 
     private var avatarGroup: some View {
         HStack(spacing: DDSpacing.xSmall) {
-            DDMiniHeadAvatar(character: .tae, size: 40)
-            DDMiniHeadAvatar(character: .header, size: 40)
-            DDMiniHeadAvatar(character: .grae, size: 40)
-            DDMiniHeadAvatar(character: .juni, size: 40)
+            ForEach(participants) { participant in
+                Button {
+                    memberTapped(participant.member)
+                } label: {
+                    PlaceSelectionParticipantAvatar(
+                        participant: participant,
+                        isSelected: selectedMember == participant.member
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!participant.hasJoined)
+            }
         }
+    }
+}
+
+struct PlaceSelectionParticipantAvatar: View {
+    let participant: PlaceSelectionFeature.Participant
+    let isSelected: Bool
+
+    var body: some View {
+        Group {
+            if participant.hasJoined {
+                DDMiniHeadAvatar(character: participant.member.avatar, size: 40)
+                    .saturation(isSelected ? 1 : 0.25)
+                    .opacity(isSelected ? 1 : 0.5)
+            } else {
+                ZStack {
+                    Circle()
+                        .stroke(
+                            DDColor.borderDefault,
+                            style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                        )
+
+                    Image(systemName: "person")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(DDColor.iconDefault)
+                }
+                .accessibilityLabel("\(participant.name) 참여 대기")
+            }
+        }
+        .frame(width: 40, height: 40)
     }
 }

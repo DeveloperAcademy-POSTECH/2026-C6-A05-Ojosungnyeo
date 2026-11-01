@@ -10,6 +10,9 @@ import SwiftUI
 struct SelectedPlaceBottomSheet: View {
     let place: PlaceDetails
     let isLoading: Bool
+    let canAdd: Bool
+    let isAlreadyAdded: Bool
+    let addButtonTapped: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -31,13 +34,14 @@ struct SelectedPlaceBottomSheet: View {
 
                 Spacer(minLength: DDSpacing.small)
 
-                Button("추가하기") {}
+                Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
                     .ddTypography(.label14)
-                    .foregroundStyle(DDColor.textPrimary)
+                    .foregroundStyle(canAdd ? DDColor.textPrimary : DDColor.textTertiary)
                     .padding(.horizontal, 12)
                     .frame(height: 28)
                     .background(DDColor.surfaceControl)
                     .clipShape(.capsule)
+                    .disabled(!canAdd)
             }
             .padding(.top, 36)
 

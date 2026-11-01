@@ -10,6 +10,7 @@ import SwiftUI
 struct MemberPlacesBottomSheet: View {
     let isExpanded: Bool
     let selectedMember: TripMember
+    let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
     var bottomContentInset: CGFloat = DDSpacing.xLarge
     let memberTapped: (TripMember) -> Void
@@ -48,32 +49,18 @@ struct MemberPlacesBottomSheet: View {
 
     private var memberSelector: some View {
         HStack(spacing: DDSpacing.xSmall) {
-            ForEach(TripMember.allCases) { member in
+            ForEach(participants) { participant in
                 Button {
-                    memberTapped(member)
+                    memberTapped(participant.member)
                 } label: {
-                    DDMiniHeadAvatar(character: member.character, size: 34)
-                        .padding(3)
-                        .background(
-                            selectedMember == member
-                                ? DDColor.actionPrimary
-                                : DDColor.surfaceControl
-                        )
-                        .clipShape(.circle)
+                    PlaceSelectionParticipantAvatar(
+                        participant: participant,
+                        isSelected: selectedMember == participant.member
+                    )
                 }
                 .buttonStyle(.plain)
+                .disabled(!participant.hasJoined)
             }
-        }
-    }
-}
-
-private extension TripMember {
-    var character: DDMiniHeadAvatar.Character {
-        switch self {
-        case .tae: .tae
-        case .header: .header
-        case .grae: .grae
-        case .juni: .juni
         }
     }
 }

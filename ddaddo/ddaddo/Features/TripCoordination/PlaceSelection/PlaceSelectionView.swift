@@ -16,6 +16,7 @@ struct PlaceSelectionView: View {
         ZStack(alignment: .bottom) {
             GoogleMapView(
                 selectedPlace: store.selectedPlace,
+                showsSelectedPlaceMarker: false,
                 pinnedPlaces: store.displayedPlaces
             )
                 .ignoresSafeArea()
@@ -42,13 +43,18 @@ struct PlaceSelectionView: View {
             if let selectedPlace = store.selectedPlace {
                 SelectedPlaceBottomSheet(
                     place: selectedPlace,
-                    isLoading: store.isPlaceDetailsLoading
-                )
+                    isLoading: store.isPlaceDetailsLoading,
+                    canAdd: store.canAddSelectedPlace,
+                    isAlreadyAdded: store.isSelectedPlaceAlreadyAdded
+                ) {
+                    store.send(.addSelectedPlaceButtonTapped)
+                }
                 .ignoresSafeArea(edges: .bottom)
             } else if !store.displayedPlaces.isEmpty {
                 MemberPlacesBottomSheet(
                     isExpanded: store.isBottomSheetExpanded,
                     selectedMember: store.selectedMember,
+                    participants: store.participants,
                     places: store.displayedPlaces,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
@@ -60,10 +66,18 @@ struct PlaceSelectionView: View {
                 .gesture(sheetDragGesture)
             } else {
                 PlaceSelectionBottomSheet(
-                    isExpanded: store.isBottomSheetExpanded
-                ) {
-                    store.send(.searchButtonTapped)
-                }
+                    isExpanded: store.isBottomSheetExpanded,
+                    selectedMember: store.selectedMember,
+                    participants: store.participants,
+                    destinationName: store.destinationName,
+                    maximumPlaceCount: store.maximumPlaceCount,
+                    memberTapped: { member in
+                        store.send(.memberProfileTapped(member))
+                    },
+                    searchButtonTapped: {
+                        store.send(.searchButtonTapped)
+                    }
+                )
                 .frame(height: currentSheetHeight, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
@@ -112,7 +126,7 @@ struct PlaceSelectionView: View {
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("3박 4일 도쿄여행")
+                Text(store.navigationTitle)
                     .ddTypography(.heading18)
                     .foregroundStyle(DDColor.textPrimary)
 
@@ -134,13 +148,10 @@ struct PlaceSelectionView: View {
 
             Spacer(minLength: 0)
 
-            Text(store.hasSelectionEnded ? "3/3" : (store.selectedPlace == nil ? "2/3" : "1/3"))
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.horizontal, DDSpacing.small)
-                .frame(height: 32)
-                .background(DDColor.surfaceDefault)
-                .clipShape(.capsule)
+            PlaceCountProgressView(
+                count: store.selectedPlaceCount,
+                maximumCount: store.maximumPlaceCount
+            )
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(height: 62)
@@ -150,12 +161,20 @@ struct PlaceSelectionView: View {
         Group {
             if store.selectedPlace != nil {
                 HStack(spacing: DDSpacing.small) {
-                    Text(store.searchText)
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textPrimary)
-                        .lineLimit(1)
+                    Button {
+                        store.send(.searchFieldTapped)
+                    } label: {
+                        HStack(spacing: 0) {
+                            Text(store.searchText)
+                                .ddTypography(.body16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .lineLimit(1)
 
-                    Spacer(minLength: 0)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
 
                     Button {
                         store.send(.clearSelectedPlaceButtonTapped)
@@ -176,9 +195,7 @@ struct PlaceSelectionView: View {
                 }
             } else {
                 DDSearchField(
-                    placeholder: store.displayedPlaces.isEmpty
-                        ? "꼭 가고 싶은 장소 8개를 추가하세요"
-                        : "꼭 가고 싶은 장소 3개를 추가하세요.",
+                    placeholder: "꼭 가고 싶은 장소 \(store.maximumPlaceCount)개를 추가하세요.",
                     text: Binding(
                         get: { store.searchText },
                         set: { store.send(.searchTextChanged($0)) }
@@ -222,6 +239,37 @@ struct PlaceSelectionView: View {
             .onEnded { value in
                 store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
             }
+    }
+}
+
+private struct PlaceCountProgressView: View {
+    let count: Int
+    let maximumCount: Int
+
+    private var progress: Double {
+        guard maximumCount > 0 else { return 0 }
+        return min(1, Double(count) / Double(maximumCount))
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(DDColor.surfaceControl, lineWidth: 3)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    DDColor.actionPrimary,
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            Text("\(count)/\(maximumCount)")
+                .ddTypography(.captionEmphasis12)
+                .foregroundStyle(DDColor.textPrimary)
+        }
+        .frame(width: 44, height: 44)
+        .animation(.easeOut(duration: 0.2), value: count)
     }
 }
 

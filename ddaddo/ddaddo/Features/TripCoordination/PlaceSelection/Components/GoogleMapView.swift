@@ -13,6 +13,7 @@ struct GoogleMapView: UIViewRepresentable {
     var longitude: CLLocationDegrees = -122.4194
     var zoom: Float = 15
     var selectedPlace: PlaceDetails?
+    var showsSelectedPlaceMarker = true
     var selectedCoordinate: CLLocationCoordinate2D?
     var pinnedPlaces: [PinnedPlace] = []
     var placeGroups: [MapPlaceGroup] = []
@@ -65,7 +66,7 @@ struct GoogleMapView: UIViewRepresentable {
     private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {
         let signature: String
         if let selectedPlace {
-            signature = selectedPlace.id
+            signature = "selected:\(selectedPlace.id):marker:\(showsSelectedPlaceMarker)"
         } else if let selectedCoordinate {
             signature = "\(selectedCoordinate.latitude),\(selectedCoordinate.longitude)"
         } else if !placeGroups.isEmpty {
@@ -84,7 +85,9 @@ struct GoogleMapView: UIViewRepresentable {
                 latitude: selectedPlace.latitude,
                 longitude: selectedPlace.longitude
             )
-            addMarker(at: coordinate, to: mapView)
+            if showsSelectedPlaceMarker {
+                addMarker(at: coordinate, to: mapView)
+            }
             mapView.animate(to: GMSCameraPosition(target: coordinate, zoom: 15))
             return
         }

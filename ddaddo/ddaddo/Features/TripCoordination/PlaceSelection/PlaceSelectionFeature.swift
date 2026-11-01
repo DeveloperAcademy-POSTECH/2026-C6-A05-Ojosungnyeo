@@ -85,6 +85,24 @@ struct PlaceSelectionFeature: Reducer {
             memberPlaces[selectedMember]?.count ?? 0
         }
 
+        var isViewingCurrentUser: Bool {
+            selectedMember == currentMember
+        }
+
+        var isSelectedPlaceAlreadyAdded: Bool {
+            guard let selectedPlace else { return false }
+            return memberPlaces[currentMember, default: []].contains {
+                $0.id == selectedPlace.id
+            }
+        }
+
+        var canAddSelectedPlace: Bool {
+            selectedPlace != nil
+                && isViewingCurrentUser
+                && !isSelectedPlaceAlreadyAdded
+                && memberPlaces[currentMember, default: []].count < maximumPlaceCount
+        }
+
         var currentParticipant: Participant? {
             participants.first(where: { $0.member == selectedMember })
         }
@@ -217,6 +235,7 @@ struct PlaceSelectionFeature: Reducer {
         case dimmedBackgroundTapped
         case bottomSheetDragEnded(CGFloat)
         case clearSelectedPlaceButtonTapped
+        case addSelectedPlaceButtonTapped
         case memberProfileTapped(TripMember)
         case timerTicked
         case moveCriteriaButtonTapped
@@ -238,7 +257,7 @@ struct PlaceSelectionFeature: Reducer {
                 }
                 state.isTimerRunning = true
                 return .run { send in
-                    for _ in 0..<5 {
+                    while !Task.isCancelled {
                         try await clock.sleep(for: .seconds(1))
                         await send(.timerTicked)
                     }
@@ -249,6 +268,7 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .searchFieldTapped:
+                state.selectedMember = state.currentMember
                 state.isSearchPresented = true
                 return .none
 
@@ -257,6 +277,7 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .searchButtonTapped:
+                state.selectedMember = state.currentMember
                 state.isBottomSheetExpanded = false
                 state.isSearchPresented = true
                 return .none
@@ -281,6 +302,28 @@ struct PlaceSelectionFeature: Reducer {
                 state.isBottomSheetExpanded = true
                 return .none
 
+            case .addSelectedPlaceButtonTapped:
+                guard
+                    state.canAddSelectedPlace,
+                    let selectedPlace = state.selectedPlace
+                else { return .none }
+
+                state.memberPlaces[state.currentMember, default: []].append(
+                    PinnedPlace(
+                        id: selectedPlace.id,
+                        name: selectedPlace.name,
+                        description: selectedPlace.address,
+                        thumbnailName: "DDMockPlaceVillage",
+                        latitude: selectedPlace.latitude,
+                        longitude: selectedPlace.longitude
+                    )
+                )
+                state.selectedMember = state.currentMember
+                state.selectedPlace = nil
+                state.searchText = ""
+                state.isBottomSheetExpanded = false
+                return .none
+
             case let .memberProfileTapped(member):
                 guard state.participants.contains(where: {
                     $0.member == member && $0.hasJoined
@@ -297,6 +340,7 @@ struct PlaceSelectionFeature: Reducer {
                     state.isTimerRunning = false
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
+                    return .cancel(id: "place-selection-timer")
                 }
                 return .none
 

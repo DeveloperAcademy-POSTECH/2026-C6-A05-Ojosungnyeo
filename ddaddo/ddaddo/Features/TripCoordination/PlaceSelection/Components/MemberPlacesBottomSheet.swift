@@ -12,8 +12,13 @@ struct MemberPlacesBottomSheet: View {
     let selectedMember: TripMember
     let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
+    let canDeletePlaces: Bool
+    let canConfirm: Bool
     var bottomContentInset: CGFloat = DDSpacing.xLarge
     let memberTapped: (TripMember) -> Void
+    let placeTapped: (PinnedPlace) -> Void
+    let deletePlace: (PinnedPlace) -> Void
+    let confirmButtonTapped: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -27,22 +32,22 @@ struct MemberPlacesBottomSheet: View {
                 .padding(.top, DDSpacing.xLarge)
 
             if isExpanded {
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: DDSpacing.medium) {
-                        ForEach(places) { place in
-                            PlacePinCard(place: place)
-                        }
-                    }
-                    .padding(.bottom, bottomContentInset)
+                if places.isEmpty {
+                    Text("아직 핀 찍힌 장소가 없어요")
+                        .ddTypography(.body16)
+                        .foregroundStyle(DDColor.textPrimary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.bottom, bottomContentInset)
+                } else {
+                    placeList
                 }
-                .padding(.top, DDSpacing.medium)
             } else {
                 Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: isExpanded ? 395 : 156)
+        .frame(height: 535)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
     }
@@ -61,6 +66,51 @@ struct MemberPlacesBottomSheet: View {
                 .buttonStyle(.plain)
                 .disabled(!participant.hasJoined)
             }
+
+            Spacer(minLength: DDSpacing.small)
+
+            Button("확정하기", action: confirmButtonTapped)
+                .ddTypography(.label14)
+                .foregroundStyle(canConfirm ? DDColor.textPrimary : DDColor.textTertiary)
+                .padding(.horizontal, DDSpacing.medium)
+                .frame(height: 28)
+                .background(DDColor.surfaceControl)
+                .clipShape(.capsule)
+                .disabled(!canConfirm)
         }
+    }
+
+    private var placeList: some View {
+        List {
+            ForEach(places) { place in
+                Button {
+                    placeTapped(place)
+                } label: {
+                    PlacePinCard(place: place)
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: DDSpacing.medium, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    if canDeletePlaces {
+                        Button(role: .destructive) {
+                            deletePlace(place)
+                        } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+
+            Color.clear
+                .frame(height: bottomContentInset)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .padding(.top, DDSpacing.medium)
     }
 }

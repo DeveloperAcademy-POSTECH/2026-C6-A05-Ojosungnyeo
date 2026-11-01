@@ -25,7 +25,7 @@ struct PlaceSelectionBottomSheet: View {
                 .padding(.top, DDSpacing.large)
 
             avatarGroup
-                .padding(.top, isExpanded ? DDSpacing.large : 40)
+                .padding(.top, DDSpacing.large)
 
             if isExpanded {
                 Text("아직 추가한 장소가 없따...")
@@ -49,7 +49,7 @@ struct PlaceSelectionBottomSheet: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: isExpanded ? 322 : 156)
+        .frame(height: isExpanded ? 322 : 535)
         .background(DDColor.surfaceDefault)
         .clipShape(
             .rect(

@@ -29,7 +29,11 @@ enum FirebaseTripService {
             .flatMap { ParticipantAvatar(rawValue: $0) }
         let ownerAvatar = ParticipantAvatar.matched(to: nickname)
             ?? storedAvatar
-            ?? ParticipantAvatar.assigned(to: nickname, fallbackIndex: 0)
+            ?? ParticipantAvatar.allCases.randomElement()!
+        let participantAvatars = ParticipantAvatar.uniqueAssignments(
+            count: request.travelerCount,
+            first: ownerAvatar
+        )
 
         for _ in 0..<5 {
             let tripReference = database.collection("trips").document()
@@ -86,9 +90,7 @@ enum FirebaseTripService {
                                 .document(index == 0 ? userID : "slot_\(index + 1)")
                             let isOwner = index == 0
                             let participantName = isOwner ? nickname : "친구 \(index + 1)"
-                            let participantAvatar = isOwner
-                                ? ownerAvatar
-                                : ParticipantAvatar.assigned(to: participantName, fallbackIndex: index)
+                            let participantAvatar = participantAvatars[index]
                             var participantData: [String: Any] = [
                                 "slotIndex": index,
                                 "uid": isOwner ? userID : NSNull(),
@@ -162,9 +164,9 @@ enum FirebaseTripService {
         let participants = participantDocuments.documents.map { document in
             let slotIndex = document.get("slotIndex") as? Int ?? 0
             let name = document.get("name") as? String ?? "친구"
-            let avatar = ParticipantAvatar.matched(to: name)
-                ?? (document.get("avatarName") as? String)
-                    .flatMap { ParticipantAvatar(rawValue: $0) }
+            let avatar = (document.get("avatarName") as? String)
+                .flatMap { ParticipantAvatar(rawValue: $0) }
+                ?? ParticipantAvatar.matched(to: name)
                 ?? ParticipantAvatar.assigned(to: name, fallbackIndex: slotIndex)
 
             return TripInvitationSnapshot.Participant(
@@ -238,9 +240,19 @@ enum FirebaseTripService {
             throw TripServiceError.tripIsFull
         }
 
-        let slotIndex = waitingParticipant.get("slotIndex") as? Int ?? 1
-        let avatar = ParticipantAvatar.matched(to: nickname)
-            ?? ParticipantAvatar.assigned(to: nickname, fallbackIndex: slotIndex)
+        let usedAvatars = Set(
+            participants.documents.compactMap { document -> ParticipantAvatar? in
+                guard document.get("status") as? String == "joined" else { return nil }
+                return (document.get("avatarName") as? String)
+                    .flatMap { ParticipantAvatar(rawValue: $0) }
+            }
+        )
+        let reservedAvatar = (waitingParticipant.get("avatarName") as? String)
+            .flatMap { ParticipantAvatar(rawValue: $0) }
+        let avatar = ParticipantAvatar.availableAssignment(
+            preferred: reservedAvatar ?? ParticipantAvatar.matched(to: nickname),
+            excluding: usedAvatars
+        )
         let participantReference = waitingParticipant.reference
 
         _ = try await database.runTransaction { transaction, errorPointer in

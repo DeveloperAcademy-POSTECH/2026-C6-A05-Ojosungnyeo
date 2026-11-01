@@ -12,6 +12,7 @@ struct SelectedPlaceBottomSheet: View {
     let isLoading: Bool
     let canAdd: Bool
     let isAlreadyAdded: Bool
+    let fallbackImageName: String?
     let addButtonTapped: () -> Void
 
     var body: some View {
@@ -70,7 +71,7 @@ struct SelectedPlaceBottomSheet: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: 395)
+        .frame(height: 389)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
         .overlay {
@@ -101,9 +102,18 @@ struct SelectedPlaceBottomSheet: View {
     @ViewBuilder
     private var photoStrip: some View {
         if place.photoData.isEmpty {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(DDColor.surfaceElevated)
-                .frame(width: 205, height: 154)
+            if let fallbackImageName {
+                Image(fallbackImageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 205, height: 154)
+                    .clipped()
+                    .clipShape(.rect(cornerRadius: 20))
+            } else {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(DDColor.surfaceElevated)
+                    .frame(width: 205, height: 154)
+            }
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DDSpacing.medium) {

@@ -17,7 +17,10 @@ struct PlaceSelectionView: View {
             GoogleMapView(
                 selectedPlace: store.selectedPlace,
                 showsSelectedPlaceMarker: false,
-                pinnedPlaces: store.displayedPlaces
+                pinnedPlaces: store.displayedPlaces,
+                onPinnedPlaceTapped: { place in
+                    store.send(.pinnedPlaceTapped(place))
+                }
             )
                 .ignoresSafeArea()
 
@@ -31,6 +34,7 @@ struct PlaceSelectionView: View {
 
             if store.isBottomSheetExpanded
                 && store.selectedPlace == nil
+                && !store.isMemberPlacesSheetPresented
                 && store.displayedPlaces.isEmpty {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
@@ -45,25 +49,34 @@ struct PlaceSelectionView: View {
                     place: selectedPlace,
                     isLoading: store.isPlaceDetailsLoading,
                     canAdd: store.canAddSelectedPlace,
-                    isAlreadyAdded: store.isSelectedPlaceAlreadyAdded
+                    isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
+                    fallbackImageName: store.selectedPinnedPlace?.thumbnailName
                 ) {
                     store.send(.addSelectedPlaceButtonTapped)
                 }
                 .ignoresSafeArea(edges: .bottom)
-            } else if !store.displayedPlaces.isEmpty {
+            } else if store.isMemberPlacesSheetPresented {
                 MemberPlacesBottomSheet(
                     isExpanded: store.isBottomSheetExpanded,
                     selectedMember: store.selectedMember,
                     participants: store.participants,
                     places: store.displayedPlaces,
+                    canDeletePlaces: store.isViewingCurrentUser,
+                    canConfirm: store.canConfirmPlaceSelection,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
                     store.send(.memberProfileTapped(member))
+                } placeTapped: { place in
+                    store.send(.pinnedPlaceTapped(place))
+                } deletePlace: { place in
+                    store.send(.deletePinnedPlaceButtonTapped(place.id))
+                } confirmButtonTapped: {
+                    store.send(.confirmButtonTapped)
                 }
                 .frame(height: currentMemberSheetHeight, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
-                .gesture(sheetDragGesture)
+                .simultaneousGesture(sheetDragGesture)
             } else {
                 PlaceSelectionBottomSheet(
                     isExpanded: store.isBottomSheetExpanded,
@@ -209,17 +222,17 @@ struct PlaceSelectionView: View {
             }
         }
         .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.zero)
+        .padding(.top, DDSpacing.medium)
     }
 
     private var currentSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 156
-        return min(322, max(156, restingHeight - sheetDragTranslation))
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 110
+        return min(322, max(110, restingHeight - sheetDragTranslation))
     }
 
     private var currentMemberSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 395 : 156
-        return min(395, max(156, restingHeight - sheetDragTranslation))
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 413 : 110
+        return min(413, max(110, restingHeight - sheetDragTranslation))
     }
 
     private var completionCTA: some View {

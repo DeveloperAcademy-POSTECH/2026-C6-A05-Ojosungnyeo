@@ -1,0 +1,220 @@
+//
+//  PlaceGroupingView.swift
+//  ddaddo
+//
+//  Created by sun on 10/31/26.
+//
+
+import ComposableArchitecture
+import SwiftUI
+
+struct PlaceGroupingView: View {
+    let store: StoreOf<PlaceGroupingFeature>
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            GoogleMapView(
+                latitude: 35.6762,
+                longitude: 139.7503,
+                zoom: 12.2,
+                placeGroups: store.placeGroups
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                tripHeader
+                travelCriteria
+                Spacer(minLength: 0)
+            }
+
+            bottomSheet
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var tripHeader: some View {
+        VStack(spacing: 0) {
+            Text(store.tripTitle)
+                .ddTypography(.label14)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text(store.tripDates)
+                .ddTypography(.label14)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
+                .frame(width: 200, height: 20, alignment: .top)
+        }
+        .frame(height: 51, alignment: .top)
+    }
+
+    private var travelCriteria: some View {
+        HStack(spacing: DDSpacing.small) {
+            Text(store.travelCriteria)
+                .ddTypography(.captionEmphasis12)
+                .foregroundStyle(DDColor.textSecondary)
+
+            Spacer(minLength: 0)
+
+            Button("변경") {
+                store.send(.travelCriteriaChangeTapped)
+            }
+            .ddTypography(.captionEmphasis12)
+            .foregroundStyle(DDColor.textPrimary)
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 19)
+        .frame(height: 40)
+        .background(DDColor.surfaceElevated)
+        .clipShape(.rect(cornerRadius: 20))
+        .padding(.horizontal, DDSpacing.large)
+    }
+
+    private var bottomSheet: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(Color(red: 85 / 255, green: 85 / 255, blue: 85 / 255))
+                .frame(width: 142, height: 5)
+                .padding(.top, 16)
+                .padding(.bottom, 17)
+
+            tabSelector
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.bottom, 15)
+
+            if store.selectedTab == .preferences {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(store.members) { member in
+                            memberCard(member)
+                        }
+                    }
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.bottom, 34)
+                }
+                .scrollIndicators(.hidden)
+            } else {
+                recommendedGroups
+            }
+        }
+        .frame(height: 413, alignment: .top)
+        .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
+        .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private var tabSelector: some View {
+        HStack(spacing: 0) {
+            tabButton("여행 취향", tab: .preferences)
+            tabButton("추천 그룹", tab: .recommendedGroups)
+        }
+        .padding(3)
+        .frame(height: 44)
+        .background(DDColor.surfaceElevated)
+        .clipShape(.capsule)
+    }
+
+    private func tabButton(_ title: String, tab: PlaceGroupingFeature.Tab) -> some View {
+        Button {
+            store.send(.tabSelected(tab))
+        } label: {
+            Text(title)
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(
+                    store.selectedTab == tab
+                        ? DDColor.actionPrimary
+                        : DDColor.textSecondary
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    store.selectedTab == tab
+                        ? Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255)
+                        : Color.clear
+                )
+                .clipShape(.capsule)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func memberCard(_ member: PlaceGroupingFeature.Member) -> some View {
+        Button {
+            store.send(.memberTapped(member.id))
+        } label: {
+            HStack(spacing: DDSpacing.large) {
+                DDMiniHeadAvatar(character: member.avatar, size: 40)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(member.name)
+                        .ddTypography(.bodyEmphasis16)
+                        .foregroundStyle(DDColor.textPrimary)
+
+                    Text(member.preferences)
+                        .ddTypography(.labelEmphasis14)
+                        .foregroundStyle(DDColor.actionPrimary)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 19)
+            .frame(height: 72)
+            .background(DDColor.surfaceElevated)
+            .clipShape(.rect(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(DDColor.borderDefault, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var recommendedGroups: some View {
+        VStack(spacing: 12) {
+            ForEach(store.recommendedGroups) { group in
+                Button {
+                    store.send(.recommendedGroupTapped(group.id))
+                } label: {
+                    HStack(spacing: DDSpacing.large) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(group.title)
+                                .ddTypography(.bodyEmphasis16)
+
+                            Text(group.participantSummary)
+                                .ddTypography(.body16)
+                        }
+                        .foregroundStyle(DDColor.textPrimary)
+
+                        Spacer(minLength: 0)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 24, weight: .regular))
+                            .foregroundStyle(DDColor.textPrimary)
+                            .frame(width: 24, height: 24)
+                    }
+                    .padding(.horizontal, 29)
+                    .frame(height: 93)
+                    .background(DDColor.surfaceElevated)
+                    .clipShape(.rect(cornerRadius: 20))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(DDColor.borderDefault, lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 0)
+
+            DDCTAButton(title: "최종 확정하기") {
+                store.send(.confirmButtonTapped)
+            }
+            .padding(.bottom, 34)
+        }
+        .padding(.horizontal, DDSpacing.large)
+    }
+}
+#Preview {
+    PlaceGroupingView(
+        store: Store(initialState: PlaceGroupingFeature.State()) {
+            PlaceGroupingFeature()
+        }
+    )
+}

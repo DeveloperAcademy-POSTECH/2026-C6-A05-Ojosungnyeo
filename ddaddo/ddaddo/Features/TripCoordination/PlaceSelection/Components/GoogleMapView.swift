@@ -15,6 +15,7 @@ struct GoogleMapView: UIViewRepresentable {
     var selectedPlace: PlaceDetails?
     var selectedCoordinate: CLLocationCoordinate2D?
     var pinnedPlaces: [PinnedPlace] = []
+    var placeGroups: [MapPlaceGroup] = []
 
     final class Coordinator {
         var markerSignature = ""
@@ -62,9 +63,18 @@ struct GoogleMapView: UIViewRepresentable {
     }
 
     private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {
-        let signature = selectedPlace?.id
-            ?? selectedCoordinate.map { "\($0.latitude),\($0.longitude)" }
-            ?? pinnedPlaces.map(\.id).joined(separator: ",")
+        let signature: String
+        if let selectedPlace {
+            signature = selectedPlace.id
+        } else if let selectedCoordinate {
+            signature = "\(selectedCoordinate.latitude),\(selectedCoordinate.longitude)"
+        } else if !placeGroups.isEmpty {
+            signature = placeGroups.map { group in
+                "\(group.id):\(group.places.map(\.id).joined(separator: ","))"
+            }.joined(separator: "|")
+        } else {
+            signature = pinnedPlaces.map(\.id).joined(separator: ",")
+        }
         guard coordinator.markerSignature != signature else { return }
         coordinator.markerSignature = signature
         mapView.clear()
@@ -85,6 +95,11 @@ struct GoogleMapView: UIViewRepresentable {
             return
         }
 
+        if !placeGroups.isEmpty {
+            addPlaceGroups(to: mapView)
+            return
+        }
+
         guard !pinnedPlaces.isEmpty else { return }
         var bounds = GMSCoordinateBounds()
         for place in pinnedPlaces {
@@ -96,6 +111,76 @@ struct GoogleMapView: UIViewRepresentable {
             bounds = bounds.includingCoordinate(coordinate)
         }
         mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 72))
+    }
+
+    private func addPlaceGroups(to mapView: GMSMapView) {
+        var bounds = GMSCoordinateBounds()
+
+        for group in placeGroups {
+            let center = CLLocationCoordinate2D(
+                latitude: group.centerLatitude,
+                longitude: group.centerLongitude
+            )
+            let circle = GMSCircle(position: center, radius: group.radius)
+            circle.fillColor = UIColor(red: 242 / 255, green: 255 / 255, blue: 96 / 255, alpha: 0.45)
+            circle.strokeColor = UIColor(red: 242 / 255, green: 255 / 255, blue: 96 / 255, alpha: 1)
+            circle.strokeWidth = 2
+            circle.map = mapView
+
+            for place in group.places {
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: place.latitude,
+                    longitude: place.longitude
+                )
+                addMarker(at: coordinate, to: mapView)
+                bounds = bounds.includingCoordinate(coordinate)
+            }
+
+            addGroupLabel(group.name, center: center, radius: group.radius, to: mapView)
+            let latitudeOffset = group.radius / 111_000
+            bounds = bounds.includingCoordinate(
+                CLLocationCoordinate2D(
+                    latitude: center.latitude - latitudeOffset,
+                    longitude: center.longitude
+                )
+            )
+            bounds = bounds.includingCoordinate(
+                CLLocationCoordinate2D(
+                    latitude: center.latitude + latitudeOffset,
+                    longitude: center.longitude
+                )
+            )
+        }
+
+        mapView.animate(
+            with: GMSCameraUpdate.fit(
+                bounds,
+                with: UIEdgeInsets(top: 150, left: 24, bottom: 330, right: 24)
+            )
+        )
+    }
+
+    private func addGroupLabel(
+        _ title: String,
+        center: CLLocationCoordinate2D,
+        radius: CLLocationDistance,
+        to mapView: GMSMapView
+    ) {
+        let label = UILabel(frame: CGRect(x: 0, y: 0, width: 56, height: 20))
+        label.font = UIFont(name: "Pretendard-SemiBold", size: 14)
+        label.text = title
+        label.textAlignment = .center
+        label.textColor = UIColor(red: 242 / 255, green: 255 / 255, blue: 96 / 255, alpha: 1)
+
+        let marker = GMSMarker(
+            position: CLLocationCoordinate2D(
+                latitude: center.latitude - radius / 111_000,
+                longitude: center.longitude
+            )
+        )
+        marker.iconView = label
+        marker.groundAnchor = CGPoint(x: 0.5, y: 0)
+        marker.map = mapView
     }
 
     private func addMarker(at coordinate: CLLocationCoordinate2D, to mapView: GMSMapView) {

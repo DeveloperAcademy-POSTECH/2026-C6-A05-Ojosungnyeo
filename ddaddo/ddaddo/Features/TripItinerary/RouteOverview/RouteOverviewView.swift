@@ -41,7 +41,10 @@ struct RouteOverviewView: View {
     }
 
     private var routeMap: some View {
-        RouteGoogleMapView(stops: store.visibleStops)
+        RouteGoogleMapView(
+            stops: store.visibleStops,
+            selectedMember: store.selectedMember
+        )
             .ignoresSafeArea()
     }
 
@@ -193,10 +196,15 @@ struct RouteOverviewView: View {
                     store.send(.memberTapped(member))
                 } label: {
                     DDMiniHeadAvatar(character: member.routeAvatarCharacter, size: 37)
-                        .opacity(store.visibleMembers.contains(member) ? 1 : 0.35)
+                        .opacity(
+                            store.selectedMember == nil || store.selectedMember == member
+                                ? 1
+                                : 0.35
+                        )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("멤버 경로 표시 전환")
+                .accessibilityLabel("\(member.accessibilityName) 일정 보기")
+                .accessibilityValue(store.selectedMember == member ? "선택됨" : "선택 안 됨")
             }
 
             Spacer(minLength: 0)
@@ -226,9 +234,10 @@ struct RouteOverviewView: View {
                                     .ddTypography(.bodyEmphasis16)
                                     .foregroundStyle(DDColor.textPrimary)
 
-                                if stop.members.count < TripMember.allCases.count {
+                                if store.selectedMember == nil,
+                                   stop.members.count < TripMember.allCases.count {
                                     HStack(spacing: -5) {
-                                        ForEach(Array(stop.members), id: \.self) { member in
+                                        ForEach(members(for: stop)) { member in
                                             Circle()
                                                 .fill(member.routeAccentColor)
                                                 .frame(width: 14, height: 14)
@@ -299,9 +308,10 @@ struct RouteOverviewView: View {
                     Text(stop.name)
                         .ddTypography(.bodyEmphasis16)
 
-                    if stop.members.count < TripMember.allCases.count {
+                    if store.selectedMember == nil,
+                       stop.members.count < TripMember.allCases.count {
                         HStack(spacing: -5) {
-                            ForEach(Array(stop.members), id: \.self) { member in
+                            ForEach(members(for: stop)) { member in
                                 Circle()
                                     .fill(member.routeAccentColor)
                                     .frame(width: 14, height: 14)
@@ -355,9 +365,22 @@ struct RouteOverviewView: View {
         }
         .frame(width: 15, height: 71, alignment: .top)
     }
+
+    private func members(for stop: RouteStop) -> [TripMember] {
+        TripMember.allCases.filter(stop.members.contains)
+    }
 }
 
-private extension TripMember {
+extension TripMember {
+    var accessibilityName: String {
+        switch self {
+        case .tae: "테이"
+        case .header: "헤더"
+        case .grae: "그레"
+        case .juni: "주니"
+        }
+    }
+
     var routeAvatarCharacter: DDMiniHeadAvatar.Character {
         switch self {
         case .tae: .tae
@@ -369,10 +392,28 @@ private extension TripMember {
 
     var routeAccentColor: Color {
         switch self {
-        case .tae: Color(red: 0.49, green: 0.82, blue: 0.79)
-        case .header: Color(red: 0.95, green: 0.62, blue: 0.51)
-        case .grae: Color(red: 0.64, green: 0.58, blue: 0.83)
-        case .juni: Color(red: 0.84, green: 0.57, blue: 0.70)
+        case .tae: Color(red: 217 / 255.0, green: 149 / 255.0, blue: 126 / 255.0)
+        case .header: Color(red: 152 / 255.0, green: 156 / 255.0, blue: 209 / 255.0)
+        case .grae: Color(red: 102 / 255.0, green: 181 / 255.0, blue: 173 / 255.0)
+        case .juni: Color(red: 197 / 255.0, green: 144 / 255.0, blue: 167 / 255.0)
+        }
+    }
+
+    var routePolylineColor: Color {
+        switch self {
+        case .tae: Color(red: 192 / 255.0, green: 106 / 255.0, blue: 78 / 255.0)
+        case .header: Color(red: 109 / 255.0, green: 114 / 255.0, blue: 189 / 255.0)
+        case .grae: Color(red: 80 / 255.0, green: 117 / 255.0, blue: 113 / 255.0)
+        case .juni: Color(red: 158 / 255.0, green: 107 / 255.0, blue: 130 / 255.0)
+        }
+    }
+
+    var routeUFOAssetName: String {
+        switch self {
+        case .tae: "DDRouteUFOTae"
+        case .header: "DDRouteUFOHeader"
+        case .grae: "DDRouteUFOGrae"
+        case .juni: "DDRouteUFOJuni"
         }
     }
 }

@@ -12,15 +12,15 @@ struct RouteOverviewFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var selectedDay = TripDay.day1
-        var visibleMembers = Set(TripMember.allCases)
+        var selectedMember: TripMember?
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
         var isEditing = false
         let places = RoutePlace.mockPlaces
 
         var visibleStops: [RouteStop] {
-            RouteStop.stopsByDay[selectedDay, default: []].filter { stop in
-                !stop.members.isDisjoint(with: visibleMembers)
-            }
+            let stops = RouteStop.stopsByDay[selectedDay, default: []]
+            guard let selectedMember else { return stops }
+            return stops.filter { $0.members.contains(selectedMember) }
         }
 
         var selectedPlace: RoutePlace {
@@ -44,7 +44,7 @@ struct RouteOverviewFeature: Reducer {
             switch action {
             case .onAppear:
                 state.selectedDay = .day1
-                state.visibleMembers = Set(TripMember.allCases)
+                state.selectedMember = nil
                 state.isEditing = false
                 return .none
 
@@ -56,11 +56,7 @@ struct RouteOverviewFeature: Reducer {
                 return .none
 
             case let .memberTapped(member):
-                if state.visibleMembers.contains(member) {
-                    state.visibleMembers.remove(member)
-                } else {
-                    state.visibleMembers.insert(member)
-                }
+                state.selectedMember = state.selectedMember == member ? nil : member
                 return .none
 
             case .editButtonTapped:

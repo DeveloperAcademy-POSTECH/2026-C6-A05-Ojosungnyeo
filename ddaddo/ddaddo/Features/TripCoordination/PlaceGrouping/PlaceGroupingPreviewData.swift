@@ -18,8 +18,8 @@ enum PlaceGroupingPreviewData {
     ]
 
     static let recommendedGroups: [PlaceGroupingFeature.RecommendedGroup] = [
-        .init(id: "shinjuku", title: "신주쿠", participantSummary: "2명 · 1명"),
-        .init(id: "chuo", title: "주오", participantSummary: "4명"),
+        .init(id: "shinjuku", title: "신주쿠", participantSummary: "2명 · 1명", memberIDs: ["tae", "header"], categories: ["쇼핑", "디저트"], places: []),
+        .init(id: "chuo", title: "주오", participantSummary: "4명", memberIDs: ["tae", "header", "juni", "grae"], categories: ["맛집"], places: []),
     ]
 
     static let placeGroups: [MapPlaceGroup] = [

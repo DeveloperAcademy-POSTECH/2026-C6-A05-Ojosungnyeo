@@ -21,18 +21,59 @@ struct PlaceGroupingDetailFeature: Reducer {
         var isToastPresented = false
         var isOwnedGroup = true
         var selectedMemberIDs: Set<String> = ["tae", "header"]
+        var groupMemberIDs: Set<String> = ["tae", "header"]
+        var preferenceCategories: [String] = ["쇼핑", "디저트"]
+        var currentMemberID = "juni"
         var isJoinConfirmationPresented = false
 
         var canJoin: Bool {
-            selectedMemberIDs == ["juni"]
+            !groupMemberIDs.contains(currentMemberID)
         }
 
         var canEditPlaces: Bool {
-            isOwnedGroup && selectedMemberIDs == ["tae", "header"]
+            isOwnedGroup && selectedMemberIDs == groupMemberIDs
         }
 
         var showsEmptyState: Bool {
-            selectedMemberIDs == ["grae"]
+            selectedMemberIDs.isDisjoint(with: groupMemberIDs)
+                || places.isEmpty
+        }
+
+        init() {}
+
+        init(
+            tripTitle: String,
+            tripDates: String,
+            group: PlaceGroupingFeature.RecommendedGroup,
+            allMembers: [PlaceGroupingFeature.Member],
+            currentMemberID: String
+        ) {
+            self.tripTitle = tripTitle
+            self.tripDates = tripDates
+            groupTitle = group.title == "자유시간 · 합류 확인"
+                ? group.title
+                : "\(group.title)를 가게따"
+            members = allMembers.map { member in
+                Member(
+                    id: member.id,
+                    name: member.name,
+                    character: member.avatar,
+                    isActive: group.memberIDs.contains(member.id)
+                )
+            }
+            places = group.places.map { place in
+                Place(
+                    id: place.id,
+                    title: place.name,
+                    address: place.description,
+                    imageName: place.thumbnailName
+                )
+            }
+            groupMemberIDs = Set(group.memberIDs)
+            selectedMemberIDs = Set(group.memberIDs)
+            preferenceCategories = group.categories
+            self.currentMemberID = currentMemberID
+            isOwnedGroup = group.memberIDs.contains(currentMemberID)
         }
     }
 
@@ -74,16 +115,10 @@ struct PlaceGroupingDetailFeature: Reducer {
         Reduce { state, action in
             switch action {
             case let .memberTapped(id):
-                switch id {
-                case "tae", "header":
-                    state.selectedMemberIDs = ["tae", "header"]
-                case "juni":
-                    state.selectedMemberIDs = ["juni"]
-                case "grae":
-                    state.selectedMemberIDs = ["grae"]
-                default:
-                    return .none
-                }
+                guard state.members.contains(where: { $0.id == id }) else { return .none }
+                state.selectedMemberIDs = state.groupMemberIDs.contains(id)
+                    ? state.groupMemberIDs
+                    : [id]
                 return .none
 
             case .joinButtonTapped:

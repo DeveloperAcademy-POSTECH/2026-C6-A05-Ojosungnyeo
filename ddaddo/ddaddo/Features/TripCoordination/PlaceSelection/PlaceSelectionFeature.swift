@@ -387,8 +387,7 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    state.completionAlert = .selectionTimeExpired
-                    return loadMemberPlacesEffect(tripID: state.tripID)
+                    return .send(.delegate(.proceedToAnalysis))
                 }
 
                 guard !state.isTimerRunning, !state.hasSelectionEnded else {
@@ -624,8 +623,10 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    state.completionAlert = .selectionTimeExpired
-                    return .cancel(id: "place-selection-timer")
+                    return .merge(
+                        .cancel(id: "place-selection-timer"),
+                        .send(.delegate(.proceedToAnalysis))
+                    )
                 }
                 return .none
 

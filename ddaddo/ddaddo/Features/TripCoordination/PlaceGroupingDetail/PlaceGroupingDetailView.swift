@@ -211,20 +211,9 @@ struct PlaceGroupingDetailView: View {
                 .foregroundStyle(DDColor.textPrimary)
 
             if !store.showsEmptyState {
-                HStack(spacing: 0) {
-                    Text("쇼핑")
-                        .ddTypography(.bodyEmphasis16)
-                        .foregroundStyle(DDColor.actionPrimary)
-                    Text(" 그리고 ")
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textSecondary)
-                    Text("디저트")
-                        .ddTypography(.bodyEmphasis16)
-                        .foregroundStyle(DDColor.actionPrimary)
-                    Text(" 취향으로 모인 그룹이에요")
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textSecondary)
-                }
+                Text("\(store.preferenceCategories.joined(separator: ", ")) 취향으로 모인 그룹이에요")
+                    .ddTypography(.body16)
+                    .foregroundStyle(DDColor.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

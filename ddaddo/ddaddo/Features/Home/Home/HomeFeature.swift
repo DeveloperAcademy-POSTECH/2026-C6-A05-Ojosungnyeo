@@ -41,6 +41,9 @@ struct HomeFeature: Reducer {
         var isTripItineraryPresented = false
         var placeSelection = PlaceSelectionFeature.State()
         var isPlaceSelectionPresented = false
+        var placeGrouping = PlaceGroupingFeature.State()
+        var isPlaceAnalysisLoading = false
+        var isPlaceGroupingPresented = false
         var tripSearch = TripSearchFeature.State()
         var isTripSearchPresented = false
         var isMenuPresented = false
@@ -60,6 +63,8 @@ struct HomeFeature: Reducer {
         case upcomingTrips(UpcomingTripsFeature.Action)
         case tripInvitationResponse(Result<TripInvitationSnapshot, Error>)
         case placeSelection(PlaceSelectionFeature.Action)
+        case placeAnalysisFinished
+        case placeGrouping(PlaceGroupingFeature.Action)
         case tripItinerary(TripItineraryFeature.Action)
         case tripSearch(TripSearchFeature.Action)
         case mascotTapped
@@ -134,7 +139,21 @@ struct HomeFeature: Reducer {
                 state.isPlaceSelectionPresented = false
                 state.isUpcomingTripsPresented = true
                 return .none
+            case .placeSelection(.delegate(.proceedToAnalysis)):
+                state.placeGrouping = PlaceGroupingFeature.State(
+                    placeSelection: state.placeSelection
+                )
+                state.isPlaceSelectionPresented = false
+                state.isPlaceGroupingPresented = false
+                state.isPlaceAnalysisLoading = true
+                return .none
+            case .placeAnalysisFinished:
+                state.isPlaceAnalysisLoading = false
+                state.isPlaceGroupingPresented = true
+                return .none
             case .placeSelection:
+                return .none
+            case .placeGrouping:
                 return .none
             case .upcomingTrips(.createTripButtonTapped):
                 state.tripSearch = TripSearchFeature.State()
@@ -258,6 +277,10 @@ struct HomeFeature: Reducer {
 
         Scope(state: \.placeSelection, action: \.placeSelection) {
             PlaceSelectionFeature()
+        }
+
+        Scope(state: \.placeGrouping, action: \.placeGrouping) {
+            PlaceGroupingFeature()
         }
 
         Scope(state: \.tripSearch, action: \.tripSearch) {

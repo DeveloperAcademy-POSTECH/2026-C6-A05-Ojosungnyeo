@@ -266,6 +266,7 @@ enum FirebaseTripService {
             excluding: usedAvatars
         )
         let participantReference = waitingParticipant.reference
+        let joinedParticipantReference = participantReference.parent.document(userID)
 
         _ = try await database.runTransaction { transaction, errorPointer in
             do {
@@ -281,13 +282,24 @@ enum FirebaseTripService {
                     return nil
                 }
 
-                transaction.updateData(
+                transaction.setData(
                     [
+                        "slotIndex": latestParticipant.get("slotIndex") as? Int ?? 0,
                         "uid": userID,
                         "name": nickname,
                         "avatarName": avatar.rawValue,
+                        "role": "member",
                         "status": "joined",
-                        "joinedAt": FieldValue.serverTimestamp()
+                        "joinedAt": FieldValue.serverTimestamp(),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
+                    forDocument: joinedParticipantReference,
+                    merge: true
+                )
+                transaction.updateData(
+                    [
+                        "status": "migrated",
+                        "updatedAt": FieldValue.serverTimestamp()
                     ],
                     forDocument: participantReference
                 )

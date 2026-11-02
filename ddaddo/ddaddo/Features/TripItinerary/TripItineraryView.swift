@@ -28,7 +28,10 @@ struct TripItineraryView: View {
                     store: store.scope(
                         state: \.routeOverview,
                         action: \.routeOverview
-                    )
+                    ),
+                    onBack: {
+                        store.send(.delegate(.returnToUpcomingTrips))
+                    }
                 )
             }
         }

@@ -8,6 +8,10 @@
 import ComposableArchitecture
 
 struct TripItineraryFeature: Reducer {
+    enum Delegate: Equatable {
+        case returnToUpcomingTrips
+    }
+
     enum Tab: Hashable {
         case dailyItinerary
         case routeOverview
@@ -15,7 +19,7 @@ struct TripItineraryFeature: Reducer {
 
     @ObservableState
     struct State: Equatable {
-        var selectedTab: Tab = .dailyItinerary
+        var selectedTab: Tab = .routeOverview
         var timeTable = TimeTableFeature.State()
         var routeOverview = RouteOverviewFeature.State()
     }
@@ -25,6 +29,7 @@ struct TripItineraryFeature: Reducer {
         case tabSelected(Tab)
         case timeTable(TimeTableFeature.Action)
         case routeOverview(RouteOverviewFeature.Action)
+        case delegate(Delegate)
     }
 
     var body: some Reducer<State, Action> {
@@ -35,10 +40,9 @@ struct TripItineraryFeature: Reducer {
                 return .none
 
             case .routeOverview(.backButtonTapped):
-                state.selectedTab = .dailyItinerary
-                return .none
+                return .send(.delegate(.returnToUpcomingTrips))
 
-            case .timeTable, .routeOverview:
+            case .timeTable, .routeOverview, .delegate:
                 return .none
             }
         }

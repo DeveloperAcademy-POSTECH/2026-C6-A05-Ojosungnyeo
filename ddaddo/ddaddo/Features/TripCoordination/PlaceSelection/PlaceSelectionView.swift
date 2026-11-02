@@ -144,6 +144,25 @@ struct PlaceSelectionView: View {
                 )
             )
         }
+        .allowsHitTesting(store.completionAlert == nil)
+        .overlay {
+            if let alert = store.completionAlert {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: alert.title,
+                        message: store.completionAlertMessage,
+                        confirmTitle: "확인",
+                        onConfirm: {
+                            store.send(.completionAlertConfirmButtonTapped)
+                        }
+                    )
+                }
+            }
+        }
     }
 
     private var navigationBar: some View {

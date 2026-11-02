@@ -170,8 +170,11 @@ struct PlaceSelectionView: View {
                 dismiss()
             } label: {
                 PlaceSelectionBackIcon()
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("예정된 여행으로 돌아가기")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
@@ -328,6 +331,7 @@ private struct PlaceSelectionBackIcon: View {
             style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
         )
         .frame(width: 24, height: 24)
+        .allowsHitTesting(false)
     }
 }
 

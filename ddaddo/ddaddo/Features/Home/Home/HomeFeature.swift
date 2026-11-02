@@ -41,6 +41,7 @@ struct HomeFeature: Reducer {
         var isTripItineraryPresented = false
         var placeSelection = PlaceSelectionFeature.State()
         var isPlaceSelectionPresented = false
+        var pendingPlaceSelectionTripID: String?
         var placeGrouping = PlaceGroupingFeature.State()
         var isPlaceAnalysisLoading = false
         var isPlaceGroupingPresented = false
@@ -112,6 +113,7 @@ struct HomeFeature: Reducer {
             case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
                 state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
+                state.pendingPlaceSelectionTripID = tripID
                 if tripID == "development-trip-123456" {
                     state.placeSelection = Self.developmentPlaceSelectionState()
                     state.isPlaceSelectionPresented = true
@@ -123,7 +125,12 @@ struct HomeFeature: Reducer {
                         )
                     )
                 }
+                .cancellable(id: "place-selection-trip-request", cancelInFlight: true)
             case let .tripInvitationResponse(.success(snapshot)):
+                guard state.pendingPlaceSelectionTripID == snapshot.tripID else {
+                    return .none
+                }
+                state.pendingPlaceSelectionTripID = nil
                 let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
                 var placeSelection = waitingState.placeSelection
                 if snapshot.tripID == "development-trip-123456" {
@@ -133,12 +140,14 @@ struct HomeFeature: Reducer {
                 state.isPlaceSelectionPresented = true
                 return .none
             case .tripInvitationResponse(.failure):
+                state.pendingPlaceSelectionTripID = nil
                 // 123456 데모 방은 서버 읽기가 일시적으로 실패해도 즉시 열린 화면을 유지한다.
                 return .none
             case .placeSelection(.delegate(.returnToUpcomingTrips)):
                 state.isPlaceSelectionPresented = false
                 state.isUpcomingTripsPresented = true
-                return .none
+                state.pendingPlaceSelectionTripID = nil
+                return .cancel(id: "place-selection-trip-request")
             case .placeSelection(.delegate(.proceedToAnalysis)):
                 state.placeGrouping = PlaceGroupingFeature.State(
                     placeSelection: state.placeSelection

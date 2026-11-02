@@ -205,10 +205,14 @@ struct UpcomingTripsFeature: Reducer {
     private static func makeTrip(from snapshot: UpcomingTripSnapshot) -> Trip {
         let destination = switch snapshot.destinationName {
         case "도쿄": "TOKYO"
+        case "상하이": "SHANGHAI"
+        case "시드니": "SYDNEY"
         default: snapshot.destinationName.uppercased()
         }
         let country = switch snapshot.countryName {
         case "일본": "Japan"
+        case "중국": "China"
+        case "호주": "Australia"
         default: snapshot.countryName
         }
 
@@ -224,12 +228,16 @@ struct UpcomingTripsFeature: Reducer {
         let calendar = Calendar(identifier: .gregorian)
         let startMonth = calendar.component(.month, from: startDate)
         let startDay = calendar.component(.day, from: startDate)
+        let startYear = calendar.component(.year, from: startDate)
         let endMonth = calendar.component(.month, from: endDate)
         let endDay = calendar.component(.day, from: endDate)
+        let yearPrefix = startYear > calendar.component(.year, from: Date())
+            ? "\(startYear % 100)년 "
+            : ""
 
         if startMonth == endMonth {
-            return "\(startMonth)월 \(startDay)일~\(endDay)일"
+            return "\(yearPrefix)\(startMonth)월 \(startDay)일~\(endDay)일"
         }
-        return "\(startMonth)월 \(startDay)일~\(endMonth)월 \(endDay)일"
+        return "\(yearPrefix)\(startMonth)월 \(startDay)일~\(endMonth)월 \(endDay)일"
     }
 }

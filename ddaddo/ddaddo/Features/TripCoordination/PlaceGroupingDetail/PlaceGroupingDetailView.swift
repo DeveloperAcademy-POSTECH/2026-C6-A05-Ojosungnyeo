@@ -118,23 +118,16 @@ struct PlaceGroupingDetailView: View {
     private var memberList: some View {
         HStack(alignment: .top, spacing: 8) {
             HStack(alignment: .top, spacing: -14) {
-                ForEach(
-                    store.members.filter {
-                        $0.id == "tae" || $0.id == "header"
-                    }
-                ) { member in
+                ForEach(Array(groupMembers.enumerated()), id: \.element.id) { index, member in
                     memberButton(
                         member,
                         isActive: store.selectedMemberIDs.contains(member.id)
                     )
+                    .zIndex(Double(groupMembers.count - index))
                 }
             }
 
-            ForEach(
-                store.members.filter {
-                    $0.id == "juni" || $0.id == "grae"
-                }
-            ) { member in
+            ForEach(individualMembers) { member in
                 memberButton(
                     member,
                     isActive: store.selectedMemberIDs.contains(member.id)
@@ -145,6 +138,14 @@ struct PlaceGroupingDetailView: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(height: 109, alignment: .top)
+    }
+
+    private var groupMembers: [PlaceGroupingDetailFeature.Member] {
+        store.members.filter { store.groupMemberIDs.contains($0.id) }
+    }
+
+    private var individualMembers: [PlaceGroupingDetailFeature.Member] {
+        store.members.filter { !store.groupMemberIDs.contains($0.id) }
     }
 
     private func memberButton(

@@ -26,6 +26,10 @@ struct WaitingForConfirmationFeature: Reducer {
             members.filter(\.isConfirmed).count
         }
 
+        var haveAllMembersConfirmed: Bool {
+            !members.isEmpty && confirmedCount == members.count
+        }
+
         init() {}
 
         init(

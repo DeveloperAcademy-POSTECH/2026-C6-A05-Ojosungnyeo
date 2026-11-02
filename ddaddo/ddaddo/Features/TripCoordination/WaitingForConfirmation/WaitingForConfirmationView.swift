@@ -141,13 +141,31 @@ struct WaitingForConfirmationView: View {
                 .foregroundStyle(Color(red: 96 / 255, green: 96 / 255, blue: 96 / 255))
                 .frame(maxWidth: .infinity)
 
-            Text("친구들의 확정 대기 중")
+            Button {
+                guard store.haveAllMembersConfirmed else { return }
+            } label: {
+                Text(
+                    store.haveAllMembersConfirmed
+                        ? "친구들의 확정 완료"
+                        : "친구들의 확정 대기 중"
+                )
                 .ddTypography(.heading20)
-                .foregroundStyle(DDColor.textPrimary)
+                .foregroundStyle(
+                    store.haveAllMembersConfirmed
+                        ? DDColor.textOnPrimary
+                        : DDColor.textPrimary
+                )
                 .frame(maxWidth: .infinity)
                 .frame(height: 55)
-                .background(Color(red: 68 / 255, green: 68 / 255, blue: 68 / 255))
+                .background(
+                    store.haveAllMembersConfirmed
+                        ? DDColor.actionPrimary
+                        : Color(red: 68 / 255, green: 68 / 255, blue: 68 / 255)
+                )
                 .clipShape(.rect(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .disabled(!store.haveAllMembersConfirmed)
         }
         .padding(.bottom, 11)
     }

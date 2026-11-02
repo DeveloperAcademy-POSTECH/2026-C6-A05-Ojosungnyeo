@@ -43,3 +43,9 @@ struct MemberPlacePins: Equatable, Sendable {
     let places: [PinnedPlace]
     let isConfirmed: Bool
 }
+
+struct MemberGroupConfirmation: Equatable, Sendable {
+    let member: TripMember
+    let name: String
+    let isConfirmed: Bool
+}

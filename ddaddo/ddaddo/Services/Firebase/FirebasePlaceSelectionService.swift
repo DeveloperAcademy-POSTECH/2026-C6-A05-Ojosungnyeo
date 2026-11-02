@@ -102,6 +102,49 @@ enum FirebasePlaceSelectionService {
         )
     }
 
+    static func confirmGroups(tripID: String, groupIDs: [String]) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        try await participant.setData(
+            [
+                "groupingConfirmed": true,
+                "confirmedGroupIDs": groupIDs,
+                "groupingConfirmedAt": FieldValue.serverTimestamp(),
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+    }
+
+    static func fetchGroupConfirmations(
+        tripID: String
+    ) async throws -> [MemberGroupConfirmation] {
+        let participants = try await Firestore.firestore()
+            .collection("trips")
+            .document(tripID)
+            .collection("participants")
+            .order(by: "slotIndex")
+            .getDocuments()
+
+        var seenMembers = Set<TripMember>()
+        return participants.documents.compactMap { document in
+            guard
+                document.get("status") as? String == "joined",
+                let avatarName = document.get("avatarName") as? String,
+                let avatar = ParticipantAvatar(rawValue: avatarName)
+            else { return nil }
+            let member = TripMember(avatar: avatar)
+            guard seenMembers.insert(member).inserted else { return nil }
+            let isDevelopmentAdmin = tripID == "development-trip-123456"
+                && document.documentID == "development-admin"
+            return MemberGroupConfirmation(
+                member: member,
+                name: document.get("name") as? String ?? "친구",
+                isConfirmed: isDevelopmentAdmin
+                    || (document.get("groupingConfirmed") as? Bool ?? false)
+            )
+        }
+    }
+
     private static func currentParticipantReference(
         tripID: String
     ) async throws -> DocumentReference {

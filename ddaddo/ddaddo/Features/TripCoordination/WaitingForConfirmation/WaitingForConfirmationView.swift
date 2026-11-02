@@ -22,6 +22,12 @@ struct WaitingForConfirmationView: View {
         .padding(.horizontal, DDSpacing.large)
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .task {
+            await store.send(.onAppear).finish()
+        }
+        .onDisappear {
+            store.send(.onDisappear)
+        }
     }
 
     private var navigationBar: some View {

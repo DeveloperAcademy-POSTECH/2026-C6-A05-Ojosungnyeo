@@ -68,6 +68,12 @@ struct TripSetUpFeature: Reducer {
             guard let tripStartDate, let tripEndDate else { return nil }
 
             let calendar = Calendar.autoupdatingCurrent
+            guard let nights = calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: tripStartDate),
+                to: calendar.startOfDay(for: tripEndDate)
+            ).day, nights >= 0 else { return nil }
+
             let start = calendar.dateComponents([.year, .month, .day], from: tripStartDate)
             let end = calendar.dateComponents([.year, .month, .day], from: tripEndDate)
 
@@ -80,15 +86,18 @@ struct TripSetUpFeature: Reducer {
                 let endDay = end.day
             else { return nil }
 
-            if startYear == endYear, startMonth == endMonth {
-                return "\(startMonth)월 \(startDay)일 ~ \(endDay)일"
+            let dateSummary: String
+            if nights == 0 {
+                dateSummary = "\(startMonth)월 \(startDay)일"
+            } else if startYear == endYear, startMonth == endMonth {
+                dateSummary = "\(startMonth)월 \(startDay)일 ~ \(endDay)일"
+            } else if startYear == endYear {
+                dateSummary = "\(startMonth)월 \(startDay)일 ~ \(endMonth)월 \(endDay)일"
+            } else {
+                dateSummary = "\(startYear)년 \(startMonth)월 \(startDay)일 ~ \(endYear)년 \(endMonth)월 \(endDay)일"
             }
 
-            if startYear == endYear {
-                return "\(startMonth)월 \(startDay)일 ~ \(endMonth)월 \(endDay)일"
-            }
-
-            return "\(startYear)년 \(startMonth)월 \(startDay)일 ~ \(endYear)년 \(endMonth)월 \(endDay)일"
+            return "\(dateSummary) · \(nights)박 \(nights + 1)일"
         }
     }
 

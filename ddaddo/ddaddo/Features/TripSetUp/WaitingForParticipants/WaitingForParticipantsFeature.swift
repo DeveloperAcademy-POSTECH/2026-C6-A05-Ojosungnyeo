@@ -237,9 +237,9 @@ struct WaitingForParticipantsFeature: Reducer {
 
             case .placeSelectionDismissed:
                 state.isPlaceSelectionPresented = false
-                return .none
+                return .send(.delegate(.returnToUpcomingTrips))
 
-            case .placeSelection(.backButtonTapped):
+            case .placeSelection(.delegate(.returnToUpcomingTrips)):
                 state.isPlaceSelectionPresented = false
                 return .send(.delegate(.returnToUpcomingTrips))
 

@@ -12,6 +12,7 @@ import Foundation
 struct PlaceSelectionFeature: Reducer {
     enum Delegate: Equatable {
         case proceedToAnalysis
+        case returnToUpcomingTrips
     }
 
     enum CompletionAlert: Equatable {
@@ -428,7 +429,7 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .backButtonTapped:
-                return .none
+                return .send(.delegate(.returnToUpcomingTrips))
 
             case .searchFieldTapped:
                 state.selectedMember = state.currentMember

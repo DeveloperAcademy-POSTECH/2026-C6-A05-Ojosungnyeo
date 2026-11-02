@@ -135,7 +135,7 @@ struct HomeFeature: Reducer {
             case .tripInvitationResponse(.failure):
                 // 123456 데모 방은 서버 읽기가 일시적으로 실패해도 즉시 열린 화면을 유지한다.
                 return .none
-            case .placeSelection(.backButtonTapped):
+            case .placeSelection(.delegate(.returnToUpcomingTrips)):
                 state.isPlaceSelectionPresented = false
                 state.isUpcomingTripsPresented = true
                 return .none
@@ -312,7 +312,7 @@ struct HomeFeature: Reducer {
                 .init(
                     id: 0,
                     member: .header,
-                    name: "관리자관리자",
+                    name: "관리자···",
                     hasJoined: true,
                     isCurrentUser: false
                 ),
@@ -335,28 +335,39 @@ struct HomeFeature: Reducer {
         var state = state
         // 고정 초대 코드 123456은 장소 선택 종료 동작을 빠르게 확인하기 위한 데모 방이다.
         state.remainingSeconds = 60
-        state.participants = state.participants.map { participant in
-            guard participant.member == .header else { return participant }
-            return PlaceSelectionFeature.Participant(
-                id: participant.id,
-                member: participant.member,
-                name: participant.name,
-                hasJoined: true,
-                isCurrentUser: participant.isCurrentUser,
-                isConfirmed: participant.isConfirmed
-            )
-        }
+        let currentUser = state.participants.first(where: \.isCurrentUser)
+        let developmentParticipants: [PlaceSelectionFeature.Participant] = state.participants
+            .filter { $0.member == .header || $0.isCurrentUser }
+            .reduce(into: [PlaceSelectionFeature.Participant]()) { result, participant in
+                guard !result.contains(where: { $0.member == participant.member }) else { return }
+                result.append(participant)
+            }
+            .map { participant in
+                guard participant.member == .header else { return participant }
+                return PlaceSelectionFeature.Participant(
+                    id: participant.id,
+                    member: participant.member,
+                    name: "관리자···",
+                    hasJoined: true,
+                    isCurrentUser: participant.isCurrentUser,
+                    isConfirmed: participant.isConfirmed
+                )
+            }
+        state.participants = developmentParticipants
         if !state.participants.contains(where: { $0.member == .header }) {
             state.participants.insert(
                 .init(
                     id: 0,
                     member: .header,
-                    name: "관리자관리자",
+                    name: "관리자···",
                     hasJoined: true,
                     isCurrentUser: false
                 ),
                 at: 0
             )
+        }
+        if !state.participants.contains(where: \.isCurrentUser), let currentUser {
+            state.participants.append(currentUser)
         }
         if state.memberPlaces[.header, default: []].isEmpty {
             state.memberPlaces[.header] = developmentAdminPlaces

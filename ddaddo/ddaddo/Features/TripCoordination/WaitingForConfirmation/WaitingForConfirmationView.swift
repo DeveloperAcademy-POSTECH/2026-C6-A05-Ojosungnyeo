@@ -97,7 +97,7 @@ struct WaitingForConfirmationView: View {
         }
         .padding(.horizontal, 19)
         .padding(.top, 19)
-        .frame(height: 227, alignment: .top)
+        .frame(height: 192, alignment: .top)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(cornerRadius: 20))
         .overlay {
@@ -124,23 +124,6 @@ struct WaitingForConfirmationView: View {
                         : Color(red: 96 / 255, green: 96 / 255, blue: 96 / 255)
                 )
                 .padding(.top, 6)
-
-            if !member.isConfirmed {
-                Button("콕찌르기") {
-                    store.send(.nudgeButtonTapped(member.id))
-                }
-                .ddTypography(.captionEmphasis12)
-                .foregroundStyle(DDColor.actionPrimary)
-                .frame(width: 62, height: 22)
-                .background(Color(red: 46 / 255, green: 46 / 255, blue: 46 / 255))
-                .clipShape(.capsule)
-                .overlay {
-                    Capsule()
-                        .stroke(Color(red: 72 / 255, green: 72 / 255, blue: 72 / 255), lineWidth: 1)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 10)
-            }
         }
         .frame(width: 78)
     }

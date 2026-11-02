@@ -423,10 +423,15 @@ enum FirebaseTripService {
             .document("slot_2")
         let thirdParticipantReference = tripReference.collection("participants").document("slot_3")
         let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
+        let adminPlacesReference = adminParticipantReference.collection("places")
         let expiresAt = Date().addingTimeInterval(inviteDuration)
         let inviteURL = makeInviteURL(code: "123456")
-        let startDate = Calendar.current.startOfDay(for: Date())
-        let endDate = Calendar.current.date(byAdding: .day, value: 3, to: startDate)!
+        let startDate = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 11, day: 22)
+        )!
+        let endDate = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 11, day: 25)
+        )!
 
         _ = try await database.runTransaction { transaction, errorPointer in
             do {
@@ -459,9 +464,20 @@ enum FirebaseTripService {
                         merge: true
                     )
                     transaction.setData(
-                        ["name": "관리자관리자"],
+                        [
+                            "slotIndex": 0,
+                            "uid": "development-admin",
+                            "name": "관리자관리자",
+                            "avatarName": ParticipantAvatar.header.rawValue,
+                            "role": "owner",
+                            "status": "joined"
+                        ],
                         forDocument: adminParticipantReference,
                         merge: true
+                    )
+                    seedAdminPlaces(
+                        transaction: transaction,
+                        placesReference: adminPlacesReference
                     )
                     transaction.setData(
                         [
@@ -521,6 +537,10 @@ enum FirebaseTripService {
                     ],
                     forDocument: adminParticipantReference
                 )
+                seedAdminPlaces(
+                    transaction: transaction,
+                    placesReference: adminPlacesReference
+                )
                 transaction.setData(
                     [
                         "slotIndex": 1,
@@ -537,6 +557,50 @@ enum FirebaseTripService {
                 errorPointer?.pointee = error as NSError
                 return nil
             }
+        }
+    }
+
+    private static func seedAdminPlaces(
+        transaction: Transaction,
+        placesReference: CollectionReference
+    ) {
+        let places: [[String: Any]] = [
+            [
+                "id": "development-stussy-tokyo",
+                "name": "스투시 도쿄점",
+                "description": "1 Chome-14-5 Jingumae, Shibuya, Tokyo",
+                "category": "쇼핑",
+                "latitude": 35.67118,
+                "longitude": 139.70564
+            ],
+            [
+                "id": "development-dover-ginza",
+                "name": "도버 스트리트 마켓 긴자",
+                "description": "6 Chome-9-5 Ginza, Chuo City, Tokyo",
+                "category": "쇼핑",
+                "latitude": 35.66965,
+                "longitude": 139.76355
+            ],
+            [
+                "id": "development-tokyo-tower",
+                "name": "도쿄 타워",
+                "description": "4 Chome-2-8 Shibakoen, Minato City, Tokyo",
+                "category": "관광지",
+                "latitude": 35.65858,
+                "longitude": 139.74543
+            ]
+        ]
+
+        for place in places {
+            guard let placeID = place["id"] as? String else { continue }
+            var data = place
+            data["createdAt"] = FieldValue.serverTimestamp()
+            data["updatedAt"] = FieldValue.serverTimestamp()
+            transaction.setData(
+                data,
+                forDocument: placesReference.document(placeID),
+                merge: true
+            )
         }
     }
 

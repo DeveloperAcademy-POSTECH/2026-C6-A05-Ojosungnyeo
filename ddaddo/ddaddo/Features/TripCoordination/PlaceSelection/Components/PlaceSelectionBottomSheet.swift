@@ -90,15 +90,12 @@ struct PlaceSelectionParticipantAvatar: View {
 
                 if participant.isConfirmed {
                     Circle()
-                        .fill(participant.member.avatar.backgroundColor)
+                        .fill(Color.white)
                         .frame(width: 14, height: 14)
                         .overlay {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(DDColor.textOnPrimary)
-                        }
-                        .overlay {
-                            Circle().stroke(DDColor.surfaceDefault, lineWidth: 1.5)
+                                .foregroundStyle(Color.black)
                         }
                         .offset(x: 2, y: -2)
                 }

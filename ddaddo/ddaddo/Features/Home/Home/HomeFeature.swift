@@ -4,6 +4,7 @@
 //
 
 import ComposableArchitecture
+import Foundation
 
 struct HomeFeature: Reducer {
     enum MascotMessage: Int, CaseIterable, Equatable {
@@ -106,6 +107,10 @@ struct HomeFeature: Reducer {
             case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
                 state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
+                if tripID == "development-trip-123456" {
+                    state.placeSelection = Self.developmentPlaceSelectionState()
+                    state.isPlaceSelectionPresented = true
+                }
                 return .run { send in
                     await send(
                         .tripInvitationResponse(
@@ -115,10 +120,15 @@ struct HomeFeature: Reducer {
                 }
             case let .tripInvitationResponse(.success(snapshot)):
                 let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
-                state.placeSelection = waitingState.placeSelection
+                var placeSelection = waitingState.placeSelection
+                if snapshot.tripID == "development-trip-123456" {
+                    placeSelection = Self.applyDevelopmentAdminFallback(to: placeSelection)
+                }
+                state.placeSelection = placeSelection
                 state.isPlaceSelectionPresented = true
                 return .none
             case .tripInvitationResponse(.failure):
+                // 123456 데모 방은 서버 읽기가 일시적으로 실패해도 즉시 열린 화면을 유지한다.
                 return .none
             case .placeSelection(.backButtonTapped):
                 state.isPlaceSelectionPresented = false
@@ -258,4 +268,103 @@ struct HomeFeature: Reducer {
             SettingsFeature()
         }
     }
+
+    private static func developmentPlaceSelectionState() -> PlaceSelectionFeature.State {
+        let startDate = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 11, day: 22)
+        )!
+        let endDate = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 11, day: 25)
+        )!
+        return PlaceSelectionFeature.State(
+            tripID: "development-trip-123456",
+            tripTitle: "3박 4일 도쿄여행",
+            destinationName: "도쿄",
+            tripStartDate: startDate,
+            tripEndDate: endDate,
+            participants: [
+                .init(
+                    id: 0,
+                    member: .header,
+                    name: "관리자관리자",
+                    hasJoined: true,
+                    isCurrentUser: false
+                ),
+                .init(
+                    id: 1,
+                    member: .juni,
+                    name: "주니",
+                    hasJoined: true,
+                    isCurrentUser: true
+                )
+            ],
+            memberPlaces: [.header: developmentAdminPlaces],
+            remainingSeconds: 60
+        )
+    }
+
+    private static func applyDevelopmentAdminFallback(
+        to state: PlaceSelectionFeature.State
+    ) -> PlaceSelectionFeature.State {
+        var state = state
+        // 고정 초대 코드 123456은 장소 선택 종료 동작을 빠르게 확인하기 위한 데모 방이다.
+        state.remainingSeconds = 60
+        state.participants = state.participants.map { participant in
+            guard participant.member == .header else { return participant }
+            return PlaceSelectionFeature.Participant(
+                id: participant.id,
+                member: participant.member,
+                name: participant.name,
+                hasJoined: true,
+                isCurrentUser: participant.isCurrentUser,
+                isConfirmed: participant.isConfirmed
+            )
+        }
+        if !state.participants.contains(where: { $0.member == .header }) {
+            state.participants.insert(
+                .init(
+                    id: 0,
+                    member: .header,
+                    name: "관리자관리자",
+                    hasJoined: true,
+                    isCurrentUser: false
+                ),
+                at: 0
+            )
+        }
+        if state.memberPlaces[.header, default: []].isEmpty {
+            state.memberPlaces[.header] = developmentAdminPlaces
+        }
+        return state
+    }
+
+    private static let developmentAdminPlaces: [PinnedPlace] = [
+        PinnedPlace(
+            id: "development-stussy-tokyo",
+            name: "스투시 도쿄점",
+            description: "1 Chome-14-5 Jingumae, Shibuya, Tokyo",
+            thumbnailName: "DDMockPlaceVillage",
+            category: "쇼핑",
+            latitude: 35.67118,
+            longitude: 139.70564
+        ),
+        PinnedPlace(
+            id: "development-dover-ginza",
+            name: "도버 스트리트 마켓 긴자",
+            description: "6 Chome-9-5 Ginza, Chuo City, Tokyo",
+            thumbnailName: "DDMockPlaceVillage",
+            category: "쇼핑",
+            latitude: 35.66965,
+            longitude: 139.76355
+        ),
+        PinnedPlace(
+            id: "development-tokyo-tower",
+            name: "도쿄 타워",
+            description: "4 Chome-2-8 Shibakoen, Minato City, Tokyo",
+            thumbnailName: "DDMockPlaceVillage",
+            category: "관광지",
+            latitude: 35.65858,
+            longitude: 139.74543
+        )
+    ]
 }

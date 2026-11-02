@@ -153,6 +153,10 @@ struct UpcomingTripsFeature: Reducer {
                     .send(.delegate(.returnHome))
                 )
 
+            case .waitingForParticipants(.delegate(.returnToUpcomingTrips)):
+                state.isWaitingForParticipantsPresented = false
+                return fetchUpcomingTripsEffect()
+
             case .waitingForParticipants:
                 return .none
 

@@ -102,7 +102,9 @@ struct PlaceSelectionFeature: Reducer {
             self.participants = participants
             self.selectedMember = selectedMember
             self.memberPlaces = memberPlaces
-            self.remainingSeconds = remainingSeconds
+            self.remainingSeconds = tripID == "development-trip-123456"
+                ? 60
+                : remainingSeconds
         }
 
         var numberOfNights: Int {
@@ -177,8 +179,19 @@ struct PlaceSelectionFeature: Reducer {
                 .filter { placeIDs.insert($0.id).inserted }
         }
 
+        /// 확정 화면의 지도에는 확정 여부와 관계없이 참여 중인 멤버가 찍은 핀을 모두 보여 준다.
+        /// 따라서 방 관리자(또는 다른 참여자)가 먼저 선택한 장소도 UFO로 함께 표시된다.
+        var joinedMemberPlaces: [PinnedPlace] {
+            var placeIDs = Set<String>()
+
+            return participants
+                .filter(\.hasJoined)
+                .flatMap { memberPlaces[$0.member, default: []] }
+                .filter { placeIDs.insert($0.id).inserted }
+        }
+
         var mapPlaces: [PinnedPlace] {
-            isShowingConfirmedPlaces ? confirmedPlaces : displayedPlaces
+            isShowingConfirmedPlaces ? joinedMemberPlaces : displayedPlaces
         }
 
         var isSelectedPlaceAlreadyAdded: Bool {
@@ -220,7 +233,9 @@ struct PlaceSelectionFeature: Reducer {
             self.tripStartDate = tripStartDate
             self.tripEndDate = tripEndDate
             self.participants = participants
-            self.remainingSeconds = remainingSeconds
+            self.remainingSeconds = tripID == "development-trip-123456"
+                ? 60
+                : remainingSeconds
 
             let selectableMembers = participants.filter(\.hasJoined).map(\.member)
             if !selectableMembers.contains(selectedMember) {
@@ -393,6 +408,14 @@ struct PlaceSelectionFeature: Reducer {
 
             case let .memberPlacesResponse(memberPins):
                 for pins in memberPins {
+                    // 개발용 도쿄 방은 로컬에 준비한 관리자 핀을 서버의 빈 배열로
+                    // 덮어쓰지 않는다. 서버에 값이 생기면 그 값을 우선 사용한다.
+                    if state.tripID == "development-trip-123456",
+                       pins.member == .header,
+                       pins.places.isEmpty,
+                       !(state.memberPlaces[.header] ?? []).isEmpty {
+                        continue
+                    }
                     state.memberPlaces[pins.member] = pins.places
                     if let index = state.participants.firstIndex(where: {
                         $0.member == pins.member

@@ -40,7 +40,7 @@ enum FirebaseTripService {
             let inviteCode = String(format: "%06d", Int.random(in: 0...999_999))
             let inviteReference = database.collection("inviteCodes").document(inviteCode)
             let expiresAt = Date().addingTimeInterval(inviteDuration)
-            let inviteURL = makeInviteURL(code: inviteCode)
+            let inviteURL = makeInviteURL(code: inviteCode, expiresAt: expiresAt)
 
             do {
                 _ = try await database.runTransaction { transaction, errorPointer in
@@ -307,7 +307,7 @@ enum FirebaseTripService {
         let thirdParticipantReference = tripReference.collection("participants").document("slot_3")
         let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
         let expiresAt = Date().addingTimeInterval(inviteDuration)
-        let inviteURL = makeInviteURL(code: "123456")
+        let inviteURL = makeInviteURL(code: "123456", expiresAt: expiresAt)
         let startDate = Calendar.current.startOfDay(for: Date())
         let endDate = Calendar.current.date(byAdding: .day, value: 3, to: startDate)!
 
@@ -423,9 +423,14 @@ enum FirebaseTripService {
         }
     }
 
-    private static func makeInviteURL(code: String) -> URL {
+    private static func makeInviteURL(code: String, expiresAt: Date) -> URL {
         var components = URLComponents(string: inviteURLBase)!
-        components.queryItems = [URLQueryItem(name: "code", value: code)]
+        components.queryItems = [
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "endTime", value: ISO8601DateFormatter().string(from: expiresAt))
+        ]
+        components.percentEncodedQuery = components.percentEncodedQuery?
+            .replacingOccurrences(of: ":", with: "%3A")
         return components.url!
     }
 }

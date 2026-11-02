@@ -4,6 +4,7 @@
 //
 
 import ComposableArchitecture
+import Foundation
 
 struct PlaceGroupingDetailFeature: Reducer {
     enum Delegate: Equatable {
@@ -18,7 +19,6 @@ struct PlaceGroupingDetailFeature: Reducer {
         var groupTitle = "신주쿠를 가게따"
         var members: [Member] = Member.preview
         var places: [Place] = Place.preview
-        var isToastPresented = false
         var isOwnedGroup = true
         var selectedMemberIDs: Set<String> = ["tae", "header"]
         var groupMemberIDs: Set<String> = ["tae", "header"]
@@ -66,7 +66,8 @@ struct PlaceGroupingDetailFeature: Reducer {
                     id: place.id,
                     title: place.name,
                     address: place.description,
-                    imageName: place.thumbnailName
+                    imageName: place.thumbnailName,
+                    photoData: place.photoData.first
                 )
             }
             groupMemberIDs = Set(group.memberIDs)
@@ -96,6 +97,7 @@ struct PlaceGroupingDetailFeature: Reducer {
         let title: String
         let address: String
         let imageName: String
+        var photoData: Data? = nil
     }
 
     enum Action: Equatable {
@@ -106,7 +108,6 @@ struct PlaceGroupingDetailFeature: Reducer {
         case joinConfirmationConfirmTapped
         case deletePlaceTapped(String)
         case placeMoved(sourceID: String, beforeID: String)
-        case toastDismissed
         case confirmButtonTapped
         case delegate(Delegate)
     }
@@ -137,15 +138,7 @@ struct PlaceGroupingDetailFeature: Reducer {
             case let .deletePlaceTapped(id):
                 guard state.canEditPlaces else { return .none }
                 state.places.removeAll { $0.id == id }
-                state.isToastPresented = true
-                return .run { send in
-                    try await Task.sleep(for: .seconds(2.5))
-                    await send(.toastDismissed)
-                }
-                .cancellable(
-                    id: "place-grouping-detail-toast",
-                    cancelInFlight: true
-                )
+                return .none
 
             case let .placeMoved(sourceID, beforeID):
                 guard state.canEditPlaces else { return .none }
@@ -160,10 +153,6 @@ struct PlaceGroupingDetailFeature: Reducer {
                     ? destinationIndex - 1
                     : destinationIndex
                 state.places.insert(place, at: adjustedDestination)
-                return .none
-
-            case .toastDismissed:
-                state.isToastPresented = false
                 return .none
 
             case .confirmButtonTapped:

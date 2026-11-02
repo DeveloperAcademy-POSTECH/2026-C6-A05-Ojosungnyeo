@@ -36,12 +36,21 @@ struct PlaceGroupingFeature: Reducer {
         var tripTitle = PlaceGroupingPreviewData.tripTitle
         var tripDates = PlaceGroupingPreviewData.tripDates
         var travelCriteria = PlaceGroupingPreviewData.travelCriteria
+        var transportationSelection = TripSetUpTransportationFeature.Selection(
+            transportation: .publicTransit,
+            duration: .thirtyMinutes
+        )
+        var transportationSheet = TripSetUpTransportationFeature.State()
+        var isTransportationSheetPresented = false
+        var isReanalyzing = false
+        var hasRequestedPlacePhotos = false
+        var sourcePlaceSelection: PlaceSelectionFeature.State?
         var selectedTab = Tab.preferences
         var members = PlaceGroupingPreviewData.members
         var placeGroups = PlaceGroupingPreviewData.placeGroups
         var recommendedGroups = PlaceGroupingPreviewData.recommendedGroups
         var currentMemberID = "juni"
-        var confirmedGroupID: String?
+        var confirmedGroupIDs: Set<String> = []
         var selectedGroupID: String?
         var detail = PlaceGroupingDetailFeature.State()
         var isDetailPresented = false
@@ -49,16 +58,35 @@ struct PlaceGroupingFeature: Reducer {
         var waitingForConfirmation = WaitingForConfirmationFeature.State()
         var isWaitingForConfirmationPresented = false
 
+        var haveAllRecommendedGroupsConfirmed: Bool {
+            !recommendedGroups.isEmpty
+                && recommendedGroups.allSatisfy { confirmedGroupIDs.contains($0.id) }
+        }
+
         init() {}
 
-        init(placeSelection: PlaceSelectionFeature.State) {
-            let result = PlaceGroupingEngine.makeGroups(from: placeSelection)
+        init(
+            placeSelection: PlaceSelectionFeature.State,
+            transportationSelection: TripSetUpTransportationFeature.Selection = .init(
+                transportation: .publicTransit,
+                duration: .thirtyMinutes
+            )
+        ) {
+            let result = PlaceGroupingEngine.makeGroups(
+                from: placeSelection,
+                selection: transportationSelection
+            )
+            sourcePlaceSelection = placeSelection
+            self.transportationSelection = transportationSelection
+            transportationSheet = TripSetUpTransportationFeature.State(
+                selection: transportationSelection
+            )
             tripTitle = placeSelection.tripTitle
             tripDates = Self.dateText(
                 start: placeSelection.tripStartDate,
                 end: placeSelection.tripEndDate
             )
-            travelCriteria = "대중교통 · 장소 간 최대 30분"
+            travelCriteria = "\(transportationSelection.transportation.title) · 장소 간 최대 \(transportationSelection.duration.rawValue)분"
             members = result.members
             placeGroups = result.mapGroups
             recommendedGroups = result.recommendedGroups
@@ -76,9 +104,12 @@ struct PlaceGroupingFeature: Reducer {
 
     @CasePathable
     enum Action: Equatable {
+        case onAppear
+        case placePhotoResponse(String, Data?)
         case travelCriteriaChangeTapped
-        case criteriaChangeCancelTapped
-        case criteriaChangeConfirmTapped
+        case transportationSheetDismissed
+        case transportationSheet(TripSetUpTransportationFeature.Action)
+        case reanalysisFinished
         case tabSelected(Tab)
         case memberTapped(String)
         case recommendedGroupTapped(String)
@@ -87,19 +118,116 @@ struct PlaceGroupingFeature: Reducer {
         case waitingForConfirmation(WaitingForConfirmationFeature.Action)
     }
 
+    @Dependency(\.placeClient) var placeClient
+
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                guard !state.hasRequestedPlacePhotos else { return .none }
+                state.hasRequestedPlacePhotos = true
+                let placesByID = state.recommendedGroups
+                    .flatMap(\.places)
+                    .reduce(into: [String: PinnedPlace]()) { result, place in
+                        result[place.id] = place
+                    }
+                return .merge(placesByID.values.map { place in
+                    .run { send in
+                        if let image = place.photoData.first {
+                            await send(.placePhotoResponse(place.id, image))
+                            return
+                        }
+                        do {
+                            guard let result = try await placeClient.autocomplete(place.name).first else {
+                                await send(.placePhotoResponse(place.id, nil))
+                                return
+                            }
+                            let details = try await placeClient.fetchDetails(result)
+                            await send(.placePhotoResponse(place.id, details.photoData.first))
+                        } catch {
+                            await send(.placePhotoResponse(place.id, nil))
+                        }
+                    }
+                })
+
+            case let .placePhotoResponse(placeID, data):
+                guard let data else { return .none }
+                let updatePlace: (PinnedPlace) -> PinnedPlace = { place in
+                    guard place.id == placeID else { return place }
+                    return PinnedPlace(
+                        id: place.id,
+                        name: place.name,
+                        description: place.description,
+                        thumbnailName: "",
+                        category: place.category,
+                        photoData: [data],
+                        latitude: place.latitude,
+                        longitude: place.longitude
+                    )
+                }
+                state.recommendedGroups = state.recommendedGroups.map { group in
+                    RecommendedGroup(
+                        id: group.id,
+                        title: group.title,
+                        participantSummary: group.participantSummary,
+                        memberIDs: group.memberIDs,
+                        categories: group.categories,
+                        places: group.places.map(updatePlace)
+                    )
+                }
+                state.placeGroups = state.placeGroups.map { group in
+                    MapPlaceGroup(
+                        id: group.id,
+                        name: group.name,
+                        places: group.places.map(updatePlace),
+                        radius: group.radius
+                    )
+                }
+                if var source = state.sourcePlaceSelection {
+                    for member in source.memberPlaces.keys {
+                        source.memberPlaces[member] = source.memberPlaces[member, default: []]
+                            .map(updatePlace)
+                    }
+                    state.sourcePlaceSelection = source
+                }
+                state.detail.places = state.detail.places.map { place in
+                    guard place.id == placeID else { return place }
+                    var place = place
+                    place.photoData = data
+                    return place
+                }
+                return .none
+
             case .travelCriteriaChangeTapped:
-                state.isCriteriaChangeConfirmationPresented = true
+                state.transportationSheet = TripSetUpTransportationFeature.State(
+                    selection: state.transportationSelection
+                )
+                state.isTransportationSheetPresented = true
                 return .none
-            case .criteriaChangeCancelTapped:
-                state.isCriteriaChangeConfirmationPresented = false
+            case .transportationSheetDismissed,
+                 .transportationSheet(.delegate(.dismiss)):
+                state.isTransportationSheetPresented = false
                 return .none
-            case .criteriaChangeConfirmTapped:
-                state.isCriteriaChangeConfirmationPresented = false
-                state.confirmedGroupID = nil
+            case let .transportationSheet(.delegate(.completed(selection))):
+                state.isTransportationSheetPresented = false
+                state.transportationSelection = selection
+                guard let source = state.sourcePlaceSelection else { return .none }
+                let refreshed = State(
+                    placeSelection: source,
+                    transportationSelection: selection
+                )
+                state.travelCriteria = refreshed.travelCriteria
+                state.members = refreshed.members
+                state.placeGroups = refreshed.placeGroups
+                state.recommendedGroups = refreshed.recommendedGroups
+                state.confirmedGroupIDs = []
                 state.selectedGroupID = nil
+                state.isReanalyzing = true
+                return .none
+            case .reanalysisFinished:
+                state.isReanalyzing = false
+                return .none
+            case .transportationSheet:
                 return .none
             case .memberTapped:
                 return .none
@@ -118,11 +246,15 @@ struct PlaceGroupingFeature: Reducer {
                 state.isDetailPresented = true
                 return .none
             case .detail(.delegate(.confirmed)):
-                state.confirmedGroupID = state.selectedGroupID
+                if let selectedGroupID = state.selectedGroupID {
+                    state.confirmedGroupIDs.insert(selectedGroupID)
+                }
                 state.isDetailPresented = false
                 return .none
             case .detail(.delegate(.joined)):
-                state.confirmedGroupID = state.selectedGroupID
+                if let selectedGroupID = state.selectedGroupID {
+                    state.confirmedGroupIDs.insert(selectedGroupID)
+                }
                 state.isDetailPresented = false
                 return .none
             case .detail(.backButtonTapped):
@@ -131,8 +263,21 @@ struct PlaceGroupingFeature: Reducer {
             case .detail:
                 return .none
             case .confirmButtonTapped:
+                guard state.haveAllRecommendedGroupsConfirmed else { return .none }
+                guard let source = state.sourcePlaceSelection else { return .none }
+                state.waitingForConfirmation = WaitingForConfirmationFeature.State(
+                    tripID: source.tripID,
+                    tripTitle: state.tripTitle,
+                    tripDates: state.tripDates,
+                    members: state.members,
+                    currentMemberID: state.currentMemberID
+                )
                 state.isWaitingForConfirmationPresented = true
-                return .none
+                let tripID = source.tripID
+                let groupIDs = state.confirmedGroupIDs.sorted()
+                return .run { _ in
+                    try? await placeClient.confirmGroups(tripID, groupIDs)
+                }
             case .waitingForConfirmation(.backButtonTapped):
                 state.isWaitingForConfirmationPresented = false
                 return .none
@@ -151,6 +296,10 @@ struct PlaceGroupingFeature: Reducer {
         Scope(state: \.detail, action: \.detail) {
             PlaceGroupingDetailFeature()
         }
+
+        Scope(state: \.transportationSheet, action: \.transportationSheet) {
+            TripSetUpTransportationFeature()
+        }
     }
 }
 
@@ -166,7 +315,10 @@ private enum PlaceGroupingEngine {
         let place: PinnedPlace
     }
 
-    static func makeGroups(from state: PlaceSelectionFeature.State) -> Result {
+    static func makeGroups(
+        from state: PlaceSelectionFeature.State,
+        selection: TripSetUpTransportationFeature.Selection
+    ) -> Result {
         let joined = state.participants.filter(\.hasJoined)
         let members = joined.map { participant in
             let categories = Set(
@@ -188,7 +340,10 @@ private enum PlaceGroupingEngine {
                 OwnedPlace(member: participant.member, place: $0)
             }
         }
-        let regions = connectedRegions(ownedPlaces)
+        let regions = connectedRegions(
+            ownedPlaces,
+            maximumDistance: maximumDistance(for: selection)
+        )
         let mapGroups = regions.enumerated().map { index, region in
             let uniquePlaces = unique(region.map(\.place))
             return MapPlaceGroup(
@@ -209,50 +364,19 @@ private enum PlaceGroupingEngine {
             )
             let memberIDs = Array(Set(region.map { $0.member.rawValue })).sorted()
             let memberComponents = categoryConnectedMembers(memberIDs, region: region)
-
-            for (componentIndex, component) in memberComponents.enumerated() {
-                let componentSet = Set(component)
-                let places = unique(
-                    region.filter { componentSet.contains($0.member.rawValue) }.map(\.place)
-                )
-                let categorySets = component.map { memberID in
-                    Set(region.filter { $0.member.rawValue == memberID }.map {
-                        normalizedCategory($0.place.category)
-                    })
-                }
-                let shared = categorySets.dropFirst().reduce(categorySets.first ?? []) {
-                    $0.intersection($1)
-                }
-                let categories = shared.isEmpty
-                    ? Array(Set(places.map { normalizedCategory($0.category) })).sorted()
-                    : shared.sorted()
-                let groupTitle = memberComponents.count == 1
-                    ? title
-                    : "\(title) \(componentIndex + 1)"
-                recommendations.append(
-                    .init(
-                        id: "region-\(regionIndex)-group-\(componentIndex)",
-                        title: groupTitle,
-                        participantSummary: "\(component.count)명 · \(places.count)곳",
-                        memberIDs: component,
-                        categories: categories,
-                        places: places
-                    )
-                )
-            }
-        }
-
-        // 장소가 없는 사람도 자유시간/합류 확인 그룹으로 결과에 남긴다.
-        let placedMemberIDs = Set(ownedPlaces.map { $0.member.rawValue })
-        for participant in joined where !placedMemberIDs.contains(participant.member.rawValue) {
+            let categories = Array(Set(regionPlaces.map {
+                normalizedCategory($0.category)
+            })).sorted()
             recommendations.append(
                 .init(
-                    id: "free-\(participant.member.rawValue)",
-                    title: "자유시간 · 합류 확인",
-                    participantSummary: "\(participant.name) · 저장한 장소 없음",
-                    memberIDs: [participant.member.rawValue],
-                    categories: [],
-                    places: []
+                    id: "region-\(regionIndex)",
+                    title: title,
+                    participantSummary: memberComponents
+                        .map { "\($0.count)명" }
+                        .joined(separator: " · "),
+                    memberIDs: memberIDs,
+                    categories: categories,
+                    places: regionPlaces
                 )
             )
         }
@@ -264,7 +388,10 @@ private enum PlaceGroupingEngine {
         )
     }
 
-    private static func connectedRegions(_ places: [OwnedPlace]) -> [[OwnedPlace]] {
+    private static func connectedRegions(
+        _ places: [OwnedPlace],
+        maximumDistance: Double
+    ) -> [[OwnedPlace]] {
         var visited = Set<Int>()
         var result: [[OwnedPlace]] = []
         for start in places.indices where !visited.contains(start) {
@@ -274,7 +401,7 @@ private enum PlaceGroupingEngine {
             while let index = queue.popLast() {
                 region.append(places[index])
                 for candidate in places.indices where !visited.contains(candidate) {
-                    if distance(places[index].place, places[candidate].place) <= 5_500 {
+                    if distance(places[index].place, places[candidate].place) <= maximumDistance {
                         visited.insert(candidate)
                         queue.append(candidate)
                     }
@@ -283,6 +410,13 @@ private enum PlaceGroupingEngine {
             result.append(region)
         }
         return result
+    }
+
+    private static func maximumDistance(
+        for selection: TripSetUpTransportationFeature.Selection
+    ) -> Double {
+        let metersPerMinute: Double = selection.transportation == .publicTransit ? 183 : 500
+        return Double(selection.duration.rawValue) * metersPerMinute
     }
 
     private static func categoryConnectedMembers(

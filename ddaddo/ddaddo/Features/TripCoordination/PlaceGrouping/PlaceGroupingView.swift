@@ -54,26 +54,14 @@ struct PlaceGroupingView: View {
                 .transition(.move(edge: .trailing))
             }
 
-            if store.isCriteriaChangeConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(3)
-
-                DDConfirmationAlert(
-                    title: "알림",
-                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
-                    cancelTitle: "아니요",
-                    confirmTitle: "네",
-                    onCancel: {
-                        store.send(.criteriaChangeCancelTapped)
-                    },
-                    onConfirm: {
-                        store.send(.criteriaChangeConfirmTapped)
+            if store.isReanalyzing {
+                LoadingView(message: "여행 취향과 장소를 다시 분석 중...")
+                    .zIndex(5)
+                    .task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        guard !Task.isCancelled else { return }
+                        store.send(.reanalysisFinished)
                     }
-                )
-                .frame(maxHeight: .infinity)
-                .zIndex(4)
             }
         }
         .animation(
@@ -86,9 +74,31 @@ struct PlaceGroupingView: View {
         )
         .animation(
             .easeInOut(duration: 0.2),
-            value: store.isCriteriaChangeConfirmationPresented
+            value: store.isReanalyzing
         )
+        .sheet(
+            isPresented: Binding(
+                get: { store.isTransportationSheetPresented },
+                set: { isPresented in
+                    if !isPresented {
+                        store.send(.transportationSheetDismissed)
+                    }
+                }
+            )
+        ) {
+            TripSetUpTransportationView(
+                store: store.scope(
+                    state: \.transportationSheet,
+                    action: \.transportationSheet
+                )
+            )
+            .presentationDetents([.height(524)])
+            .presentationDragIndicator(.hidden)
+        }
         .preferredColorScheme(.dark)
+        .task {
+            await store.send(.onAppear).finish()
+        }
     }
 
     private var tripHeader: some View {
@@ -226,57 +236,66 @@ struct PlaceGroupingView: View {
     }
 
     private var recommendedGroups: some View {
-        VStack(spacing: 12) {
-            ForEach(store.recommendedGroups) { group in
-                Button {
-                    store.send(.recommendedGroupTapped(group.id))
-                } label: {
-                    HStack(spacing: DDSpacing.large) {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(group.title)
-                                .ddTypography(.bodyEmphasis16)
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(store.recommendedGroups) { group in
+                        Button {
+                            store.send(.recommendedGroupTapped(group.id))
+                        } label: {
+                            HStack(spacing: DDSpacing.large) {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(group.title)
+                                        .ddTypography(.bodyEmphasis16)
 
-                            Text(group.participantSummary)
-                                .ddTypography(.body16)
-                        }
-                        .foregroundStyle(DDColor.textPrimary)
-
-                        Spacer(minLength: 0)
-
-                        if store.confirmedGroupID == group.id {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(DDColor.textOnPrimary)
-                                .frame(width: 24, height: 24)
-                                .background(DDColor.actionPrimary)
-                                .clipShape(.circle)
-                        } else {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 24, weight: .regular))
+                                    Text(group.participantSummary)
+                                        .ddTypography(.body16)
+                                }
                                 .foregroundStyle(DDColor.textPrimary)
-                                .frame(width: 24, height: 24)
+
+                                Spacer(minLength: 0)
+
+                                if store.confirmedGroupIDs.contains(group.id) {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(DDColor.textOnPrimary)
+                                        .frame(width: 24, height: 24)
+                                        .background(DDColor.actionPrimary)
+                                        .clipShape(.circle)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 24, weight: .regular))
+                                        .foregroundStyle(DDColor.textPrimary)
+                                        .frame(width: 24, height: 24)
+                                }
+                            }
+                            .padding(.horizontal, 29)
+                            .frame(maxWidth: .infinity, minHeight: 93, maxHeight: 93)
+                            .background(DDColor.surfaceElevated)
+                            .clipShape(.rect(cornerRadius: 20))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(DDColor.borderDefault, lineWidth: 1)
+                            }
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(.horizontal, 29)
-                    .frame(maxWidth: .infinity, minHeight: 93, maxHeight: 93)
-                    .background(DDColor.surfaceElevated)
-                    .clipShape(.rect(cornerRadius: 20))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(DDColor.borderDefault, lineWidth: 1)
-                    }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
+                .padding(.bottom, 12)
             }
+            .scrollIndicators(.hidden)
 
-            Spacer(minLength: 0)
-
-            DDCTAButton(title: "최종 확정하기") {
+            DDCTAButton(
+                title: "지역 그룹 확정하기",
+                isEnabled: store.haveAllRecommendedGroupsConfirmed
+            ) {
                 store.send(.confirmButtonTapped)
             }
+            .padding(.top, 8)
             .padding(.bottom, 34)
+            .background(DDColor.surfaceDefault)
         }
         .padding(.horizontal, DDSpacing.large)
     }

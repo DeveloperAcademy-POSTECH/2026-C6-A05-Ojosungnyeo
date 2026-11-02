@@ -9,6 +9,7 @@ import Foundation
 struct TripSetUpFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
+        case returnToUpcomingTrips
     }
 
     @ObservableState
@@ -220,10 +221,13 @@ struct TripSetUpFeature: Reducer {
                 state.creationErrorMessage = nil
                 return .none
 
-            case .waitingForParticipantsDismissed,
-                 .waitingForParticipants(.backButtonTapped):
+            case .waitingForParticipantsDismissed:
                 state.isWaitingForParticipantsPresented = false
                 return .none
+
+            case .waitingForParticipants(.backButtonTapped):
+                state.isWaitingForParticipantsPresented = false
+                return .send(.delegate(.returnToUpcomingTrips))
 
             case .waitingForParticipants(.delegate(.returnHome)):
                 state.isWaitingForParticipantsPresented = false

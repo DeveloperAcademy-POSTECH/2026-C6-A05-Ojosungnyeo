@@ -171,7 +171,12 @@ struct TripSetUpView: View {
 
     private var setUpCards: some View {
         VStack(spacing: DDSpacing.medium) {
-            navigationCard(title: "여행 일정", detail: store.tripDateSummary, height: 83) {
+            navigationCard(
+                title: "여행 일정",
+                detail: store.tripDateSummary,
+                detailColor: DDColor.actionPrimary,
+                height: 83
+            ) {
                 store.send(.travelScheduleButtonTapped)
             }
 

@@ -93,7 +93,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
                 .filter(stop.members.contains)
                 .map(\.rawValue)
                 .joined(separator: ",")
-            return "\(stop.id):\(stop.latitude):\(stop.longitude):\(memberSignature)"
+            return "\(stop.id):\(stop.order):\(stop.latitude):\(stop.longitude):\(memberSignature)"
         }
         .joined(separator: "|")
         let signature = "\(selectedMember?.rawValue ?? "all")#\(stopSignature)"
@@ -106,8 +106,12 @@ struct RouteGoogleMapView: UIViewRepresentable {
         guard !stops.isEmpty else { return }
 
         var bounds = GMSCoordinateBounds()
+        let orderedSteps = Array(Set(stops.map(\.order))).sorted()
+        let numberByOrder = Dictionary(
+            uniqueKeysWithValues: orderedSteps.enumerated().map { ($0.element, $0.offset + 1) }
+        )
 
-        for (index, stop) in stops.enumerated() {
+        for stop in stops {
             let coordinate = coordinate(for: stop)
             bounds = bounds.includingCoordinate(coordinate)
 
@@ -118,7 +122,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
             coordinator.numberedMarkers.append(
                 NumberedMarker(
                     marker: marker,
-                    number: index + 1,
+                    number: numberByOrder[stop.order, default: 1],
                     assetName: style.assetName,
                     badgeColor: style.badgeColor
                 )

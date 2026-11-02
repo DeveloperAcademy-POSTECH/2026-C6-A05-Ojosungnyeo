@@ -9,6 +9,7 @@ import Foundation
 struct TripSearchFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
+        case returnToUpcomingTrips
     }
 
     typealias Region = TripDestination.Region
@@ -108,6 +109,10 @@ struct TripSearchFeature: Reducer {
             case .tripSetUp(.delegate(.returnHome)):
                 state.isTripSetUpPresented = false
                 return .send(.delegate(.returnHome))
+
+            case .tripSetUp(.delegate(.returnToUpcomingTrips)):
+                state.isTripSetUpPresented = false
+                return .send(.delegate(.returnToUpcomingTrips))
 
             case .tripSetUp:
                 return .none

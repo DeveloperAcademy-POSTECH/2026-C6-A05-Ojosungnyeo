@@ -41,7 +41,17 @@ struct WaitingForParticipantsFeature: Reducer {
         let participants: [Participant]
 
         var shareURL: URL {
-            url ?? URL(string: "https://ddaddo-web.vercel.app/invite?code=\(code)")!
+            var components = URLComponents(
+                url: url ?? URL(string: "https://ddaddo-web.vercel.app/invite")!,
+                resolvingAgainstBaseURL: false
+            )!
+            components.queryItems = [
+                URLQueryItem(name: "code", value: code),
+                URLQueryItem(name: "endTime", value: ISO8601DateFormatter().string(from: expiresAt))
+            ]
+            components.percentEncodedQuery = components.percentEncodedQuery?
+                .replacingOccurrences(of: ":", with: "%3A")
+            return components.url!
         }
 
         var shareText: String {

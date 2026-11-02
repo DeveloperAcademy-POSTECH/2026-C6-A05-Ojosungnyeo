@@ -40,7 +40,7 @@ enum FirebaseTripService {
             let inviteCode = String(format: "%06d", Int.random(in: 0...999_999))
             let inviteReference = database.collection("inviteCodes").document(inviteCode)
             let expiresAt = Date().addingTimeInterval(inviteDuration)
-            let inviteURL = makeInviteURL(code: inviteCode)
+            let inviteURL = makeInviteURL(code: inviteCode, expiresAt: expiresAt)
 
             do {
                 _ = try await database.runTransaction { transaction, errorPointer in
@@ -437,13 +437,9 @@ enum FirebaseTripService {
         let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
         let adminPlacesReference = adminParticipantReference.collection("places")
         let expiresAt = Date().addingTimeInterval(inviteDuration)
-        let inviteURL = makeInviteURL(code: "123456")
-        let startDate = Calendar.current.date(
-            from: DateComponents(year: 2026, month: 11, day: 22)
-        )!
-        let endDate = Calendar.current.date(
-            from: DateComponents(year: 2026, month: 11, day: 25)
-        )!
+        let inviteURL = makeInviteURL(code: "123456", expiresAt: expiresAt)
+        let startDate = Calendar.current.startOfDay(for: Date())
+        let endDate = Calendar.current.date(byAdding: .day, value: 3, to: startDate)!
 
         _ = try await database.runTransaction { transaction, errorPointer in
             do {
@@ -572,53 +568,14 @@ enum FirebaseTripService {
         }
     }
 
-    private static func seedAdminPlaces(
-        transaction: Transaction,
-        placesReference: CollectionReference
-    ) {
-        let places: [[String: Any]] = [
-            [
-                "id": "development-stussy-tokyo",
-                "name": "스투시 도쿄점",
-                "description": "1 Chome-14-5 Jingumae, Shibuya, Tokyo",
-                "category": "쇼핑",
-                "latitude": 35.67118,
-                "longitude": 139.70564
-            ],
-            [
-                "id": "development-dover-ginza",
-                "name": "도버 스트리트 마켓 긴자",
-                "description": "6 Chome-9-5 Ginza, Chuo City, Tokyo",
-                "category": "쇼핑",
-                "latitude": 35.66965,
-                "longitude": 139.76355
-            ],
-            [
-                "id": "development-tokyo-tower",
-                "name": "도쿄 타워",
-                "description": "4 Chome-2-8 Shibakoen, Minato City, Tokyo",
-                "category": "관광지",
-                "latitude": 35.65858,
-                "longitude": 139.74543
-            ]
-        ]
-
-        for place in places {
-            guard let placeID = place["id"] as? String else { continue }
-            var data = place
-            data["createdAt"] = FieldValue.serverTimestamp()
-            data["updatedAt"] = FieldValue.serverTimestamp()
-            transaction.setData(
-                data,
-                forDocument: placesReference.document(placeID),
-                merge: true
-            )
-        }
-    }
-
     private static func makeInviteURL(code: String) -> URL {
         var components = URLComponents(string: inviteURLBase)!
-        components.queryItems = [URLQueryItem(name: "code", value: code)]
+        components.queryItems = [
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "endTime", value: ISO8601DateFormatter().string(from: expiresAt))
+        ]
+        components.percentEncodedQuery = components.percentEncodedQuery?
+            .replacingOccurrences(of: ":", with: "%3A")
         return components.url!
     }
 }

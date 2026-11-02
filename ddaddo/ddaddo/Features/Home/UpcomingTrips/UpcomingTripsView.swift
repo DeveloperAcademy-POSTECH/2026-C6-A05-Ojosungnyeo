@@ -8,6 +8,7 @@ import SwiftUI
 
 struct UpcomingTripsView: View {
     let store: StoreOf<UpcomingTripsFeature>
+    @State private var openSwipeTripID: UpcomingTripsFeature.Trip.ID?
 
     var body: some View {
         ZStack {
@@ -23,20 +24,18 @@ struct UpcomingTripsView: View {
                     .padding(.bottom, 8)
 
                 ScrollView {
-                    if store.trips.isEmpty && !store.isLoadingTrips {
-                        emptyState
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 84)
-                    } else {
-                        LazyVStack(spacing: 15) {
-                            ForEach(store.trips) { trip in
-                                UpcomingTripTicketCard(
-                                    trip: trip,
-                                    action: {
-                                        store.send(.viewScheduleButtonTapped(trip.id))
-                                    }
-                                )
-                            }
+                    LazyVStack(spacing: 15) {
+                        ForEach(store.trips) { trip in
+                            SwipeableUpcomingTripCard(
+                                trip: trip,
+                                openTripID: $openSwipeTripID,
+                                deleteAction: {
+                                    store.send(.deleteButtonTapped(trip.id))
+                                },
+                                action: {
+                                    store.send(.viewScheduleButtonTapped(trip.id))
+                                }
+                            )
                         }
                         .padding(.horizontal, DDSpacing.large)
                         .padding(.top, 15)
@@ -111,6 +110,25 @@ struct UpcomingTripsView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: store.isInviteCodeModalPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isWaitingForParticipantsPresented)
+        .allowsHitTesting(store.pendingDeletionTripID == nil)
+        .overlay {
+            if store.pendingDeletionTripID != nil {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: "여행 삭제하기",
+                        message: "예정된 여행을 진짜 삭제할까요?",
+                        cancelTitle: "아니요",
+                        confirmTitle: "네",
+                        onCancel: { store.send(.deleteCancelButtonTapped) },
+                        onConfirm: { store.send(.deleteConfirmButtonTapped) }
+                    )
+                }
+            }
+        }
         .preferredColorScheme(.dark)
         .alert(
             "여행에 참여할 수 없어요",
@@ -228,6 +246,57 @@ struct UpcomingTripsView: View {
 
 }
 
+private struct SwipeableUpcomingTripCard: View {
+    let trip: UpcomingTripsFeature.Trip
+    @Binding var openTripID: UpcomingTripsFeature.Trip.ID?
+    let deleteAction: () -> Void
+    let action: () -> Void
+
+    @State private var dragTranslation: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { proxy in
+            let deleteWidth = proxy.size.width * (CGFloat(121) / 370)
+            let revealWidth = deleteWidth + 15
+            let openOffset = openTripID == trip.id ? -revealWidth : 0
+            let cardOffset = min(0, max(-revealWidth, openOffset + dragTranslation))
+
+            ZStack(alignment: .trailing) {
+                Button(action: deleteAction) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 30, weight: .regular))
+                        .foregroundStyle(DDColor.actionPrimary)
+                        .frame(width: deleteWidth, height: proxy.size.height)
+                        .background(Color(red: 68 / 255, green: 68 / 255, blue: 68 / 255))
+                        .clipShape(.rect(cornerRadius: DDRadius.medium))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(trip.destination) 여행 삭제")
+
+                UpcomingTripTicketCard(trip: trip, action: action)
+                    .frame(width: proxy.size.width)
+                    .offset(x: cardOffset)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 20)
+                            .onChanged { value in
+                                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                                dragTranslation = value.translation.width
+                            }
+                            .onEnded { value in
+                                defer { dragTranslation = 0 }
+                                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    openTripID = value.translation.width < -40 ? trip.id : nil
+                                }
+                            }
+                    )
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .aspectRatio(377.6288757324219 / 146, contentMode: .fit)
+    }
+}
+
 private struct UpcomingTripsBroadcastBanner: View {
     let message: String
 
@@ -239,7 +308,7 @@ private struct UpcomingTripsBroadcastBanner: View {
             .overlay {
                 GeometryReader { proxy in
                     Text(message)
-                        .ddTypography(.labelEmphasis14)
+                        .ddTypography(.captionEmphasis12)
                         .tracking(0.6)
                         .lineSpacing(2)
                         .foregroundStyle(DDColor.textOnPrimary)

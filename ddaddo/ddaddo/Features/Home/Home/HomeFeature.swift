@@ -176,6 +176,11 @@ struct HomeFeature: Reducer {
                 return .none
             case .tripSearch(.delegate(.returnHome)):
                 state.isTripSearchPresented = false
+                return .none
+            case .tripSearch(.delegate(.returnToUpcomingTrips)):
+                state.isTripSearchPresented = false
+                state.isUpcomingTripsPresented = true
+                return .none
                 state.isUpcomingTripsPresented = true
                 return .send(.upcomingTrips(.onAppear))
             case .tripSearch:

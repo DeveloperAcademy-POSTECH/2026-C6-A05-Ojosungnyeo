@@ -5,11 +5,35 @@
 //  Created by sun on 10/21/26.
 //
 
+import Foundation
+
 struct PinnedPlace: Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let description: String
     let thumbnailName: String
+    let category: String
+    let photoData: [Data]
     let latitude: Double
     let longitude: Double
+
+    init(
+        id: String,
+        name: String,
+        description: String,
+        thumbnailName: String,
+        category: String = "장소",
+        photoData: [Data] = [],
+        latitude: Double,
+        longitude: Double
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.thumbnailName = thumbnailName
+        self.category = category
+        self.photoData = photoData
+        self.latitude = latitude
+        self.longitude = longitude
+    }
 }

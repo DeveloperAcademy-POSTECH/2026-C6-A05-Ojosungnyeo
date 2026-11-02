@@ -435,7 +435,6 @@ enum FirebaseTripService {
             .document("slot_2")
         let thirdParticipantReference = tripReference.collection("participants").document("slot_3")
         let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
-        let adminPlacesReference = adminParticipantReference.collection("places")
         let expiresAt = Date().addingTimeInterval(inviteDuration)
         let inviteURL = makeInviteURL(code: "123456", expiresAt: expiresAt)
         let startDate = Calendar.current.startOfDay(for: Date())
@@ -482,10 +481,6 @@ enum FirebaseTripService {
                         ],
                         forDocument: adminParticipantReference,
                         merge: true
-                    )
-                    seedAdminPlaces(
-                        transaction: transaction,
-                        placesReference: adminPlacesReference
                     )
                     transaction.setData(
                         [
@@ -545,10 +540,6 @@ enum FirebaseTripService {
                     ],
                     forDocument: adminParticipantReference
                 )
-                seedAdminPlaces(
-                    transaction: transaction,
-                    placesReference: adminPlacesReference
-                )
                 transaction.setData(
                     [
                         "slotIndex": 1,
@@ -568,7 +559,7 @@ enum FirebaseTripService {
         }
     }
 
-    private static func makeInviteURL(code: String) -> URL {
+    private static func makeInviteURL(code: String, expiresAt: Date) -> URL {
         var components = URLComponents(string: inviteURLBase)!
         components.queryItems = [
             URLQueryItem(name: "code", value: code),

@@ -181,8 +181,6 @@ struct HomeFeature: Reducer {
                 state.isTripSearchPresented = false
                 state.isUpcomingTripsPresented = true
                 return .none
-                state.isUpcomingTripsPresented = true
-                return .send(.upcomingTrips(.onAppear))
             case .tripSearch:
                 return .none
             case .mascotTapped:

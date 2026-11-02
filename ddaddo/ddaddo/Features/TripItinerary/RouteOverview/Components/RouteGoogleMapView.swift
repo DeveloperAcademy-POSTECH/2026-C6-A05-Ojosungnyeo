@@ -10,10 +10,11 @@ import SwiftUI
 
 struct RouteGoogleMapView: UIViewRepresentable {
     let stops: [RouteStop]
+    let selectedMember: TripMember?
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var signature = ""
-        var numberedMarkers: [(marker: GMSMarker, number: Int)] = []
+        var numberedMarkers: [NumberedMarker] = []
         var markerScale: CGFloat = -1
 
         func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
@@ -28,11 +29,20 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
             for numberedMarker in numberedMarkers {
                 numberedMarker.marker.icon = RouteGoogleMapView.markerImage(
+                    assetName: numberedMarker.assetName,
                     number: numberedMarker.number,
+                    badgeColor: numberedMarker.badgeColor,
                     scale: scale
                 )
             }
         }
+    }
+
+    struct NumberedMarker {
+        let marker: GMSMarker
+        let number: Int
+        let assetName: String
+        let badgeColor: UIColor
     }
 
     func makeCoordinator() -> Coordinator {
@@ -78,7 +88,15 @@ struct RouteGoogleMapView: UIViewRepresentable {
     }
 
     private func updateRoute(on mapView: GMSMapView, coordinator: Coordinator) {
-        let signature = stops.map { "\($0.id):\($0.latitude):\($0.longitude)" }.joined(separator: "|")
+        let stopSignature = stops.map { stop in
+            let memberSignature = TripMember.allCases
+                .filter(stop.members.contains)
+                .map(\.rawValue)
+                .joined(separator: ",")
+            return "\(stop.id):\(stop.order):\(stop.latitude):\(stop.longitude):\(memberSignature)"
+        }
+        .joined(separator: "|")
+        let signature = "\(selectedMember?.rawValue ?? "all")#\(stopSignature)"
         guard signature != coordinator.signature else { return }
         coordinator.signature = signature
         mapView.clear()
@@ -87,54 +105,187 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
         guard !stops.isEmpty else { return }
 
-        let path = GMSMutablePath()
         var bounds = GMSCoordinateBounds()
+        let orderedSteps = Array(Set(stops.map(\.order))).sorted()
+        let numberByOrder = Dictionary(
+            uniqueKeysWithValues: orderedSteps.enumerated().map { ($0.element, $0.offset + 1) }
+        )
 
-        for (index, stop) in stops.enumerated() {
-            let coordinate = CLLocationCoordinate2D(
-                latitude: stop.latitude,
-                longitude: stop.longitude
-            )
-            path.add(coordinate)
+        for stop in stops {
+            let coordinate = coordinate(for: stop)
             bounds = bounds.includingCoordinate(coordinate)
 
             let marker = GMSMarker(position: coordinate)
             marker.groundAnchor = CGPoint(x: 0.5, y: 0.82)
             marker.map = mapView
-            coordinator.numberedMarkers.append((marker, index + 1))
+            let style = markerStyle(for: stop)
+            coordinator.numberedMarkers.append(
+                NumberedMarker(
+                    marker: marker,
+                    number: numberByOrder[stop.order, default: 1],
+                    assetName: style.assetName,
+                    badgeColor: style.badgeColor
+                )
+            )
         }
 
         coordinator.updateMarkerScale(for: mapView.camera.zoom)
-
-        let polyline = GMSPolyline(path: path)
-        polyline.strokeColor = UIColor(red: 242 / 255, green: 1, blue: 96 / 255, alpha: 1)
-        polyline.strokeWidth = 5
-        polyline.map = mapView
+        drawRoutes(on: mapView)
 
         mapView.padding = UIEdgeInsets(top: 140, left: 44, bottom: 320, right: 28)
         mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 64))
     }
 
-    fileprivate static func markerImage(number: Int, scale: CGFloat) -> UIImage? {
-        guard let source = UIImage(named: "DDRouteUFO") else { return nil }
-        let size = CGSize(width: 60 * scale, height: 96 * scale)
+    private func markerStyle(for stop: RouteStop) -> (assetName: String, badgeColor: UIColor) {
+        if let selectedMember {
+            return (
+                selectedMember.routeUFOAssetName,
+                UIColor(selectedMember.routeAccentColor)
+            )
+        }
+
+        guard stop.members.count < TripMember.allCases.count,
+              let member = TripMember.allCases.first(where: stop.members.contains) else {
+            return ("DDRouteUFONeon", Self.neonMarkerColor)
+        }
+
+        return (member.routeUFOAssetName, UIColor(member.routeAccentColor))
+    }
+
+    private func drawRoutes(on mapView: GMSMapView) {
+        guard stops.count > 1 else { return }
+
+        if let selectedMember {
+            drawPolyline(
+                coordinates: stops.map { coordinate(for: $0) },
+                color: UIColor(selectedMember.routePolylineColor),
+                on: mapView
+            )
+            return
+        }
+
+        var membersByLeg: [RouteLeg: [TripMember]] = [:]
+        var orderedLegs: [RouteLeg] = []
+
+        for member in TripMember.allCases {
+            let memberStops = stops.filter { $0.members.contains(member) }
+
+            for (start, end) in zip(memberStops, memberStops.dropFirst()) {
+                let leg = RouteLeg(startID: start.id, endID: end.id)
+                if membersByLeg[leg] == nil {
+                    orderedLegs.append(leg)
+                }
+                membersByLeg[leg, default: []].append(member)
+            }
+        }
+
+        let stopsByID = Dictionary(uniqueKeysWithValues: stops.map { ($0.id, $0) })
+
+        for leg in orderedLegs {
+            guard let start = stopsByID[leg.startID],
+                  let end = stopsByID[leg.endID],
+                  let members = membersByLeg[leg] else { continue }
+
+            if members.count == TripMember.allCases.count {
+                drawPolyline(
+                    coordinates: [coordinate(for: start), coordinate(for: end)],
+                    color: Self.neonRouteColor,
+                    on: mapView
+                )
+                continue
+            }
+
+            for (memberIndex, member) in members.enumerated() {
+                let offset = Double(memberIndex) - Double(members.count - 1) / 2
+                drawPolyline(
+                    coordinates: offsetCoordinates(
+                        from: coordinate(for: start),
+                        to: coordinate(for: end),
+                        offset: offset * 0.00010
+                    ),
+                    color: UIColor(member.routePolylineColor),
+                    on: mapView
+                )
+            }
+        }
+    }
+
+    private struct RouteLeg: Hashable {
+        let startID: RouteStop.ID
+        let endID: RouteStop.ID
+    }
+
+    private func coordinate(for stop: RouteStop) -> CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)
+    }
+
+    private func offsetCoordinates(
+        from start: CLLocationCoordinate2D,
+        to end: CLLocationCoordinate2D,
+        offset: Double
+    ) -> [CLLocationCoordinate2D] {
+        guard offset != 0 else { return [start, end] }
+
+        let latitudeDelta = end.latitude - start.latitude
+        let longitudeDelta = end.longitude - start.longitude
+        let length = hypot(latitudeDelta, longitudeDelta)
+        guard length > 0 else { return [start, end] }
+
+        let latitudeOffset = -longitudeDelta / length * offset
+        let longitudeOffset = latitudeDelta / length * offset
+        return [
+            CLLocationCoordinate2D(
+                latitude: start.latitude + latitudeOffset,
+                longitude: start.longitude + longitudeOffset
+            ),
+            CLLocationCoordinate2D(
+                latitude: end.latitude + latitudeOffset,
+                longitude: end.longitude + longitudeOffset
+            )
+        ]
+    }
+
+    private func drawPolyline(
+        coordinates: [CLLocationCoordinate2D],
+        color: UIColor,
+        on mapView: GMSMapView
+    ) {
+        let path = GMSMutablePath()
+        for coordinate in coordinates {
+            path.add(coordinate)
+        }
+
+        let polyline = GMSPolyline(path: path)
+        polyline.strokeColor = color
+        polyline.strokeWidth = 5
+        polyline.map = mapView
+    }
+
+    fileprivate static func markerImage(
+        assetName: String,
+        number: Int,
+        badgeColor: UIColor,
+        scale: CGFloat
+    ) -> UIImage? {
+        guard let source = UIImage(named: assetName) else { return nil }
+        let size = CGSize(width: 48 * scale, height: 96 * scale)
         return UIGraphicsImageRenderer(size: size).image { _ in
             source.draw(
                 in: CGRect(
                     x: 0,
                     y: 0,
-                    width: 60 * scale,
-                    height: 82 * scale
+                    width: 48 * scale,
+                    height: 72 * scale
                 )
             )
 
             let circleRect = CGRect(
-                x: 22.5 * scale,
-                y: 79 * scale,
+                x: 16.5 * scale,
+                y: 80 * scale,
                 width: 15 * scale,
                 height: 15 * scale
             )
-            UIColor(red: 242 / 255, green: 1, blue: 96 / 255, alpha: 1).setFill()
+            badgeColor.setFill()
             UIBezierPath(ovalIn: circleRect).fill()
 
             let paragraph = NSMutableParagraphStyle()
@@ -146,8 +297,8 @@ struct RouteGoogleMapView: UIViewRepresentable {
             ]
             String(number).draw(
                 in: CGRect(
-                    x: 22.5 * scale,
-                    y: 80.5 * scale,
+                    x: 16.5 * scale,
+                    y: 81.5 * scale,
                     width: 15 * scale,
                     height: 12 * scale
                 ),
@@ -155,6 +306,20 @@ struct RouteGoogleMapView: UIViewRepresentable {
             )
         }
     }
+
+    private static let neonMarkerColor = UIColor(
+        red: 242 / 255,
+        green: 1,
+        blue: 96 / 255,
+        alpha: 1
+    )
+
+    private static let neonRouteColor = UIColor(
+        red: 138 / 255,
+        green: 150 / 255,
+        blue: 0,
+        alpha: 1
+    )
 
     private static let darkMapStyle = """
     [

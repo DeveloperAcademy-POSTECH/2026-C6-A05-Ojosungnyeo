@@ -103,7 +103,7 @@ struct PlaceSelectionFeature: Reducer {
             self.participants = participants
             self.selectedMember = selectedMember
             self.memberPlaces = memberPlaces
-            self.remainingSeconds = tripID == "development-trip-123456"
+            self.remainingSeconds = tripID.hasPrefix("development-trip-")
                 ? 60
                 : remainingSeconds
         }
@@ -234,7 +234,7 @@ struct PlaceSelectionFeature: Reducer {
             self.tripStartDate = tripStartDate
             self.tripEndDate = tripEndDate
             self.participants = participants
-            self.remainingSeconds = tripID == "development-trip-123456"
+            self.remainingSeconds = tripID.hasPrefix("development-trip-")
                 ? 60
                 : remainingSeconds
 

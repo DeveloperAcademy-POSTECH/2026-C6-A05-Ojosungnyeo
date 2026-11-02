@@ -25,7 +25,7 @@ enum FirebasePlaceSelectionService {
 
             // 개발용 관리자는 인증 사용자가 아니므로 보안 규칙상 하위 컬렉션을
             // 읽을 수 없다. 해당 핀은 HomeFeature의 고정 관리자 데이터로 보완한다.
-            if tripID == "development-trip-123456",
+            if tripID.hasPrefix("development-trip-"),
                participant.documentID == "development-admin" {
                 continue
             }
@@ -134,7 +134,7 @@ enum FirebasePlaceSelectionService {
             else { return nil }
             let member = TripMember(avatar: avatar)
             guard seenMembers.insert(member).inserted else { return nil }
-            let isDevelopmentAdmin = tripID == "development-trip-123456"
+            let isDevelopmentAdmin = tripID.hasPrefix("development-trip-")
                 && document.documentID == "development-admin"
             return MemberGroupConfirmation(
                 member: member,

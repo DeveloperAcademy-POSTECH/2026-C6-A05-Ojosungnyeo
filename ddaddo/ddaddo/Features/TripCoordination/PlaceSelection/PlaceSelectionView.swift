@@ -60,10 +60,14 @@ struct PlaceSelectionView: View {
                     isLoading: store.isPlaceDetailsLoading,
                     canAdd: store.canAddSelectedPlace,
                     isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
-                    fallbackImageName: store.selectedPinnedPlace?.thumbnailName
-                ) {
-                    store.send(.addSelectedPlaceButtonTapped)
-                }
+                    fallbackImageName: store.selectedPinnedPlace?.thumbnailName,
+                    closeButtonTapped: {
+                        store.send(.clearSelectedPlaceButtonTapped)
+                    },
+                    addButtonTapped: {
+                        store.send(.addSelectedPlaceButtonTapped)
+                    }
+                )
                 .ignoresSafeArea(edges: .bottom)
             } else if store.isMemberPlacesSheetPresented {
                 MemberPlacesBottomSheet(

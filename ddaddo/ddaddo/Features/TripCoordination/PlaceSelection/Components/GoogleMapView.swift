@@ -13,34 +13,34 @@ struct GoogleMapView: UIViewRepresentable {
     var longitude: CLLocationDegrees = -122.4194
     var zoom: Float = 15
     var selectedPlace: PlaceDetails?
+    var showsSelectedPlaceMarker = true
     var selectedCoordinate: CLLocationCoordinate2D?
     var pinnedPlaces: [PinnedPlace] = []
+    var showsPinnedPlaceNumbers = false
     var placeGroups: [MapPlaceGroup] = []
+    var onPinnedPlaceTapped: ((PinnedPlace) -> Void)?
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
+        var parent: GoogleMapView
         var markerSignature = ""
-        var ufoMarkers: [GMSMarker] = []
-        var markerScale: CGFloat = -1
 
-        func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
-            updateMarkerScale(for: position.zoom)
+        init(parent: GoogleMapView) {
+            self.parent = parent
         }
 
-        func updateMarkerScale(for zoom: Float) {
-            let zoomDifference = CGFloat(zoom - 13)
-            let scale = min(max(pow(1.22, zoomDifference), 0.48), 1.35)
-            guard abs(scale - markerScale) >= 0.05 else { return }
-            markerScale = scale
+        func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
+            guard
+                let place = marker.userData as? PinnedPlace,
+                let onPinnedPlaceTapped = parent.onPinnedPlaceTapped
+            else { return false }
 
-            let image = GoogleMapView.markerImage(scale: scale)
-            for marker in ufoMarkers {
-                marker.icon = image
-            }
+            onPinnedPlaceTapped(place)
+            return true
         }
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(parent: self)
     }
 
     func makeUIView(context: Context) -> UIView {
@@ -67,6 +67,7 @@ struct GoogleMapView: UIViewRepresentable {
 
     func updateUIView(_ view: UIView, context: Context) {
         guard let mapView = view as? GMSMapView else { return }
+        context.coordinator.parent = self
         updateSelection(on: mapView, coordinator: context.coordinator)
     }
 
@@ -84,7 +85,7 @@ struct GoogleMapView: UIViewRepresentable {
     private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {
         let signature: String
         if let selectedPlace {
-            signature = selectedPlace.id
+            signature = "selected:\(selectedPlace.id):marker:\(showsSelectedPlaceMarker)"
         } else if let selectedCoordinate {
             signature = "\(selectedCoordinate.latitude),\(selectedCoordinate.longitude)"
         } else if !placeGroups.isEmpty {
@@ -92,7 +93,8 @@ struct GoogleMapView: UIViewRepresentable {
                 "\(group.id):\(group.places.map(\.id).joined(separator: ","))"
             }.joined(separator: "|")
         } else {
-            signature = pinnedPlaces.map(\.id).joined(separator: ",")
+            signature = "numbered:\(showsPinnedPlaceNumbers):"
+                + pinnedPlaces.map(\.id).joined(separator: ",")
         }
         guard coordinator.markerSignature != signature else { return }
         coordinator.markerSignature = signature
@@ -105,12 +107,11 @@ struct GoogleMapView: UIViewRepresentable {
                 latitude: selectedPlace.latitude,
                 longitude: selectedPlace.longitude
             )
-            addMarker(
-                at: coordinate,
-                to: mapView,
-                coordinator: coordinator
-            )
-            coordinator.updateMarkerScale(for: mapView.camera.zoom)
+            if showsSelectedPlaceMarker {
+                addMarker(at: coordinate, to: mapView)
+            } else {
+                addPinnedPlaceMarkers(to: mapView)
+            }
             mapView.animate(to: GMSCameraPosition(target: coordinate, zoom: 15))
             return
         }
@@ -133,15 +134,16 @@ struct GoogleMapView: UIViewRepresentable {
 
         guard !pinnedPlaces.isEmpty else { return }
         var bounds = GMSCoordinateBounds()
-        for place in pinnedPlaces {
+        for (index, place) in pinnedPlaces.enumerated() {
             let coordinate = CLLocationCoordinate2D(
                 latitude: place.latitude,
                 longitude: place.longitude
             )
             addMarker(
                 at: coordinate,
-                to: mapView,
-                coordinator: coordinator
+                place: place,
+                number: showsPinnedPlaceNumbers ? index + 1 : nil,
+                to: mapView
             )
             bounds = bounds.includingCoordinate(coordinate)
         }
@@ -171,11 +173,7 @@ struct GoogleMapView: UIViewRepresentable {
                     latitude: place.latitude,
                     longitude: place.longitude
                 )
-                addMarker(
-                    at: coordinate,
-                    to: mapView,
-                    coordinator: coordinator
-                )
+                addMarker(at: coordinate, place: place, to: mapView)
                 bounds = bounds.includingCoordinate(coordinate)
             }
 
@@ -227,24 +225,59 @@ struct GoogleMapView: UIViewRepresentable {
         marker.map = mapView
     }
 
+    private func addPinnedPlaceMarkers(to mapView: GMSMapView) {
+        for (index, place) in pinnedPlaces.enumerated() {
+            let coordinate = CLLocationCoordinate2D(
+                latitude: place.latitude,
+                longitude: place.longitude
+            )
+            addMarker(
+                at: coordinate,
+                place: place,
+                number: showsPinnedPlaceNumbers ? index + 1 : nil,
+                to: mapView
+            )
+        }
+    }
+
     private func addMarker(
         at coordinate: CLLocationCoordinate2D,
-        to mapView: GMSMapView,
-        coordinator: Coordinator
+        place: PinnedPlace? = nil,
+        number: Int? = nil,
+        to mapView: GMSMapView
     ) {
         let marker = GMSMarker(position: coordinate)
+        if let number {
+            marker.iconView = numberedMarkerView(number: number)
+        } else {
+            marker.icon = UIImage(named: "UFO")
+        }
         marker.groundAnchor = CGPoint(x: 0.5, y: 1)
+        marker.userData = place
         marker.map = mapView
         coordinator.ufoMarkers.append(marker)
     }
 
-    fileprivate static func markerImage(scale: CGFloat) -> UIImage? {
-        guard let source = UIImage(named: "UFO") else { return nil }
-        let size = CGSize(width: 42 * scale, height: 63 * scale)
+    private func numberedMarkerView(number: Int) -> UIView {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 48, height: 87))
 
-        return UIGraphicsImageRenderer(size: size).image { _ in
-            source.draw(in: CGRect(origin: .zero, size: size))
-        }
+        let imageView = UIImageView(frame: CGRect(x: 0, y: 0, width: 48, height: 72))
+        imageView.image = UIImage(named: "UFO")
+        imageView.contentMode = .scaleAspectFit
+        container.addSubview(imageView)
+
+        let numberLabel = UILabel(frame: CGRect(x: 16.5, y: 72, width: 15, height: 15))
+        numberLabel.backgroundColor = UIColor(red: 242 / 255, green: 255 / 255, blue: 96 / 255, alpha: 1)
+        numberLabel.textColor = .black
+        numberLabel.font = UIFont(name: "Pretendard-Medium", size: 10)
+            ?? .systemFont(ofSize: 10, weight: .medium)
+        numberLabel.textAlignment = .center
+        numberLabel.text = "\(number)"
+        numberLabel.layer.cornerRadius = 7.5
+        numberLabel.layer.masksToBounds = true
+        container.addSubview(numberLabel)
+
+        return container
     }
 
     private static let darkMapStyle = """

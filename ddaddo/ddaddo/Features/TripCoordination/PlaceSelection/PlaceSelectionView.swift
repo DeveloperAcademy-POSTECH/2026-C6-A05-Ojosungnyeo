@@ -16,13 +16,18 @@ struct PlaceSelectionView: View {
         ZStack(alignment: .bottom) {
             GoogleMapView(
                 selectedPlace: store.selectedPlace,
-                pinnedPlaces: store.displayedPlaces
+                showsSelectedPlaceMarker: false,
+                pinnedPlaces: store.mapPlaces,
+                showsPinnedPlaceNumbers: store.isShowingConfirmedPlaces,
+                onPinnedPlaceTapped: { place in
+                    store.send(.pinnedPlaceTapped(place))
+                }
             )
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 navigationBar
-                if !store.hasSelectionEnded {
+                if !store.isShowingConfirmedPlaces {
                     searchField
                 }
                 Spacer()
@@ -30,6 +35,7 @@ struct PlaceSelectionView: View {
 
             if store.isBottomSheetExpanded
                 && store.selectedPlace == nil
+                && !store.isMemberPlacesSheetPresented
                 && store.displayedPlaces.isEmpty {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
@@ -39,43 +45,84 @@ struct PlaceSelectionView: View {
 
             }
 
-            if let selectedPlace = store.selectedPlace {
+            if store.isShowingConfirmedPlaces {
+                ConfirmedPlacesBottomSheet(
+                    participants: store.participants,
+                    places: store.confirmedPlaces,
+                    isEditing: store.isEditingConfirmedPlaces,
+                    editButtonTapped: {
+                        store.send(.confirmedPlacesEditButtonTapped)
+                    },
+                    deletePlace: { place in
+                        store.send(.deleteConfirmedPlaceButtonTapped(place.id))
+                    }
+                )
+                .frame(height: 413, alignment: .top)
+                .clipped()
+                .ignoresSafeArea(edges: .bottom)
+            } else if let selectedPlace = store.selectedPlace {
                 SelectedPlaceBottomSheet(
                     place: selectedPlace,
-                    isLoading: store.isPlaceDetailsLoading
-                )
+                    isLoading: store.isPlaceDetailsLoading,
+                    canAdd: store.canAddSelectedPlace,
+                    isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
+                    fallbackImageName: store.selectedPinnedPlace?.thumbnailName
+                ) {
+                    store.send(.addSelectedPlaceButtonTapped)
+                }
                 .ignoresSafeArea(edges: .bottom)
-            } else if !store.displayedPlaces.isEmpty {
+            } else if store.isMemberPlacesSheetPresented {
                 MemberPlacesBottomSheet(
                     isExpanded: store.isBottomSheetExpanded,
                     selectedMember: store.selectedMember,
+                    participants: store.participants,
                     places: store.displayedPlaces,
+                    canDeletePlaces: store.isViewingCurrentUser,
+                    canConfirm: store.canConfirmPlaceSelection,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
                     store.send(.memberProfileTapped(member))
+                } placeTapped: { place in
+                    store.send(.pinnedPlaceTapped(place))
+                } deletePlace: { place in
+                    store.send(.deletePinnedPlaceButtonTapped(place.id))
+                } confirmButtonTapped: {
+                    store.send(.confirmButtonTapped)
                 }
                 .frame(height: currentMemberSheetHeight, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
-                .gesture(sheetDragGesture)
+                .overlay(alignment: .top) {
+                    Color.clear
+                        .contentShape(.rect)
+                        .frame(height: 44)
+                        .gesture(sheetDragGesture)
+                }
             } else {
                 PlaceSelectionBottomSheet(
-                    isExpanded: store.isBottomSheetExpanded
-                ) {
-                    store.send(.searchButtonTapped)
-                }
+                    isExpanded: store.isBottomSheetExpanded,
+                    selectedMember: store.selectedMember,
+                    participants: store.participants,
+                    destinationName: store.destinationName,
+                    maximumPlaceCount: store.maximumPlaceCount,
+                    memberTapped: { member in
+                        store.send(.memberProfileTapped(member))
+                    },
+                    searchButtonTapped: {
+                        store.send(.searchButtonTapped)
+                    }
+                )
                 .frame(height: currentSheetHeight, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
                 .gesture(sheetDragGesture)
             }
 
-            if store.hasSelectionEnded {
-                completionCTA
-            }
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
-        .animation(.easeOut(duration: 0.22), value: store.hasSelectionEnded)
+        .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
         .task {
             await store.send(.onAppear).finish()
@@ -97,22 +144,70 @@ struct PlaceSelectionView: View {
                 )
             )
         }
+        .allowsHitTesting(store.completionAlert == nil)
+        .overlay {
+            if let alert = store.completionAlert {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: alert.title,
+                        message: store.completionAlertMessage,
+                        confirmTitle: "확인",
+                        onConfirm: {
+                            store.send(.completionAlertConfirmButtonTapped)
+                        }
+                    )
+                }
+            }
+        }
     }
 
     private var navigationBar: some View {
-        HStack(spacing: DDSpacing.large) {
+        Group {
+            if store.isShowingConfirmedPlaces {
+                confirmedNavigationBar
+            } else {
+                placeSelectionNavigationBar
+            }
+        }
+    }
+
+    private var confirmedNavigationBar: some View {
+        ZStack {
+            Text(store.navigationTitle)
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+
+            HStack {
+                Button {
+                    store.send(.backButtonTapped)
+                } label: {
+                    PlaceSelectionBackIcon()
+                        .frame(width: 24, height: 40)
+                }
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .frame(height: 62)
+    }
+
+    private var placeSelectionNavigationBar: some View {
+        HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(DDColor.iconDefault)
-                    .frame(width: 24, height: 24)
+                PlaceSelectionBackIcon()
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("3박 4일 도쿄여행")
+                Text(store.navigationTitle)
                     .ddTypography(.heading18)
                     .foregroundStyle(DDColor.textPrimary)
 
@@ -123,26 +218,26 @@ struct PlaceSelectionView: View {
                 } else {
                     HStack(spacing: DDSpacing.small) {
                         Image(systemName: "timer")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 15, weight: .regular))
+                            .frame(width: 17, height: 19)
 
                         Text(store.timerText)
                             .ddTypography(.captionEmphasis12)
                     }
-                    .foregroundStyle(DDColor.textPrimary)
+                    .foregroundStyle(DDColor.textSecondary)
+                    .frame(height: 19, alignment: .bottom)
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42, alignment: .leading)
+            .clipped()
 
-            Spacer(minLength: 0)
-
-            Text(store.hasSelectionEnded ? "3/3" : (store.selectedPlace == nil ? "2/3" : "1/3"))
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.horizontal, DDSpacing.small)
-                .frame(height: 32)
-                .background(DDColor.surfaceDefault)
-                .clipShape(.capsule)
+            PlaceCountProgressView(
+                count: store.selectedPlaceCount,
+                maximumCount: store.maximumPlaceCount
+            )
         }
         .padding(.horizontal, DDSpacing.large)
+        .frame(maxWidth: .infinity)
         .frame(height: 62)
     }
 
@@ -150,12 +245,20 @@ struct PlaceSelectionView: View {
         Group {
             if store.selectedPlace != nil {
                 HStack(spacing: DDSpacing.small) {
-                    Text(store.searchText)
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textPrimary)
-                        .lineLimit(1)
+                    Button {
+                        store.send(.searchFieldTapped)
+                    } label: {
+                        HStack(spacing: 0) {
+                            Text(store.searchText)
+                                .ddTypography(.body16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .lineLimit(1)
 
-                    Spacer(minLength: 0)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
 
                     Button {
                         store.send(.clearSelectedPlaceButtonTapped)
@@ -176,9 +279,7 @@ struct PlaceSelectionView: View {
                 }
             } else {
                 DDSearchField(
-                    placeholder: store.displayedPlaces.isEmpty
-                        ? "꼭 가고 싶은 장소 8개를 추가하세요"
-                        : "꼭 가고 싶은 장소 3개를 추가하세요.",
+                    placeholder: "꼭 가고 싶은 장소 \(store.maximumPlaceCount)개를 추가하세요.",
                     text: Binding(
                         get: { store.searchText },
                         set: { store.send(.searchTextChanged($0)) }
@@ -192,26 +293,17 @@ struct PlaceSelectionView: View {
             }
         }
         .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.zero)
+        .padding(.top, DDSpacing.medium)
     }
 
     private var currentSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 156
-        return min(322, max(156, restingHeight - sheetDragTranslation))
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 110
+        return min(322, max(110, restingHeight - sheetDragTranslation))
     }
 
     private var currentMemberSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 395 : 156
-        return min(395, max(156, restingHeight - sheetDragTranslation))
-    }
-
-    private var completionCTA: some View {
-        DDCTAButton(title: "이동 기준 정하기") {
-            store.send(.moveCriteriaButtonTapped)
-        }
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.bottom, 20)
-        .background(DDColor.surfaceDefault)
+        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 413 : 110
+        return min(413, max(110, restingHeight - sheetDragTranslation))
     }
 
     private var sheetDragGesture: some Gesture {
@@ -222,6 +314,53 @@ struct PlaceSelectionView: View {
             .onEnded { value in
                 store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
             }
+    }
+}
+
+private struct PlaceCountProgressView: View {
+    let count: Int
+    let maximumCount: Int
+
+    private var progress: Double {
+        guard maximumCount > 0 else { return 0 }
+        return min(1, Double(count) / Double(maximumCount))
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(DDColor.surfaceControl, lineWidth: 3)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    DDColor.actionPrimary,
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            Text("\(count)/\(maximumCount)")
+                .font(.custom("Pretendard-SemiBold", size: 11))
+                .foregroundStyle(DDColor.textPrimary)
+        }
+        .frame(width: 36, height: 36)
+        .frame(width: 44, height: 44)
+        .animation(.easeOut(duration: 0.2), value: count)
+    }
+}
+
+private struct PlaceSelectionBackIcon: View {
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: 17, y: 3))
+            path.addLine(to: CGPoint(x: 7, y: 12))
+            path.addLine(to: CGPoint(x: 17, y: 21))
+        }
+        .stroke(
+            DDColor.textPrimary,
+            style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
+        )
+        .frame(width: 24, height: 24)
     }
 }
 

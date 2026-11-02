@@ -227,6 +227,11 @@ struct WaitingForParticipantsFeature: Reducer {
                 state.isPlaceSelectionPresented = false
                 return .none
 
+            case .placeSelection(.delegate(.proceedToAnalysis)):
+                // The analysis destination is implemented by the grouping flow owner.
+                // Keep this explicit hand-off point so it can be connected when that screen lands.
+                return .none
+
             case .placeSelection:
                 return .none
 

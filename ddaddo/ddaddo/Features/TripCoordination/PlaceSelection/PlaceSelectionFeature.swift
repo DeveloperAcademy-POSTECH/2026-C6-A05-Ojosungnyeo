@@ -10,12 +10,48 @@ import CoreGraphics
 import Foundation
 
 struct PlaceSelectionFeature: Reducer {
+    enum Delegate: Equatable {
+        case proceedToAnalysis
+    }
+
+    enum CompletionAlert: Equatable {
+        case allMembersConfirmed
+        case selectionTimeExpired
+
+        var title: String {
+            switch self {
+            case .allMembersConfirmed:
+                "모두 장소 선택을 마쳤어요"
+            case .selectionTimeExpired:
+                "72시간이 지났어요"
+            }
+        }
+
+    }
+
     struct Participant: Equatable, Identifiable, Sendable {
         let id: Int
         let member: TripMember
         let name: String
         let hasJoined: Bool
         let isCurrentUser: Bool
+        var isConfirmed: Bool
+
+        init(
+            id: Int,
+            member: TripMember,
+            name: String,
+            hasJoined: Bool,
+            isCurrentUser: Bool,
+            isConfirmed: Bool = false
+        ) {
+            self.id = id
+            self.member = member
+            self.name = name
+            self.hasJoined = hasJoined
+            self.isCurrentUser = isCurrentUser
+            self.isConfirmed = isConfirmed
+        }
     }
 
     @ObservableState
@@ -37,6 +73,8 @@ struct PlaceSelectionFeature: Reducer {
         var remainingSeconds: Int
         var isTimerRunning = false
         var hasSelectionEnded = false
+        var isEditingConfirmedPlaces = false
+        var completionAlert: CompletionAlert?
         var placeSearch = PlaceSearchFeature.State()
 
         init(
@@ -96,7 +134,48 @@ struct PlaceSelectionFeature: Reducer {
         }
 
         var canConfirmPlaceSelection: Bool {
-            !memberPlaces[currentMember, default: []].isEmpty && !hasSelectionEnded
+            !memberPlaces[currentMember, default: []].isEmpty
+                && !isCurrentUserConfirmed
+                && !hasSelectionEnded
+        }
+
+        var isCurrentUserConfirmed: Bool {
+            participants.first(where: \.isCurrentUser)?.isConfirmed == true
+        }
+
+        var haveAllJoinedParticipantsConfirmed: Bool {
+            let joinedParticipants = participants.filter(\.hasJoined)
+            return !joinedParticipants.isEmpty
+                && joinedParticipants.allSatisfy(\.isConfirmed)
+        }
+
+        var completionAlertMessage: String {
+            switch completionAlert {
+            case .allMembersConfirmed:
+                let joinedCount = participants.filter(\.hasJoined).count
+                return "\(joinedCount)명 모두 장소핀을 확정했어요.\n이제 함께 갈 장소를 묶어볼까요?\n다음 그룹핑 단계로 넘어가세요."
+            case .selectionTimeExpired:
+                return "장소 선택 시간이 종료됐어요.\n지금까지 확정된 장소핀으로\n다음 그룹핑 단계를 시작해 볼까요?"
+            case nil:
+                return ""
+            }
+        }
+
+        var isShowingConfirmedPlaces: Bool {
+            isCurrentUserConfirmed || hasSelectionEnded
+        }
+
+        var confirmedPlaces: [PinnedPlace] {
+            var placeIDs = Set<String>()
+
+            return participants
+                .filter { $0.hasJoined && $0.isConfirmed }
+                .flatMap { memberPlaces[$0.member, default: []] }
+                .filter { placeIDs.insert($0.id).inserted }
+        }
+
+        var mapPlaces: [PinnedPlace] {
+            isShowingConfirmedPlaces ? confirmedPlaces : displayedPlaces
         }
 
         var isSelectedPlaceAlreadyAdded: Bool {
@@ -261,12 +340,16 @@ struct PlaceSelectionFeature: Reducer {
         case deletePinnedPlaceButtonTapped(String)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
+        case confirmedPlacesEditButtonTapped
+        case deleteConfirmedPlaceButtonTapped(String)
+        case completionAlertConfirmButtonTapped
         case timerTicked
         case moveCriteriaButtonTapped
         case placeDetailsResponse(PlaceDetails)
         case placeDetailsFailed
         case searchDismissed
         case placeSearch(PlaceSearchFeature.Action)
+        case delegate(Delegate)
     }
 
     @Dependency(\.placeClient) var placeClient
@@ -276,6 +359,15 @@ struct PlaceSelectionFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .onAppear:
+                if state.remainingSeconds <= 0 {
+                    state.isTimerRunning = false
+                    state.hasSelectionEnded = true
+                    state.isBottomSheetExpanded = true
+                    state.isSearchPresented = false
+                    state.completionAlert = .selectionTimeExpired
+                    return .none
+                }
+
                 guard !state.isTimerRunning, !state.hasSelectionEnded else {
                     return .none
                 }
@@ -422,7 +514,43 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .confirmButtonTapped:
+                guard state.canConfirmPlaceSelection else { return .none }
+                guard let index = state.participants.firstIndex(where: \.isCurrentUser) else {
+                    return .none
+                }
+
+                state.participants[index].isConfirmed = true
+                state.selectedPlace = nil
+                state.selectedPinnedPlace = nil
+                state.searchText = ""
+                state.isMemberPlacesSheetPresented = false
+                state.isBottomSheetExpanded = true
+                state.isEditingConfirmedPlaces = false
+
+                if state.haveAllJoinedParticipantsConfirmed {
+                    state.isTimerRunning = false
+                    state.hasSelectionEnded = true
+                    state.completionAlert = .allMembersConfirmed
+                    return .cancel(id: "place-selection-timer")
+                }
                 return .none
+
+            case .confirmedPlacesEditButtonTapped:
+                guard state.isShowingConfirmedPlaces else { return .none }
+                state.isEditingConfirmedPlaces.toggle()
+                return .none
+
+            case let .deleteConfirmedPlaceButtonTapped(placeID):
+                guard state.isEditingConfirmedPlaces else { return .none }
+                for member in state.memberPlaces.keys {
+                    state.memberPlaces[member, default: []].removeAll { $0.id == placeID }
+                }
+                return .none
+
+            case .completionAlertConfirmButtonTapped:
+                guard state.completionAlert != nil else { return .none }
+                state.completionAlert = nil
+                return .send(.delegate(.proceedToAnalysis))
 
             case .timerTicked:
                 guard state.remainingSeconds > 0 else { return .none }
@@ -431,6 +559,8 @@ struct PlaceSelectionFeature: Reducer {
                     state.isTimerRunning = false
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
+                    state.isSearchPresented = false
+                    state.completionAlert = .selectionTimeExpired
                     return .cancel(id: "place-selection-timer")
                 }
                 return .none
@@ -479,6 +609,9 @@ struct PlaceSelectionFeature: Reducer {
                 }
 
             case .placeSearch:
+                return .none
+
+            case .delegate:
                 return .none
             }
         }

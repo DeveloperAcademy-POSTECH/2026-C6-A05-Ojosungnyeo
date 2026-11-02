@@ -23,9 +23,13 @@ struct GoogleMapView: UIViewRepresentable {
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var parent: GoogleMapView
         var markerSignature = ""
+        var ufoMarkers: [(marker: GMSMarker, number: Int?)] = []
+        var markerScale: CGFloat = -1
+        var currentZoom: Float
 
         init(parent: GoogleMapView) {
             self.parent = parent
+            currentZoom = parent.zoom
         }
 
         func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
@@ -36,6 +40,31 @@ struct GoogleMapView: UIViewRepresentable {
 
             onPinnedPlaceTapped(place)
             return true
+        }
+
+        func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
+            updateMarkerScale(for: position.zoom)
+        }
+
+        func updateMarkerScale(for zoom: Float) {
+            currentZoom = zoom
+            let zoomDifference = CGFloat(zoom - 13)
+            let scale = min(max(pow(1.22, zoomDifference), 0.48), 1.35)
+            guard abs(scale - markerScale) >= 0.05 else { return }
+            markerScale = scale
+
+            for item in ufoMarkers {
+                if let number = item.number {
+                    item.marker.icon = nil
+                    item.marker.iconView = GoogleMapView.numberedMarkerView(
+                        number: number,
+                        scale: scale
+                    )
+                } else {
+                    item.marker.iconView = nil
+                    item.marker.icon = GoogleMapView.markerImage(scale: scale)
+                }
+            }
         }
     }
 
@@ -99,6 +128,8 @@ struct GoogleMapView: UIViewRepresentable {
         guard coordinator.markerSignature != signature else { return }
         coordinator.markerSignature = signature
         mapView.clear()
+        coordinator.ufoMarkers.removeAll()
+        coordinator.markerScale = -1
 
         if let selectedPlace {
             let coordinate = CLLocationCoordinate2D(
@@ -106,22 +137,34 @@ struct GoogleMapView: UIViewRepresentable {
                 longitude: selectedPlace.longitude
             )
             if showsSelectedPlaceMarker {
-                addMarker(at: coordinate, to: mapView)
+                addMarker(
+                    at: coordinate,
+                    to: mapView,
+                    coordinator: coordinator
+                )
             } else {
-                addPinnedPlaceMarkers(to: mapView)
+                addPinnedPlaceMarkers(
+                    to: mapView,
+                    coordinator: coordinator
+                )
             }
             mapView.animate(to: GMSCameraPosition(target: coordinate, zoom: 15))
             return
         }
 
         if let selectedCoordinate {
-            addMarker(at: selectedCoordinate, to: mapView)
+            addMarker(
+                at: selectedCoordinate,
+                to: mapView,
+                coordinator: coordinator
+            )
+            coordinator.updateMarkerScale(for: coordinator.currentZoom)
             mapView.animate(to: GMSCameraPosition(target: selectedCoordinate, zoom: zoom))
             return
         }
 
         if !placeGroups.isEmpty {
-            addPlaceGroups(to: mapView)
+            addPlaceGroups(to: mapView, coordinator: coordinator)
             return
         }
 
@@ -136,14 +179,19 @@ struct GoogleMapView: UIViewRepresentable {
                 at: coordinate,
                 place: place,
                 number: showsPinnedPlaceNumbers ? index + 1 : nil,
-                to: mapView
+                to: mapView,
+                coordinator: coordinator
             )
             bounds = bounds.includingCoordinate(coordinate)
         }
         mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 72))
+        coordinator.updateMarkerScale(for: coordinator.currentZoom)
     }
 
-    private func addPlaceGroups(to mapView: GMSMapView) {
+    private func addPlaceGroups(
+        to mapView: GMSMapView,
+        coordinator: Coordinator
+    ) {
         var bounds = GMSCoordinateBounds()
 
         for group in placeGroups {
@@ -162,7 +210,12 @@ struct GoogleMapView: UIViewRepresentable {
                     latitude: place.latitude,
                     longitude: place.longitude
                 )
-                addMarker(at: coordinate, place: place, to: mapView)
+                addMarker(
+                    at: coordinate,
+                    place: place,
+                    to: mapView,
+                    coordinator: coordinator
+                )
                 bounds = bounds.includingCoordinate(coordinate)
             }
 
@@ -188,6 +241,7 @@ struct GoogleMapView: UIViewRepresentable {
                 with: UIEdgeInsets(top: 150, left: 24, bottom: 330, right: 24)
             )
         )
+        coordinator.updateMarkerScale(for: coordinator.currentZoom)
     }
 
     private func addGroupLabel(
@@ -213,7 +267,10 @@ struct GoogleMapView: UIViewRepresentable {
         marker.map = mapView
     }
 
-    private func addPinnedPlaceMarkers(to mapView: GMSMapView) {
+    private func addPinnedPlaceMarkers(
+        to mapView: GMSMapView,
+        coordinator: Coordinator
+    ) {
         for (index, place) in pinnedPlaces.enumerated() {
             let coordinate = CLLocationCoordinate2D(
                 latitude: place.latitude,
@@ -223,7 +280,8 @@ struct GoogleMapView: UIViewRepresentable {
                 at: coordinate,
                 place: place,
                 number: showsPinnedPlaceNumbers ? index + 1 : nil,
-                to: mapView
+                to: mapView,
+                coordinator: coordinator
             )
         }
     }
@@ -232,35 +290,65 @@ struct GoogleMapView: UIViewRepresentable {
         at coordinate: CLLocationCoordinate2D,
         place: PinnedPlace? = nil,
         number: Int? = nil,
-        to mapView: GMSMapView
+        to mapView: GMSMapView,
+        coordinator: Coordinator
     ) {
         let marker = GMSMarker(position: coordinate)
-        if let number {
-            marker.iconView = numberedMarkerView(number: number)
-        } else {
-            marker.icon = UIImage(named: "UFO")
-        }
         marker.groundAnchor = CGPoint(x: 0.5, y: 1)
         marker.userData = place
         marker.map = mapView
+        coordinator.ufoMarkers.append((marker, number))
+        coordinator.updateMarkerScale(for: coordinator.currentZoom)
     }
 
-    private func numberedMarkerView(number: Int) -> UIView {
-        let container = UIView(frame: CGRect(x: 0, y: 0, width: 48, height: 87))
+    fileprivate static func markerImage(scale: CGFloat) -> UIImage? {
+        guard let source = UIImage(named: "UFO") else { return nil }
+        let size = CGSize(width: 42 * scale, height: 63 * scale)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            source.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
 
-        let imageView = UIImageView(frame: CGRect(x: 0, y: 0, width: 48, height: 72))
+    fileprivate static func numberedMarkerView(
+        number: Int,
+        scale: CGFloat
+    ) -> UIView {
+        let width = 42 * scale
+        let ufoHeight = 63 * scale
+        let numberSize = 15 * scale
+        let container = UIView(
+            frame: CGRect(
+                x: 0,
+                y: 0,
+                width: width,
+                height: ufoHeight + numberSize
+            )
+        )
+
+        let imageView = UIImageView(
+            frame: CGRect(x: 0, y: 0, width: width, height: ufoHeight)
+        )
         imageView.image = UIImage(named: "UFO")
         imageView.contentMode = .scaleAspectFit
         container.addSubview(imageView)
 
-        let numberLabel = UILabel(frame: CGRect(x: 16.5, y: 72, width: 15, height: 15))
+        let numberLabel = UILabel(
+            frame: CGRect(
+                x: (width - numberSize) / 2,
+                y: ufoHeight,
+                width: numberSize,
+                height: numberSize
+            )
+        )
         numberLabel.backgroundColor = UIColor(red: 242 / 255, green: 255 / 255, blue: 96 / 255, alpha: 1)
         numberLabel.textColor = .black
-        numberLabel.font = UIFont(name: "Pretendard-Medium", size: 10)
-            ?? .systemFont(ofSize: 10, weight: .medium)
+        numberLabel.font = UIFont(
+            name: "Pretendard-Medium",
+            size: 10 * scale
+        ) ?? .systemFont(ofSize: 10 * scale, weight: .medium)
         numberLabel.textAlignment = .center
         numberLabel.text = "\(number)"
-        numberLabel.layer.cornerRadius = 7.5
+        numberLabel.layer.cornerRadius = numberSize / 2
         numberLabel.layer.masksToBounds = true
         container.addSubview(numberLabel)
 

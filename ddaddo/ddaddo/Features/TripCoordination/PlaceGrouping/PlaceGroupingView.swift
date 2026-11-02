@@ -29,6 +29,21 @@ struct PlaceGroupingView: View {
 
             bottomSheet
 
+            if store.isDetailPresented {
+                PlaceGroupingDetailView(
+                    store: store.scope(
+                        state: \.detail,
+                        action: \.detail
+                    ),
+                    onBack: {
+                        store.send(.detail(.backButtonTapped))
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.move(edge: .trailing))
+                .zIndex(2)
+            }
+
             if store.isWaitingForConfirmationPresented {
                 WaitingForConfirmationView(
                     store: store.scope(
@@ -38,10 +53,40 @@ struct PlaceGroupingView: View {
                 )
                 .transition(.move(edge: .trailing))
             }
+
+            if store.isCriteriaChangeConfirmationPresented {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(3)
+
+                DDConfirmationAlert(
+                    title: "알림",
+                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    onCancel: {
+                        store.send(.criteriaChangeCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.criteriaChangeConfirmTapped)
+                    }
+                )
+                .frame(maxHeight: .infinity)
+                .zIndex(4)
+            }
         }
         .animation(
             .easeInOut(duration: 0.3),
             value: store.isWaitingForConfirmationPresented
+        )
+        .animation(
+            .easeInOut(duration: 0.3),
+            value: store.isDetailPresented
+        )
+        .animation(
+            .easeInOut(duration: 0.2),
+            value: store.isCriteriaChangeConfirmationPresented
         )
         .preferredColorScheme(.dark)
     }
@@ -198,21 +243,32 @@ struct PlaceGroupingView: View {
 
                         Spacer(minLength: 0)
 
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 24, weight: .regular))
-                            .foregroundStyle(DDColor.textPrimary)
-                            .frame(width: 24, height: 24)
+                        if store.confirmedGroupID == group.id {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(DDColor.textOnPrimary)
+                                .frame(width: 24, height: 24)
+                                .background(DDColor.actionPrimary)
+                                .clipShape(.circle)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 24, weight: .regular))
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(width: 24, height: 24)
+                        }
                     }
                     .padding(.horizontal, 29)
-                    .frame(height: 93)
+                    .frame(maxWidth: .infinity, minHeight: 93, maxHeight: 93)
                     .background(DDColor.surfaceElevated)
                     .clipShape(.rect(cornerRadius: 20))
                     .overlay {
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(DDColor.borderDefault, lineWidth: 1)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
 
             Spacer(minLength: 0)

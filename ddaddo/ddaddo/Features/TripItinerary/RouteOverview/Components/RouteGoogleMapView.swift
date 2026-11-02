@@ -11,8 +11,28 @@ import SwiftUI
 struct RouteGoogleMapView: UIViewRepresentable {
     let stops: [RouteStop]
 
-    final class Coordinator {
+    final class Coordinator: NSObject, GMSMapViewDelegate {
         var signature = ""
+        var numberedMarkers: [(marker: GMSMarker, number: Int)] = []
+        var markerScale: CGFloat = -1
+
+        func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
+            updateMarkerScale(for: position.zoom)
+        }
+
+        func updateMarkerScale(for zoom: Float) {
+            let zoomDifference = CGFloat(zoom - 13)
+            let scale = min(max(pow(1.22, zoomDifference), 0.48), 1.35)
+            guard abs(scale - markerScale) >= 0.05 else { return }
+            markerScale = scale
+
+            for numberedMarker in numberedMarkers {
+                numberedMarker.marker.icon = RouteGoogleMapView.markerImage(
+                    number: numberedMarker.number,
+                    scale: scale
+                )
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -32,6 +52,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
         )
 
         let mapView = GMSMapView(options: options)
+        mapView.delegate = context.coordinator
         mapView.settings.compassButton = false
         mapView.settings.myLocationButton = false
         mapView.isBuildingsEnabled = false
@@ -61,13 +82,15 @@ struct RouteGoogleMapView: UIViewRepresentable {
         guard signature != coordinator.signature else { return }
         coordinator.signature = signature
         mapView.clear()
+        coordinator.numberedMarkers.removeAll()
+        coordinator.markerScale = -1
 
         guard !stops.isEmpty else { return }
 
         let path = GMSMutablePath()
         var bounds = GMSCoordinateBounds()
 
-        for stop in stops {
+        for (index, stop) in stops.enumerated() {
             let coordinate = CLLocationCoordinate2D(
                 latitude: stop.latitude,
                 longitude: stop.longitude
@@ -76,13 +99,15 @@ struct RouteGoogleMapView: UIViewRepresentable {
             bounds = bounds.includingCoordinate(coordinate)
 
             let marker = GMSMarker(position: coordinate)
-            marker.icon = Self.markerImage
             marker.groundAnchor = CGPoint(x: 0.5, y: 0.82)
             marker.map = mapView
+            coordinator.numberedMarkers.append((marker, index + 1))
         }
 
+        coordinator.updateMarkerScale(for: mapView.camera.zoom)
+
         let polyline = GMSPolyline(path: path)
-        polyline.strokeColor = UIColor(red: 0.40, green: 0.95, blue: 0.89, alpha: 1)
+        polyline.strokeColor = UIColor(red: 242 / 255, green: 1, blue: 96 / 255, alpha: 1)
         polyline.strokeWidth = 5
         polyline.map = mapView
 
@@ -90,13 +115,46 @@ struct RouteGoogleMapView: UIViewRepresentable {
         mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 64))
     }
 
-    private static let markerImage: UIImage? = {
+    fileprivate static func markerImage(number: Int, scale: CGFloat) -> UIImage? {
         guard let source = UIImage(named: "DDRouteUFO") else { return nil }
-        let size = CGSize(width: 60, height: 82)
+        let size = CGSize(width: 60 * scale, height: 96 * scale)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            source.draw(in: CGRect(origin: .zero, size: size))
+            source.draw(
+                in: CGRect(
+                    x: 0,
+                    y: 0,
+                    width: 60 * scale,
+                    height: 82 * scale
+                )
+            )
+
+            let circleRect = CGRect(
+                x: 22.5 * scale,
+                y: 79 * scale,
+                width: 15 * scale,
+                height: 15 * scale
+            )
+            UIColor(red: 242 / 255, green: 1, blue: 96 / 255, alpha: 1).setFill()
+            UIBezierPath(ovalIn: circleRect).fill()
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 10 * scale, weight: .medium),
+                .foregroundColor: UIColor.black,
+                .paragraphStyle: paragraph
+            ]
+            String(number).draw(
+                in: CGRect(
+                    x: 22.5 * scale,
+                    y: 80.5 * scale,
+                    width: 15 * scale,
+                    height: 12 * scale
+                ),
+                withAttributes: attributes
+            )
         }
-    }()
+    }
 
     private static let darkMapStyle = """
     [

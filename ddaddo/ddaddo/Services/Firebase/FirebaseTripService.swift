@@ -307,7 +307,7 @@ enum FirebaseTripService {
         let thirdParticipantReference = tripReference.collection("participants").document("slot_3")
         let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
         let expiresAt = Date().addingTimeInterval(inviteDuration)
-        let inviteURL = makeInviteURL(code: "123456")
+        let inviteURL = makeInviteURL(code: "123456", expiresAt: expiresAt)
         let startDate = Calendar.current.startOfDay(for: Date())
         let endDate = Calendar.current.date(byAdding: .day, value: 3, to: startDate)!
 

@@ -68,6 +68,16 @@ struct HomeView: View {
                 .transition(.move(edge: .trailing))
             }
 
+            if store.isPlaceSelectionPresented {
+                PlaceSelectionView(
+                    store: store.scope(
+                        state: \.placeSelection,
+                        action: \.placeSelection
+                    )
+                )
+                .transition(.move(edge: .trailing))
+            }
+
             if store.isTripSearchPresented {
                 TripSearchView(
                     store: store.scope(
@@ -85,6 +95,7 @@ struct HomeView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
+        .animation(.easeInOut(duration: 0.3), value: store.isPlaceSelectionPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripSearchPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isSettingsPresented)
         .task {

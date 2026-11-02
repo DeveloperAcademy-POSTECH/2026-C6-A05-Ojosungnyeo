@@ -108,13 +108,18 @@ enum FirebaseTripService {
                             )
                         }
 
+                        var userData: [String: Any] = [
+                            "joinedTripIDs": FieldValue.arrayUnion([tripReference.documentID]),
+                            "updatedAt": FieldValue.serverTimestamp()
+                        ]
                         if storedAvatar != ownerAvatar {
-                            transaction.setData(
-                                ["avatarName": ownerAvatar.rawValue],
-                                forDocument: database.collection("users").document(userID),
-                                merge: true
-                            )
+                            userData["avatarName"] = ownerAvatar.rawValue
                         }
+                        transaction.setData(
+                            userData,
+                            forDocument: database.collection("users").document(userID),
+                            merge: true
+                        )
                         return tripReference.documentID
                     } catch {
                         errorPointer?.pointee = error as NSError
@@ -232,6 +237,13 @@ enum FirebaseTripService {
             .getDocuments()
 
         if participants.documents.contains(where: { $0.get("uid") as? String == userID }) {
+            try await database.collection("users").document(userID).setData(
+                [
+                    "joinedTripIDs": FieldValue.arrayUnion([tripID]),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
             return try await fetchInvitation(tripID: tripID)
         }
         guard let waitingParticipant = participants.documents.first(where: {
@@ -280,7 +292,11 @@ enum FirebaseTripService {
                     forDocument: participantReference
                 )
                 transaction.setData(
-                    ["avatarName": avatar.rawValue],
+                    [
+                        "avatarName": avatar.rawValue,
+                        "joinedTripIDs": FieldValue.arrayUnion([tripID]),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
                     forDocument: database.collection("users").document(userID),
                     merge: true
                 )
@@ -292,6 +308,107 @@ enum FirebaseTripService {
         }
 
         return try await fetchInvitation(tripID: tripID)
+    }
+
+    static func fetchUpcomingTrips() async throws -> [UpcomingTripSnapshot] {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard let userID = Auth.auth().currentUser?.uid else {
+            throw TripServiceError.unauthenticated
+        }
+
+        let database = Firestore.firestore()
+        let userReference = database.collection("users").document(userID)
+        let userDocument = try await userReference.getDocument()
+        var tripIDs = userDocument.get("joinedTripIDs") as? [String] ?? []
+
+        #if DEBUG
+        // 고정 초대 코드 123456을 joinedTripIDs 도입 전에 사용한 계정도 복구한다.
+        let developmentTripID = "development-trip-123456"
+        if !tripIDs.contains(developmentTripID) {
+            let developmentTrip = database.collection("trips").document(developmentTripID)
+            let membership = try await developmentTrip
+                .collection("participants")
+                .whereField("uid", isEqualTo: userID)
+                .limit(to: 1)
+                .getDocuments()
+            if !membership.documents.isEmpty {
+                tripIDs.append(developmentTripID)
+                try await userReference.setData(
+                    [
+                        "joinedTripIDs": FieldValue.arrayUnion([developmentTripID]),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
+                    merge: true
+                )
+            }
+        }
+        #endif
+
+        // joinedTripIDs 도입 전에 참여한 기존 방은 한 번 찾아 사용자 문서를 보정한다.
+        if tripIDs.isEmpty {
+            var discoveredTripIDs: [String] = []
+            if let tripDocuments = try? await database.collection("trips").getDocuments() {
+                for tripDocument in tripDocuments.documents {
+                    let membership = try await tripDocument.reference
+                        .collection("participants")
+                        .whereField("uid", isEqualTo: userID)
+                        .limit(to: 1)
+                        .getDocuments()
+                    if !membership.documents.isEmpty {
+                        discoveredTripIDs.append(tripDocument.documentID)
+                    }
+                }
+            }
+
+            if !discoveredTripIDs.isEmpty {
+                try await userReference.setData(
+                    [
+                        "joinedTripIDs": FieldValue.arrayUnion(discoveredTripIDs),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
+                    merge: true
+                )
+                tripIDs = discoveredTripIDs
+            }
+        }
+
+        #if DEBUG
+        // 데모에서는 123456 도쿄 방만 예정된 여행으로 유지한다.
+        tripIDs = tripIDs.filter { $0 == "development-trip-123456" }
+        try await userReference.setData(
+            [
+                "joinedTripIDs": tripIDs,
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+        #endif
+
+        var trips: [UpcomingTripSnapshot] = []
+        for tripID in Set(tripIDs) {
+            let tripReference = database.collection("trips").document(tripID)
+            let tripDocument = try await tripReference.getDocument()
+            guard
+                tripDocument.exists,
+                let startDate = (tripDocument.get("startAt") as? Timestamp)?.dateValue(),
+                let endDate = (tripDocument.get("endAt") as? Timestamp)?.dateValue()
+            else { continue }
+
+            let destination = (tripDocument.get("destinations") as? [[String: Any]])?.first
+            trips.append(
+                UpcomingTripSnapshot(
+                    tripID: tripReference.documentID,
+                    destinationName: destination?["name"] as? String ?? "여행",
+                    countryName: destination?["country"] as? String ?? "",
+                    startDate: startDate,
+                    endDate: endDate
+                )
+            )
+        }
+
+        return trips.sorted { $0.startDate < $1.startDate }
     }
 
     private static func seedDevelopmentTripIfNeeded(ownerID: String) async throws {

@@ -113,6 +113,7 @@ struct WaitingForParticipantsFeature: Reducer {
 
         mutating func synchronizePlaceSelection() {
             placeSelection.updateTripContext(
+                tripID: invitation.tripID,
                 tripTitle: invitation.title,
                 destinationName: invitation.destinationName,
                 tripStartDate: invitation.startDate,

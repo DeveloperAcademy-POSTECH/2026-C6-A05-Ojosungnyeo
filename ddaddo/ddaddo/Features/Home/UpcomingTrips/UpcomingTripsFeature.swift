@@ -21,6 +21,7 @@ struct UpcomingTripsFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var trips: [Trip] = []
+        var isLoadingTrips = false
         var isAddTripMenuPresented = false
         var isInviteCodeModalPresented = false
         var inviteCode = ""
@@ -36,6 +37,8 @@ struct UpcomingTripsFeature: Reducer {
 
     @CasePathable
     enum Action {
+        case onAppear
+        case upcomingTripsResponse(Result<[UpcomingTripSnapshot], Error>)
         case backButtonTapped
         case addTripButtonTapped
         case addTripMenuDismissed
@@ -58,6 +61,24 @@ struct UpcomingTripsFeature: Reducer {
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                guard !state.isLoadingTrips else { return .none }
+                state.isLoadingTrips = true
+                return fetchUpcomingTripsEffect()
+
+            case let .upcomingTripsResponse(.success(snapshots)):
+                state.isLoadingTrips = false
+                var trips: [Trip] = []
+                for snapshot in snapshots {
+                    trips.append(Self.makeTrip(from: snapshot))
+                }
+                state.trips = trips
+                return .none
+
+            case .upcomingTripsResponse(.failure):
+                state.isLoadingTrips = false
+                return .none
+
             case .backButtonTapped:
                 state.isAddTripMenuPresented = false
                 return .none
@@ -109,7 +130,7 @@ struct UpcomingTripsFeature: Reducer {
                 state.inviteCode = ""
                 state.waitingForParticipants = WaitingForParticipantsFeature.State(snapshot: snapshot)
                 state.isWaitingForParticipantsPresented = true
-                return .none
+                return fetchUpcomingTripsEffect()
 
             case let .joinTripFailed(message):
                 state.isJoiningTrip = false
@@ -127,7 +148,10 @@ struct UpcomingTripsFeature: Reducer {
 
             case .waitingForParticipants(.delegate(.returnHome)):
                 state.isWaitingForParticipantsPresented = false
-                return .send(.delegate(.returnHome))
+                return .merge(
+                    fetchUpcomingTripsEffect(),
+                    .send(.delegate(.returnHome))
+                )
 
             case .waitingForParticipants:
                 return .none
@@ -142,5 +166,46 @@ struct UpcomingTripsFeature: Reducer {
         .ifLet(\.waitingForParticipants, action: \.waitingForParticipants) {
             WaitingForParticipantsFeature()
         }
+    }
+
+    private func fetchUpcomingTripsEffect() -> Effect<Action> {
+        .run { send in
+            await send(
+                .upcomingTripsResponse(
+                    Result { try await tripClient.fetchUpcomingTrips() }
+                )
+            )
+        }
+    }
+
+    private static func makeTrip(from snapshot: UpcomingTripSnapshot) -> Trip {
+        let destination = switch snapshot.destinationName {
+        case "도쿄": "TOKYO"
+        default: snapshot.destinationName.uppercased()
+        }
+        let country = switch snapshot.countryName {
+        case "일본": "Japan"
+        default: snapshot.countryName
+        }
+
+        return Trip(
+            id: snapshot.tripID,
+            destination: destination,
+            country: country,
+            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate)
+        )
+    }
+
+    private static func dateText(from startDate: Date, to endDate: Date) -> String {
+        let calendar = Calendar(identifier: .gregorian)
+        let startMonth = calendar.component(.month, from: startDate)
+        let startDay = calendar.component(.day, from: startDate)
+        let endMonth = calendar.component(.month, from: endDate)
+        let endDay = calendar.component(.day, from: endDate)
+
+        if startMonth == endMonth {
+            return "\(startMonth)월 \(startDay)일~\(endDay)일"
+        }
+        return "\(startMonth)월 \(startDay)일~\(endMonth)월 \(endDay)일"
     }
 }

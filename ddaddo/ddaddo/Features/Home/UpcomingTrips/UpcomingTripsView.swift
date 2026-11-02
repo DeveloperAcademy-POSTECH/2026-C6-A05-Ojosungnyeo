@@ -23,19 +23,25 @@ struct UpcomingTripsView: View {
                     .padding(.bottom, 8)
 
                 ScrollView {
-                    LazyVStack(spacing: 15) {
-                        ForEach(store.trips) { trip in
-                            UpcomingTripTicketCard(
-                                trip: trip,
-                                action: {
-                                    store.send(.viewScheduleButtonTapped(trip.id))
-                                }
-                            )
+                    if store.trips.isEmpty && !store.isLoadingTrips {
+                        emptyState
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 84)
+                    } else {
+                        LazyVStack(spacing: 15) {
+                            ForEach(store.trips) { trip in
+                                UpcomingTripTicketCard(
+                                    trip: trip,
+                                    action: {
+                                        store.send(.viewScheduleButtonTapped(trip.id))
+                                    }
+                                )
+                            }
                         }
+                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.top, 15)
+                        .padding(.bottom, DDSpacing.xLarge)
                     }
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.top, 15)
-                    .padding(.bottom, DDSpacing.xLarge)
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -63,6 +69,9 @@ struct UpcomingTripsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: store.isAddTripMenuPresented)
+        .task {
+            store.send(.onAppear)
+        }
         .overlay {
             if store.isInviteCodeModalPresented {
                 ZStack {
@@ -120,6 +129,20 @@ struct UpcomingTripsView: View {
         } message: {
             Text(store.joinErrorMessage ?? "")
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: DDSpacing.small) {
+            Text("아직 예정된 여행이 없어따.")
+                .ddTypography(.heading20)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text("+를 눌러 친구들과 여행 계획을 세워보세따!")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, DDSpacing.large)
     }
 
     private var header: some View {

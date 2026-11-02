@@ -10,6 +10,10 @@ import ComposableArchitecture
 struct PlaceClient: DependencyKey, Sendable {
     var autocomplete: @Sendable (String) async throws -> [PlaceSearchResult]
     var fetchDetails: @Sendable (PlaceSearchResult) async throws -> PlaceDetails
+    var fetchMemberPlaces: @Sendable (String) async throws -> [MemberPlacePins]
+    var savePlace: @Sendable (String, PinnedPlace) async throws -> Void
+    var deletePlace: @Sendable (String, String) async throws -> Void
+    var confirmPlaces: @Sendable (String) async throws -> Void
 
     static let liveValue: PlaceClient = {
         let service = GooglePlacesService()
@@ -19,6 +23,21 @@ struct PlaceClient: DependencyKey, Sendable {
             },
             fetchDetails: { result in
                 try await service.fetchDetails(for: result)
+            },
+            fetchMemberPlaces: { tripID in
+                try await FirebasePlaceSelectionService.fetchMemberPlaces(tripID: tripID)
+            },
+            savePlace: { tripID, place in
+                try await FirebasePlaceSelectionService.savePlace(place, tripID: tripID)
+            },
+            deletePlace: { tripID, placeID in
+                try await FirebasePlaceSelectionService.deletePlace(
+                    placeID: placeID,
+                    tripID: tripID
+                )
+            },
+            confirmPlaces: { tripID in
+                try await FirebasePlaceSelectionService.confirmPlaces(tripID: tripID)
             }
         )
     }()
@@ -37,7 +56,11 @@ struct PlaceClient: DependencyKey, Sendable {
                 longitude: 139.6500,
                 photoData: []
             )
-        }
+        },
+        fetchMemberPlaces: { _ in [] },
+        savePlace: { _, _ in },
+        deletePlace: { _, _ in },
+        confirmPlaces: { _ in }
     )
 }
 

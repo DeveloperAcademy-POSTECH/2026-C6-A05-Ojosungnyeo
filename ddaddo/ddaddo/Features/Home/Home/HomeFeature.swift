@@ -34,10 +34,12 @@ struct HomeFeature: Reducer {
         var userID = ""
         var nickname = ""
         var mascotMessage = MascotMessage.welcome
-        var upcomingTrips = UpcomingTripsPreviewData.state
+        var upcomingTrips = UpcomingTripsFeature.State()
         var isUpcomingTripsPresented = false
         var tripItinerary = TripItineraryFeature.State()
         var isTripItineraryPresented = false
+        var placeSelection = PlaceSelectionFeature.State()
+        var isPlaceSelectionPresented = false
         var tripSearch = TripSearchFeature.State()
         var isTripSearchPresented = false
         var isMenuPresented = false
@@ -55,6 +57,8 @@ struct HomeFeature: Reducer {
         case exploreTripsButtonTapped
         case homeSwipedUp
         case upcomingTrips(UpcomingTripsFeature.Action)
+        case tripInvitationResponse(Result<TripInvitationSnapshot, Error>)
+        case placeSelection(PlaceSelectionFeature.Action)
         case tripItinerary(TripItineraryFeature.Action)
         case tripSearch(TripSearchFeature.Action)
         case mascotTapped
@@ -72,6 +76,7 @@ struct HomeFeature: Reducer {
     @Dependency(\.appleSignInClient) var appleSignInClient
     @Dependency(\.authClient) var authClient
     @Dependency(\.nicknameClient) var nicknameClient
+    @Dependency(\.tripClient) var tripClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -98,11 +103,28 @@ struct HomeFeature: Reducer {
             case .upcomingTrips(.backButtonTapped):
                 state.isUpcomingTripsPresented = false
                 return .none
-            case .upcomingTrips(.viewScheduleButtonTapped):
-                state.tripItinerary = TripItineraryFeature.State()
-                state.tripItinerary.selectedTab = .dailyItinerary
-                state.isTripItineraryPresented = true
+            case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
+                state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
+                return .run { send in
+                    await send(
+                        .tripInvitationResponse(
+                            Result { try await tripClient.fetchInvitation(tripID) }
+                        )
+                    )
+                }
+            case let .tripInvitationResponse(.success(snapshot)):
+                let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
+                state.placeSelection = waitingState.placeSelection
+                state.isPlaceSelectionPresented = true
+                return .none
+            case .tripInvitationResponse(.failure):
+                return .none
+            case .placeSelection(.backButtonTapped):
+                state.isPlaceSelectionPresented = false
+                state.isUpcomingTripsPresented = true
+                return .none
+            case .placeSelection:
                 return .none
             case .upcomingTrips(.createTripButtonTapped):
                 state.tripSearch = TripSearchFeature.State()
@@ -125,7 +147,8 @@ struct HomeFeature: Reducer {
                 return .none
             case .tripSearch(.delegate(.returnHome)):
                 state.isTripSearchPresented = false
-                return .none
+                state.isUpcomingTripsPresented = true
+                return .send(.upcomingTrips(.onAppear))
             case .tripSearch:
                 return .none
             case .mascotTapped:
@@ -221,6 +244,10 @@ struct HomeFeature: Reducer {
 
         Scope(state: \.tripItinerary, action: \.tripItinerary) {
             TripItineraryFeature()
+        }
+
+        Scope(state: \.placeSelection, action: \.placeSelection) {
+            PlaceSelectionFeature()
         }
 
         Scope(state: \.tripSearch, action: \.tripSearch) {

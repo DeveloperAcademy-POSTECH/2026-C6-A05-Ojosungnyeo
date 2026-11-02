@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PlaceSearchView: View {
     let store: StoreOf<PlaceSearchFeature>
+    @Environment(\.dismiss) private var dismiss
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -30,7 +31,9 @@ struct PlaceSearchView: View {
     private var searchBar: some View {
         HStack(spacing: DDSpacing.small) {
             Button {
+                isSearchFocused = false
                 store.send(.closeButtonTapped)
+                dismiss()
             } label: {
                 Image(systemName: "chevron.backward")
                     .font(.system(size: 16, weight: .medium))

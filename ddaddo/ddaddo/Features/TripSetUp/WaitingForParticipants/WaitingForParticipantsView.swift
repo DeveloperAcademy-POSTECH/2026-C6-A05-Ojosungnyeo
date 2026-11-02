@@ -21,14 +21,14 @@ struct WaitingForParticipantsView: View {
                     .padding(.top, DDSpacing.small)
 
                 invitationCard
-                    .padding(.top, DDSpacing.xLarge)
+                    .padding(.top, DDSpacing.xxLarge + DDSpacing.large)
 
                 timer
                     .frame(maxWidth: .infinity)
-                    .padding(.top, DDSpacing.xLarge)
+                    .padding(.top, 108)
 
                 participantsCard
-                    .padding(.top, DDSpacing.large)
+                    .padding(.top, 98)
 
                 if !store.haveAllParticipantsJoined {
                     refreshButton
@@ -37,7 +37,6 @@ struct WaitingForParticipantsView: View {
                 }
             }
             .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.small)
             .padding(.bottom, DDSpacing.xLarge)
         }
         .scrollIndicators(.hidden)
@@ -108,7 +107,7 @@ struct WaitingForParticipantsView: View {
             .accessibilityLabel("뒤로 가기")
 
             HStack(spacing: DDSpacing.xSmall) {
-                Text("친구를 기다리고 이따")
+                Text("친구를 기다리고 있다")
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
 
@@ -160,49 +159,25 @@ struct WaitingForParticipantsView: View {
     }
 
     private var timer: some View {
-        VStack(spacing: DDSpacing.small) {
-            ZStack {
-                WaitingTimerProgressArc(progress: store.timerProgress)
-                    .stroke(Color(red: 0.7, green: 0.73, blue: 0.72), lineWidth: 16)
-                    .animation(.linear(duration: 1), value: store.timerProgress)
-
-                Circle()
-                    .fill(Color(red: 0.21, green: 0.24, blue: 0.23))
-                    .padding(DDSpacing.large)
-
-                Circle()
-                    .fill(Color(red: 0.8, green: 0.86, blue: 0.75))
-                    .frame(width: 70, height: 70)
-                    .overlay {
-                        Circle().stroke(DDColor.actionPrimary, lineWidth: 3)
-                    }
-
-                Ellipse()
-                    .fill(.white.opacity(0.75))
-                    .frame(width: 14, height: 23)
-                    .rotationEffect(.degrees(22))
-                    .offset(x: -15, y: -12)
-
-                timerLight.offset(x: -42, y: -42)
-                timerLight.offset(x: 42, y: -42)
-                timerLight.offset(x: 0, y: 52)
-            }
-            .frame(width: 200, height: 200)
-            .accessibilityHidden(true)
-
-            Text(store.timerText)
-                .ddTypography(.title24)
-                .foregroundStyle(DDColor.actionPrimary)
-                .padding(.top, DDSpacing.small)
-                .monospacedDigit()
-                .accessibilityLabel("남은 시간 \(store.timerText)")
-        }
+        Text(timerDisplayText)
+            .font(.custom("Pretendard-SemiBold", size: 36, relativeTo: .largeTitle))
+            .foregroundStyle(DDColor.actionPrimary)
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.65)
+            .multilineTextAlignment(.center)
     }
 
-    private var timerLight: some View {
-        Circle()
-            .fill(DDColor.actionPrimary)
-            .frame(width: 13, height: 13)
+    private var timerDisplayText: String {
+        let remainingSeconds = store.remainingSeconds
+        guard remainingSeconds > 0 else { return "초대 기간이 만료되었어요" }
+
+        let hours = remainingSeconds / 3_600
+        let minutes = remainingSeconds % 3_600 / 60
+        if hours > 0 {
+            return "\(hours)시간 \(minutes)분 남음"
+        }
+        return minutes > 0 ? "\(minutes)분 남음" : "1분 미만 남음"
     }
 
     private var participantsCard: some View {
@@ -226,13 +201,13 @@ struct WaitingForParticipantsView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 102, alignment: .top)
+            .frame(maxWidth: .infinity, minHeight: 108, alignment: .top)
         }
         .padding(.leading, 17)
         .padding(.trailing, 15)
         .padding(.top, 17)
-        .padding(.bottom, 10)
-        .frame(maxWidth: .infinity, minHeight: 165, alignment: .topLeading)
+        .padding(.bottom, 17)
+        .frame(maxWidth: .infinity, minHeight: 181, alignment: .topLeading)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(cornerRadius: DDRadius.medium))
         .overlay {
@@ -287,7 +262,7 @@ struct WaitingForParticipantsView: View {
                     .frame(height: 16)
             }
         }
-        .frame(width: 72, height: 102, alignment: .top)
+        .frame(maxWidth: .infinity, minHeight: 108, alignment: .top)
         .multilineTextAlignment(.center)
         .accessibilityElement(children: .combine)
     }
@@ -322,64 +297,10 @@ struct WaitingForParticipantsView: View {
     }
 }
 
-private struct WaitingTimerProgressArc: Shape {
-    var progress: Double
-
-    var animatableData: Double {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let fraction = min(1, max(0, progress))
-        guard fraction > 0 else { return Path() }
-
-        var path = Path()
-        path.addArc(
-            center: CGPoint(x: rect.midX, y: rect.midY),
-            radius: min(rect.width, rect.height) / 2,
-            startAngle: .degrees(-90),
-            endAngle: .degrees(-90 + 360 * fraction),
-            clockwise: false
-        )
-        return path
-    }
-}
-
 #Preview {
     WaitingForParticipantsView(
         store: Store(initialState: .mock()) {
             WaitingForParticipantsFeature()
         }
     )
-}
-
-#Preview("타이머 72:00 · 36:00 · 01:30 · 00:00") {
-    let initialState = WaitingForParticipantsFeature.State.mock(
-        now: Date(timeIntervalSince1970: 0)
-    )
-
-    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: DDSpacing.large) {
-        ForEach([259_200, 129_600, 5_400, 0], id: \.self) { remainingSeconds in
-            let state = WaitingForParticipantsFeature.State(
-                invitation: initialState.invitation,
-                countdownDuration: initialState.countdownDuration,
-                currentDate: initialState.invitation.expiresAt.addingTimeInterval(
-                    -TimeInterval(remainingSeconds)
-                )
-            )
-
-            VStack(spacing: DDSpacing.small) {
-                WaitingTimerProgressArc(progress: state.timerProgress)
-                    .stroke(Color(red: 0.7, green: 0.73, blue: 0.72), lineWidth: 16)
-                    .frame(width: 100, height: 100)
-
-                Text("\(Int(state.timerProgress * 100))% · \(state.timerText)")
-                    .ddTypography(.label14)
-                    .foregroundStyle(DDColor.textPrimary)
-            }
-        }
-    }
-    .padding(DDSpacing.xLarge)
-    .background(DDColor.surfaceDefault)
 }

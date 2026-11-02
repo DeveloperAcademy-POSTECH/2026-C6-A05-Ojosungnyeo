@@ -37,10 +37,10 @@ struct UpcomingTripsView: View {
                                 }
                             )
                         }
-                        .padding(.horizontal, DDSpacing.large)
-                        .padding(.top, 15)
-                        .padding(.bottom, DDSpacing.xLarge)
                     }
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.top, 15)
+                    .padding(.bottom, DDSpacing.xLarge)
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {

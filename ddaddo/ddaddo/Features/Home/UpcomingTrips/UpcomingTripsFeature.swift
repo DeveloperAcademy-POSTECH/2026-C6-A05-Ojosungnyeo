@@ -26,6 +26,7 @@ struct UpcomingTripsFeature: Reducer {
         var inviteCode = ""
         var isJoiningTrip = false
         var joinErrorMessage: String?
+        var pendingDeletionTripID: Trip.ID?
         var waitingForParticipants: WaitingForParticipantsFeature.State?
         var isWaitingForParticipantsPresented = false
 
@@ -47,6 +48,9 @@ struct UpcomingTripsFeature: Reducer {
         case joinTripResponse(TripInvitationSnapshot)
         case joinTripFailed(String)
         case joinErrorDismissed
+        case deleteButtonTapped(Trip.ID)
+        case deleteCancelButtonTapped
+        case deleteConfirmButtonTapped
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
         case delegate(Delegate)
@@ -118,6 +122,22 @@ struct UpcomingTripsFeature: Reducer {
 
             case .joinErrorDismissed:
                 state.joinErrorMessage = nil
+                return .none
+
+            case let .deleteButtonTapped(tripID):
+                guard state.pendingDeletionTripID == nil,
+                      state.trips.contains(where: { $0.id == tripID }) else { return .none }
+                state.pendingDeletionTripID = tripID
+                return .none
+
+            case .deleteCancelButtonTapped:
+                state.pendingDeletionTripID = nil
+                return .none
+
+            case .deleteConfirmButtonTapped:
+                guard state.pendingDeletionTripID != nil else { return .none }
+                // TODO: 삭제 API 연결 후 이 ID로 요청하고 성공했을 때만 목록에서 제거한다.
+                state.pendingDeletionTripID = nil
                 return .none
 
             case .waitingForParticipantsDismissed,

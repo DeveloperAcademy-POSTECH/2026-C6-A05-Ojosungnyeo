@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ParticipantAvatar: String, CaseIterable, Equatable, Sendable {
+enum ParticipantAvatar: String, CaseIterable, Equatable, Hashable, Sendable {
     case grae = "DDMiniHeadGrae"
     case header = "DDMiniHeadHeader"
     case juni = "DDMiniHeadJuni"
@@ -38,5 +38,35 @@ enum ParticipantAvatar: String, CaseIterable, Equatable, Sendable {
 
     static func assigned(to name: String, fallbackIndex: Int) -> Self {
         matched(to: name) ?? rotation[fallbackIndex % rotation.count]
+    }
+
+    static func uniqueAssignments(count: Int, first: Self) -> [Self] {
+        guard count > 0 else { return [] }
+
+        let remaining = rotation
+            .filter { $0 != first }
+            .shuffled()
+        let uniqueAssignments = [first] + remaining
+
+        guard count > uniqueAssignments.count else {
+            return Array(uniqueAssignments.prefix(count))
+        }
+
+        return (0..<count).map { uniqueAssignments[$0 % uniqueAssignments.count] }
+    }
+
+    static func availableAssignment(
+        preferred: Self?,
+        excluding usedAvatars: Set<Self>
+    ) -> Self {
+        if let preferred, !usedAvatars.contains(preferred) {
+            return preferred
+        }
+
+        return rotation
+            .filter { !usedAvatars.contains($0) }
+            .randomElement()
+            ?? preferred
+            ?? rotation.randomElement()!
     }
 }

@@ -100,7 +100,9 @@ struct HomeFeature: Reducer {
                 return .none
             case .upcomingTrips(.viewScheduleButtonTapped):
                 state.tripItinerary = TripItineraryFeature.State()
+                state.tripItinerary.selectedTab = .dailyItinerary
                 state.isTripItineraryPresented = true
+                state.isUpcomingTripsPresented = true
                 return .none
             case .upcomingTrips(.createTripButtonTapped):
                 state.tripSearch = TripSearchFeature.State()
@@ -112,8 +114,9 @@ struct HomeFeature: Reducer {
             case .upcomingTrips:
                 return .none
             case .tripItinerary(.timeTable(.backButtonTapped)),
-                 .tripItinerary(.routeOverview(.backButtonTapped)):
+                 .tripItinerary(.delegate(.returnToUpcomingTrips)):
                 state.isTripItineraryPresented = false
+                state.isUpcomingTripsPresented = true
                 return .none
             case .tripItinerary:
                 return .none

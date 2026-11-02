@@ -16,6 +16,7 @@ struct WaitingForParticipantsFeature: Reducer {
         let name: String
         let avatarName: String?
         let hasJoined: Bool
+        let isCurrentUser: Bool
 
         var displayName: String {
             if name.hasPrefix("친구 "),
@@ -29,6 +30,10 @@ struct WaitingForParticipantsFeature: Reducer {
 
     struct Invitation: Equatable {
         let tripID: String
+        let title: String
+        let destinationName: String
+        let startDate: Date
+        let endDate: Date
         let code: String
         let url: URL?
         let expiresAt: Date
@@ -69,12 +74,14 @@ struct WaitingForParticipantsFeature: Reducer {
             self.invitation = invitation
             self.countdownDuration = countdownDuration
             self.currentDate = currentDate
+            synchronizePlaceSelection()
         }
 
         init(snapshot: TripInvitationSnapshot, currentDate: Date = Date()) {
             invitation = Invitation(snapshot: snapshot)
             countdownDuration = Self.mockDuration
             self.currentDate = currentDate
+            synchronizePlaceSelection()
         }
 
         static func mock(now: Date = Date()) -> Self {
@@ -112,6 +119,30 @@ struct WaitingForParticipantsFeature: Reducer {
         var haveAllParticipantsJoined: Bool {
             !invitation.participants.isEmpty
                 && joinedCount == invitation.participants.count
+        }
+
+        mutating func synchronizePlaceSelection() {
+            placeSelection.updateTripContext(
+                tripTitle: invitation.title,
+                destinationName: invitation.destinationName,
+                tripStartDate: invitation.startDate,
+                tripEndDate: invitation.endDate,
+                participants: invitation.participants.compactMap { participant in
+                    guard
+                        let avatarName = participant.avatarName,
+                        let avatar = ParticipantAvatar(rawValue: avatarName)
+                    else { return nil }
+
+                    return PlaceSelectionFeature.Participant(
+                        id: participant.id,
+                        member: TripMember(avatar: avatar),
+                        name: participant.name,
+                        hasJoined: participant.hasJoined,
+                        isCurrentUser: participant.isCurrentUser
+                    )
+                },
+                remainingSeconds: remainingSeconds
+            )
         }
     }
 
@@ -177,9 +208,11 @@ struct WaitingForParticipantsFeature: Reducer {
                 state.invitation = invitation
                 state.currentDate = now
                 state.isRefreshing = false
+                state.synchronizePlaceSelection()
                 return .none
 
             case .mapButtonTapped:
+                state.synchronizePlaceSelection()
                 if state.haveAllParticipantsJoined {
                     state.isMapConfirmationPresented = false
                     state.isPlaceSelectionPresented = true
@@ -204,6 +237,11 @@ struct WaitingForParticipantsFeature: Reducer {
                 state.isPlaceSelectionPresented = false
                 return .none
 
+            case .placeSelection(.delegate(.proceedToAnalysis)):
+                // The analysis destination is implemented by the grouping flow owner.
+                // Keep this explicit hand-off point so it can be connected when that screen lands.
+                return .none
+
             case .placeSelection:
                 return .none
 
@@ -225,6 +263,10 @@ private extension WaitingForParticipantsFeature.Invitation {
     init(snapshot: TripInvitationSnapshot) {
         self.init(
             tripID: snapshot.tripID,
+            title: snapshot.title,
+            destinationName: snapshot.destinationName,
+            startDate: snapshot.startDate,
+            endDate: snapshot.endDate,
             code: snapshot.code,
             url: snapshot.url,
             expiresAt: snapshot.expiresAt,
@@ -233,7 +275,8 @@ private extension WaitingForParticipantsFeature.Invitation {
                     id: $0.id,
                     name: $0.name,
                     avatarName: $0.avatarName,
-                    hasJoined: $0.hasJoined
+                    hasJoined: $0.hasJoined,
+                    isCurrentUser: $0.isCurrentUser
                 )
             }
         )
@@ -242,15 +285,19 @@ private extension WaitingForParticipantsFeature.Invitation {
     static func mock(expiresAt: Date) -> Self {
         Self(
             tripID: "preview-trip",
+            title: "도쿄 여행",
+            destinationName: "도쿄",
+            startDate: Date(),
+            endDate: Calendar.current.date(byAdding: .day, value: 3, to: Date())!,
             code: "999994",
             // Replace with the server-provided web invitation URL when available.
             url: URL(string: "https://ddaddo-web.vercel.app/invite")!,
             expiresAt: expiresAt,
             participants: [
-                .init(id: 1, name: "테이", avatarName: "DDMiniHeadTae", hasJoined: true),
-                .init(id: 2, name: "헤더", avatarName: "DDMiniHeadHeader", hasJoined: true),
-                .init(id: 3, name: "그레", avatarName: "DDMiniHeadGrae", hasJoined: false),
-                .init(id: 4, name: "주니", avatarName: "DDMiniHeadJuni", hasJoined: false)
+                .init(id: 1, name: "테이", avatarName: "DDMiniHeadTae", hasJoined: true, isCurrentUser: true),
+                .init(id: 2, name: "헤더", avatarName: "DDMiniHeadHeader", hasJoined: true, isCurrentUser: false),
+                .init(id: 3, name: "그레", avatarName: "DDMiniHeadGrae", hasJoined: false, isCurrentUser: false),
+                .init(id: 4, name: "주니", avatarName: "DDMiniHeadJuni", hasJoined: false, isCurrentUser: false)
             ]
         )
     }

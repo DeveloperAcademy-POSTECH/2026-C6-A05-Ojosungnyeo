@@ -29,7 +29,11 @@ enum FirebaseTripService {
             .flatMap { ParticipantAvatar(rawValue: $0) }
         let ownerAvatar = ParticipantAvatar.matched(to: nickname)
             ?? storedAvatar
-            ?? ParticipantAvatar.assigned(to: nickname, fallbackIndex: 0)
+            ?? ParticipantAvatar.allCases.randomElement()!
+        let participantAvatars = ParticipantAvatar.uniqueAssignments(
+            count: request.travelerCount,
+            first: ownerAvatar
+        )
 
         for _ in 0..<5 {
             let tripReference = database.collection("trips").document()
@@ -86,9 +90,7 @@ enum FirebaseTripService {
                                 .document(index == 0 ? userID : "slot_\(index + 1)")
                             let isOwner = index == 0
                             let participantName = isOwner ? nickname : "친구 \(index + 1)"
-                            let participantAvatar = isOwner
-                                ? ownerAvatar
-                                : ParticipantAvatar.assigned(to: participantName, fallbackIndex: index)
+                            let participantAvatar = participantAvatars[index]
                             var participantData: [String: Any] = [
                                 "slotIndex": index,
                                 "uid": isOwner ? userID : NSNull(),
@@ -146,6 +148,15 @@ enum FirebaseTripService {
             throw TripServiceError.tripNotFound
         }
 
+        let calendar = Calendar(identifier: .gregorian)
+        let startDate = (tripDocument.get("startAt") as? Timestamp)?.dateValue()
+            ?? calendar.startOfDay(for: Date())
+        let endDate = (tripDocument.get("endAt") as? Timestamp)?.dateValue()
+            ?? calendar.date(byAdding: .day, value: 3, to: startDate)!
+        let destinations = tripDocument.get("destinations") as? [[String: Any]]
+        let destinationName = destinations?.first?["name"] as? String ?? "도쿄"
+        let currentUserID = Auth.auth().currentUser?.uid
+
         let participantDocuments = try await tripReference
             .collection("participants")
             .order(by: "slotIndex")
@@ -153,21 +164,26 @@ enum FirebaseTripService {
         let participants = participantDocuments.documents.map { document in
             let slotIndex = document.get("slotIndex") as? Int ?? 0
             let name = document.get("name") as? String ?? "친구"
-            let avatar = ParticipantAvatar.matched(to: name)
-                ?? (document.get("avatarName") as? String)
-                    .flatMap { ParticipantAvatar(rawValue: $0) }
+            let avatar = (document.get("avatarName") as? String)
+                .flatMap { ParticipantAvatar(rawValue: $0) }
+                ?? ParticipantAvatar.matched(to: name)
                 ?? ParticipantAvatar.assigned(to: name, fallbackIndex: slotIndex)
 
             return TripInvitationSnapshot.Participant(
                 id: slotIndex,
                 name: name,
                 avatarName: avatar.rawValue,
-                hasJoined: document.get("status") as? String == "joined"
+                hasJoined: document.get("status") as? String == "joined",
+                isCurrentUser: document.get("uid") as? String == currentUserID
             )
         }
 
         return TripInvitationSnapshot(
             tripID: tripID,
+            title: tripDocument.get("title") as? String ?? "여행",
+            destinationName: destinationName,
+            startDate: startDate,
+            endDate: endDate,
             code: code,
             url: url,
             expiresAt: expiresAt,
@@ -224,9 +240,19 @@ enum FirebaseTripService {
             throw TripServiceError.tripIsFull
         }
 
-        let slotIndex = waitingParticipant.get("slotIndex") as? Int ?? 1
-        let avatar = ParticipantAvatar.matched(to: nickname)
-            ?? ParticipantAvatar.assigned(to: nickname, fallbackIndex: slotIndex)
+        let usedAvatars = Set(
+            participants.documents.compactMap { document -> ParticipantAvatar? in
+                guard document.get("status") as? String == "joined" else { return nil }
+                return (document.get("avatarName") as? String)
+                    .flatMap { ParticipantAvatar(rawValue: $0) }
+            }
+        )
+        let reservedAvatar = (waitingParticipant.get("avatarName") as? String)
+            .flatMap { ParticipantAvatar(rawValue: $0) }
+        let avatar = ParticipantAvatar.availableAssignment(
+            preferred: reservedAvatar ?? ParticipantAvatar.matched(to: nickname),
+            excluding: usedAvatars
+        )
         let participantReference = waitingParticipant.reference
 
         _ = try await database.runTransaction { transaction, errorPointer in
@@ -281,7 +307,9 @@ enum FirebaseTripService {
         let thirdParticipantReference = tripReference.collection("participants").document("slot_3")
         let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
         let expiresAt = Date().addingTimeInterval(inviteDuration)
-        let inviteURL = makeInviteURL(code: "123456", expiresAt: expiresAt)
+        let inviteURL = makeInviteURL(code: "123456")
+        let startDate = Calendar.current.startOfDay(for: Date())
+        let endDate = Calendar.current.date(byAdding: .day, value: 3, to: startDate)!
 
         _ = try await database.runTransaction { transaction, errorPointer in
             do {
@@ -297,6 +325,15 @@ enum FirebaseTripService {
                     )
                     transaction.setData(
                         [
+                            "title": "3박 4일 도쿄여행",
+                            "destinationIDs": ["tokyo"],
+                            "destinations": [[
+                                "id": "tokyo",
+                                "country": "일본",
+                                "name": "도쿄"
+                            ]],
+                            "startAt": Timestamp(date: startDate),
+                            "endAt": Timestamp(date: endDate),
                             "expiresAt": Timestamp(date: expiresAt),
                             "travelerCount": 2,
                             "updatedAt": FieldValue.serverTimestamp()
@@ -325,9 +362,15 @@ enum FirebaseTripService {
                 transaction.setData(
                     [
                         "ownerID": ownerID,
-                        "title": "친구 이름의 여행",
-                        "destinationIDs": [],
-                        "destinations": [],
+                        "title": "3박 4일 도쿄여행",
+                        "destinationIDs": ["tokyo"],
+                        "destinations": [[
+                            "id": "tokyo",
+                            "country": "일본",
+                            "name": "도쿄"
+                        ]],
+                        "startAt": Timestamp(date: startDate),
+                        "endAt": Timestamp(date: endDate),
                         "travelerCount": 2,
                         "transportation": "",
                         "maximumTravelMinutes": 0,

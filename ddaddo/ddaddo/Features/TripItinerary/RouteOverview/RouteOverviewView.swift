@@ -10,21 +10,32 @@ import SwiftUI
 
 struct RouteOverviewView: View {
     let store: StoreOf<RouteOverviewFeature>
-    @State private var isItineraryExpanded = true
+    var onBack: () -> Void = {
+        // Preview and isolated usages can omit navigation handling.
+    }
+    @State private var isItineraryExpanded = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            routeMap
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                routeMap
 
-            VStack(spacing: 0) {
-                tripNavigation
-                dayPicker
-                Spacer(minLength: 0)
+                VStack(spacing: 0) {
+                    tripNavigation
+                    dayPicker
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 8)
+
+                itineraryPanel(
+                    fullHeight: max(560, proxy.size.height - 143)
+                )
             }
-            .padding(.top, 8)
-
-            itineraryPanel
-                .ignoresSafeArea(edges: .bottom)
+        }
+        .animation(.easeInOut(duration: 0.25), value: store.isEditing)
+        .onAppear {
+            isItineraryExpanded = false
+            store.send(.onAppear)
         }
         .preferredColorScheme(.dark)
     }
@@ -37,15 +48,17 @@ struct RouteOverviewView: View {
     private var tripNavigation: some View {
         ZStack {
             Button {
-                store.send(.backButtonTapped)
+                onBack()
             } label: {
                 Image(systemName: "chevron.backward")
                     .font(.system(size: 24, weight: .regular))
                     .foregroundStyle(DDColor.textPrimary)
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
 
             VStack(spacing: 0) {
                 Text("3박 4일 도쿄 여행")
@@ -81,13 +94,13 @@ struct RouteOverviewView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 59)
+            .padding(.horizontal, 17)
         }
         .scrollIndicators(.hidden)
         .padding(.vertical, 8)
     }
 
-    private var itineraryPanel: some View {
+    private func itineraryPanel(fullHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Capsule()
                 .fill(DDColor.textTertiary)
@@ -95,46 +108,82 @@ struct RouteOverviewView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 16)
 
-            memberFilter
-                .padding(.top, 14)
+            if store.isEditing {
+                editingHeader
+                    .padding(.top, 14)
 
-            if isItineraryExpanded {
                 Text("여행 일정")
                     .ddTypography(.bodyEmphasis16)
                     .foregroundStyle(DDColor.textPrimary)
-                    .padding(.top, 18)
+                    .padding(.top, 14)
 
-                itineraryList
+                editingItineraryList
                     .padding(.top, 12)
             } else {
+                memberFilter
+                    .padding(.top, 14)
+
                 Text("여행 일정")
                     .ddTypography(.bodyEmphasis16)
                     .foregroundStyle(DDColor.textPrimary)
-                    .padding(.top, 10)
+                    .padding(.top, isItineraryExpanded ? 18 : 10)
+
+                if isItineraryExpanded {
+                    itineraryList
+                        .padding(.top, 12)
+                }
             }
         }
         .padding(.leading, 15)
         .padding(.trailing, DDSpacing.large)
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: isItineraryExpanded ? 413 : 127, alignment: .top)
+        .frame(
+            height: store.isEditing
+                ? fullHeight
+                : (isItineraryExpanded ? 413 : 139),
+            alignment: .top
+        )
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
         .contentShape(.rect)
         .gesture(
-            DragGesture(minimumDistance: 12)
-                .onEnded { value in
-                    if value.translation.height < -30 {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            isItineraryExpanded = true
-                        }
-                    } else if value.translation.height > 30 {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            isItineraryExpanded = false
+            store.isEditing
+                ? nil
+                : DragGesture(minimumDistance: 12)
+                    .onEnded { value in
+                        if value.translation.height < -30 {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                isItineraryExpanded = true
+                            }
+                        } else if value.translation.height > 30 {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                isItineraryExpanded = false
+                            }
                         }
                     }
-                }
         )
+    }
+
+    private var editingHeader: some View {
+        HStack(spacing: DDSpacing.xSmall) {
+            ForEach(TripMember.allCases) { member in
+                DDMiniHeadAvatar(character: member.routeAvatarCharacter, size: 37)
+            }
+
+            Spacer(minLength: 0)
+
+            Button("완료") {
+                store.send(.editingDoneButtonTapped)
+            }
+            .ddTypography(.bodyEmphasis16)
+            .foregroundStyle(DDColor.textOnPrimary)
+            .padding(.horizontal, DDSpacing.large)
+            .frame(height: 34)
+            .background(DDColor.actionPrimary)
+            .clipShape(.capsule)
+            .buttonStyle(.plain)
+        }
     }
 
     private var memberFilter: some View {
@@ -206,6 +255,83 @@ struct RouteOverviewView: View {
             .padding(.bottom, 40)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var editingItineraryList: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(Array(store.visibleStops.enumerated()), id: \.element.id) { index, stop in
+                    HStack(alignment: .top, spacing: 12) {
+                        timelineMarker(index: index, isLast: false)
+                        editingStopCard(stop)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 12) {
+                    timelineMarker(index: store.visibleStops.count, isLast: true)
+
+                    Button {
+                    } label: {
+                        Text("+장소 추가하기")
+                            .ddTypography(.bodyEmphasis16)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                            .padding(.horizontal, DDSpacing.xLarge)
+                            .background(DDColor.surfaceElevated)
+                            .clipShape(.rect(cornerRadius: 20))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(DDColor.textTertiary, lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.bottom, 40)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func editingStopCard(_ stop: RouteStop) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(stop.name)
+                        .ddTypography(.bodyEmphasis16)
+
+                    if stop.members.count < TripMember.allCases.count {
+                        HStack(spacing: -5) {
+                            ForEach(Array(stop.members), id: \.self) { member in
+                                Circle()
+                                    .fill(member.routeAccentColor)
+                                    .frame(width: 14, height: 14)
+                            }
+                        }
+                    }
+                }
+                .foregroundStyle(DDColor.textPrimary)
+
+                Text(stop.category)
+                    .ddTypography(.labelEmphasis14)
+                    .foregroundStyle(DDColor.actionPrimary)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(DDColor.textSecondary)
+                .frame(width: 28, height: 44)
+                .accessibilityLabel("일정 순서 변경")
+        }
+        .padding(.horizontal, DDSpacing.xLarge)
+        .frame(maxWidth: .infinity, minHeight: 72)
+        .background(DDColor.surfaceElevated)
+        .clipShape(.rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(DDColor.textTertiary, lineWidth: 1)
+        }
     }
 
     private func timelineMarker(index: Int, isLast: Bool) -> some View {

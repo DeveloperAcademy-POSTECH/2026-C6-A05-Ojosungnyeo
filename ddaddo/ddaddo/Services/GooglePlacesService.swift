@@ -124,20 +124,41 @@ final class GooglePlacesService: @unchecked Sendable {
     }
 
     private static func categoryName(for types: [String]?) -> String {
-        let localizedNames = [
-            "clothing_store": "의류점",
-            "restaurant": "음식점",
-            "cafe": "카페",
-            "bakery": "베이커리",
-            "bar": "바",
-            "museum": "박물관",
-            "tourist_attraction": "관광 명소",
-            "shopping_mall": "쇼핑몰",
-            "lodging": "숙소"
+        let placeTypes = Set(types ?? [])
+        let categories: [(name: String, types: Set<String>)] = [
+            ("맛집", ["restaurant", "meal_takeaway", "meal_delivery", "ramen_restaurant", "sushi_restaurant", "korean_restaurant", "japanese_restaurant"]),
+            ("카페", ["cafe", "coffee_shop"]),
+            ("디저트", ["bakery", "dessert_shop", "ice_cream_shop", "candy_store"]),
+            ("바·펍", ["bar", "pub", "wine_bar", "cocktail_bar"]),
+            ("시장", ["market", "supermarket", "grocery_store"]),
+            ("기념품", ["gift_shop"]),
+            ("쇼핑", ["shopping_mall", "department_store", "clothing_store", "shoe_store"]),
+            ("편집숍", ["store", "home_goods_store", "furniture_store", "book_store"]),
+            ("랜드마크", ["landmark", "monument", "cultural_landmark", "historical_landmark"]),
+            ("전망대", ["observation_deck"]),
+            ("역사·종교", ["church", "hindu_temple", "mosque", "synagogue", "buddhist_temple", "place_of_worship", "historical_place"]),
+            ("박물관", ["museum"]),
+            ("미술관", ["art_gallery"]),
+            ("공연·전시", ["performing_arts_theater", "concert_hall", "event_venue", "convention_center"]),
+            ("공방·체험", ["cultural_center", "community_center"]),
+            ("공원·정원", ["park", "garden", "national_park"]),
+            ("해변", ["beach"]),
+            ("산·트레킹", ["hiking_area"]),
+            ("호수·강", ["lake", "river", "natural_feature"]),
+            ("테마파크", ["amusement_park", "water_park"]),
+            ("동물원·수족관", ["zoo", "aquarium"]),
+            ("게임·오락", ["bowling_alley", "casino", "movie_theater", "amusement_center", "video_arcade"]),
+            ("온천·스파", ["spa", "sauna"]),
+            ("숙소", ["lodging", "hotel", "motel", "hostel", "bed_and_breakfast", "guest_house"]),
+            ("공항", ["airport"]),
+            ("기차역", ["train_station", "subway_station"]),
+            ("버스터미널", ["bus_station", "transit_station"]),
+            ("관광지", ["tourist_attraction"])
         ]
-        for type in types ?? [] {
-            if let name = localizedNames[type] {
-                return name
+
+        for category in categories {
+            if !placeTypes.isDisjoint(with: category.types) {
+                return category.name
             }
         }
         return "장소"

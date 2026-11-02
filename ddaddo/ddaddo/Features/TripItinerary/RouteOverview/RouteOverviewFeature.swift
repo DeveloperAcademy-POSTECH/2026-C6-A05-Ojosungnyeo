@@ -14,6 +14,7 @@ struct RouteOverviewFeature: Reducer {
         var selectedDay = TripDay.day1
         var visibleMembers = Set(TripMember.allCases)
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
+        var isEditing = false
         let places = RoutePlace.mockPlaces
 
         var visibleStops: [RouteStop] {
@@ -28,10 +29,12 @@ struct RouteOverviewFeature: Reducer {
     }
 
     enum Action: Equatable {
+        case onAppear
         case backButtonTapped
         case daySelected(TripDay)
         case memberTapped(TripMember)
         case editButtonTapped
+        case editingDoneButtonTapped
         case placeChanged(RoutePlace.ID?)
         case addressCopyButtonTapped(String)
     }
@@ -39,6 +42,12 @@ struct RouteOverviewFeature: Reducer {
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                state.selectedDay = .day1
+                state.visibleMembers = Set(TripMember.allCases)
+                state.isEditing = false
+                return .none
+
             case .backButtonTapped:
                 return .none
 
@@ -55,6 +64,11 @@ struct RouteOverviewFeature: Reducer {
                 return .none
 
             case .editButtonTapped:
+                state.isEditing = true
+                return .none
+
+            case .editingDoneButtonTapped:
+                state.isEditing = false
                 return .none
 
             case let .placeChanged(placeID):

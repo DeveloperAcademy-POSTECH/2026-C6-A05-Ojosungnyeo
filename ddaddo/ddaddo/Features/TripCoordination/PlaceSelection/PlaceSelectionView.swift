@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
+    @Environment(\.dismiss) private var dismiss
     @GestureState private var sheetDragTranslation: CGFloat = 0
 
     var body: some View {
@@ -166,6 +167,7 @@ struct PlaceSelectionView: View {
         HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
+                dismiss()
             } label: {
                 PlaceSelectionBackIcon()
             }

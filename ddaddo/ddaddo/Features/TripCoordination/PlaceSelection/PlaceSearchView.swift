@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PlaceSearchView: View {
     let store: StoreOf<PlaceSearchFeature>
+    @Environment(\.dismiss) private var dismiss
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -30,14 +31,17 @@ struct PlaceSearchView: View {
     private var searchBar: some View {
         HStack(spacing: DDSpacing.small) {
             Button {
+                isSearchFocused = false
                 store.send(.closeButtonTapped)
+                dismiss()
             } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(DDColor.iconDefault)
+                PlaceSearchBackIcon()
                     .frame(width: 24, height: 24)
+                    .frame(width: 40, height: 41)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("이전 화면으로 돌아가기")
 
             TextField(
                 "장소를 검색하세요",
@@ -108,6 +112,20 @@ struct PlaceSearchView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+}
+
+private struct PlaceSearchBackIcon: View {
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: 16, y: 4))
+            path.addLine(to: CGPoint(x: 8, y: 12))
+            path.addLine(to: CGPoint(x: 16, y: 20))
+        }
+        .stroke(
+            DDColor.textPrimary,
+            style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
+        )
     }
 }
 

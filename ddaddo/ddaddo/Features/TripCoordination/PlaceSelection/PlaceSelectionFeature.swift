@@ -12,6 +12,7 @@ import Foundation
 struct PlaceSelectionFeature: Reducer {
     enum Delegate: Equatable {
         case proceedToAnalysis
+        case returnToUpcomingTrips
     }
 
     enum CompletionAlert: Equatable {
@@ -56,6 +57,7 @@ struct PlaceSelectionFeature: Reducer {
 
     @ObservableState
     struct State: Equatable {
+        var tripID: String
         var tripTitle: String
         var destinationName: String
         var tripStartDate: Date
@@ -78,6 +80,7 @@ struct PlaceSelectionFeature: Reducer {
         var placeSearch = PlaceSearchFeature.State()
 
         init(
+            tripID: String = "preview-trip",
             tripTitle: String = "도쿄 여행",
             destinationName: String = "도쿄",
             tripStartDate: Date = Date(),
@@ -92,6 +95,7 @@ struct PlaceSelectionFeature: Reducer {
                 ?? participants.first(where: \.hasJoined)?.member
                 ?? .tae
 
+            self.tripID = tripID
             self.tripTitle = tripTitle
             self.destinationName = destinationName
             self.tripStartDate = tripStartDate
@@ -174,8 +178,19 @@ struct PlaceSelectionFeature: Reducer {
                 .filter { placeIDs.insert($0.id).inserted }
         }
 
+        /// 확정 화면의 지도에는 확정 여부와 관계없이 참여 중인 멤버가 찍은 핀을 모두 보여 준다.
+        /// 따라서 방 관리자(또는 다른 참여자)가 먼저 선택한 장소도 UFO로 함께 표시된다.
+        var joinedMemberPlaces: [PinnedPlace] {
+            var placeIDs = Set<String>()
+
+            return participants
+                .filter(\.hasJoined)
+                .flatMap { memberPlaces[$0.member, default: []] }
+                .filter { placeIDs.insert($0.id).inserted }
+        }
+
         var mapPlaces: [PinnedPlace] {
-            isShowingConfirmedPlaces ? confirmedPlaces : displayedPlaces
+            isShowingConfirmedPlaces ? joinedMemberPlaces : displayedPlaces
         }
 
         var isSelectedPlaceAlreadyAdded: Bool {
@@ -203,6 +218,7 @@ struct PlaceSelectionFeature: Reducer {
         }
 
         mutating func updateTripContext(
+            tripID: String,
             tripTitle: String,
             destinationName: String,
             tripStartDate: Date,
@@ -210,6 +226,7 @@ struct PlaceSelectionFeature: Reducer {
             participants: [Participant],
             remainingSeconds: Int
         ) {
+            self.tripID = tripID
             self.tripTitle = tripTitle
             self.destinationName = destinationName
             self.tripStartDate = tripStartDate
@@ -326,6 +343,9 @@ struct PlaceSelectionFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case onAppear
+        case memberPlacesResponse([MemberPlacePins])
+        case memberPlacesFailed
+        case placeMutationFailed
         case backButtonTapped
         case searchFieldTapped
         case searchTextChanged(String)
@@ -364,24 +384,40 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    state.completionAlert = .selectionTimeExpired
-                    return .none
+                    return .send(.delegate(.proceedToAnalysis))
                 }
 
                 guard !state.isTimerRunning, !state.hasSelectionEnded else {
                     return .none
                 }
                 state.isTimerRunning = true
-                return .run { send in
-                    while !Task.isCancelled {
-                        try await clock.sleep(for: .seconds(1))
-                        await send(.timerTicked)
+                return .merge(
+                    loadMemberPlacesEffect(tripID: state.tripID),
+                    .run { send in
+                        while !Task.isCancelled {
+                            try await clock.sleep(for: .seconds(1))
+                            await send(.timerTicked)
+                        }
+                    }
+                    .cancellable(id: "place-selection-timer", cancelInFlight: true)
+                )
+
+            case let .memberPlacesResponse(memberPins):
+                for pins in memberPins {
+                    state.memberPlaces[pins.member] = pins.places
+                    if let index = state.participants.firstIndex(where: {
+                        $0.member == pins.member
+                    }) {
+                        state.participants[index].isConfirmed = pins.isConfirmed
                     }
                 }
-                .cancellable(id: "place-selection-timer", cancelInFlight: true)
+                return .none
+
+            case .memberPlacesFailed, .placeMutationFailed:
+                return .none
 
             case .backButtonTapped:
-                return .none
+                return .send(.delegate(.returnToUpcomingTrips))
 
             case .searchFieldTapped:
                 state.selectedMember = state.currentMember
@@ -426,8 +462,7 @@ struct PlaceSelectionFeature: Reducer {
                     let selectedPlace = state.selectedPlace
                 else { return .none }
 
-                state.memberPlaces[state.currentMember, default: []].append(
-                    PinnedPlace(
+                let pinnedPlace = PinnedPlace(
                         id: selectedPlace.id,
                         name: selectedPlace.name,
                         description: selectedPlace.address,
@@ -437,14 +472,21 @@ struct PlaceSelectionFeature: Reducer {
                         latitude: selectedPlace.latitude,
                         longitude: selectedPlace.longitude
                     )
-                )
+                state.memberPlaces[state.currentMember, default: []].append(pinnedPlace)
                 state.selectedMember = state.currentMember
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.searchText = ""
                 state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = false
-                return .none
+                let tripID = state.tripID
+                return .run { send in
+                    do {
+                        try await placeClient.savePlace(tripID, pinnedPlace)
+                    } catch {
+                        await send(.placeMutationFailed)
+                    }
+                }
 
             case let .pinnedPlaceTapped(place):
                 state.isMemberPlacesSheetPresented = true
@@ -499,7 +541,14 @@ struct PlaceSelectionFeature: Reducer {
                     state.searchText = ""
                     state.isPlaceDetailsLoading = false
                 }
-                return .none
+                let tripID = state.tripID
+                return .run { send in
+                    do {
+                        try await placeClient.deletePlace(tripID, placeID)
+                    } catch {
+                        await send(.placeMutationFailed)
+                    }
+                }
 
             case let .memberProfileTapped(member):
                 guard state.participants.contains(where: {
@@ -511,7 +560,7 @@ struct PlaceSelectionFeature: Reducer {
                 state.searchText = ""
                 state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = true
-                return .none
+                return loadMemberPlacesEffect(tripID: state.tripID)
 
             case .confirmButtonTapped:
                 guard state.canConfirmPlaceSelection else { return .none }
@@ -531,9 +580,12 @@ struct PlaceSelectionFeature: Reducer {
                     state.isTimerRunning = false
                     state.hasSelectionEnded = true
                     state.completionAlert = .allMembersConfirmed
-                    return .cancel(id: "place-selection-timer")
+                    return .merge(
+                        confirmPlacesEffect(tripID: state.tripID),
+                        .cancel(id: "place-selection-timer")
+                    )
                 }
-                return .none
+                return confirmPlacesEffect(tripID: state.tripID)
 
             case .confirmedPlacesEditButtonTapped:
                 guard state.isShowingConfirmedPlaces else { return .none }
@@ -560,8 +612,10 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    state.completionAlert = .selectionTimeExpired
-                    return .cancel(id: "place-selection-timer")
+                    return .merge(
+                        .cancel(id: "place-selection-timer"),
+                        .send(.delegate(.proceedToAnalysis))
+                    )
                 }
                 return .none
 
@@ -618,6 +672,26 @@ struct PlaceSelectionFeature: Reducer {
 
         Scope(state: \.placeSearch, action: \.placeSearch) {
             PlaceSearchFeature()
+        }
+    }
+
+    private func loadMemberPlacesEffect(tripID: String) -> Effect<Action> {
+        .run { send in
+            do {
+                await send(.memberPlacesResponse(try await placeClient.fetchMemberPlaces(tripID)))
+            } catch {
+                await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func confirmPlacesEffect(tripID: String) -> Effect<Action> {
+        .run { send in
+            do {
+                try await placeClient.confirmPlaces(tripID)
+            } catch {
+                await send(.placeMutationFailed)
+            }
         }
     }
 }

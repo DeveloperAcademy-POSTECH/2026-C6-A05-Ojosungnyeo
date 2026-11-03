@@ -23,24 +23,29 @@ struct UpcomingTripsView: View {
                     .padding(.top, DDSpacing.small)
                     .padding(.bottom, 8)
 
-                ScrollView {
-                    LazyVStack(spacing: 15) {
-                        ForEach(store.trips) { trip in
-                            SwipeableUpcomingTripCard(
-                                trip: trip,
-                                openTripID: $openSwipeTripID,
-                                deleteAction: {
-                                    store.send(.deleteButtonTapped(trip.id))
-                                },
-                                action: {
-                                    store.send(.viewScheduleButtonTapped(trip.id))
-                                }
-                            )
+                if store.trips.isEmpty && !store.isLoadingTrips {
+                    emptyState
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 15) {
+                            ForEach(store.trips) { trip in
+                                SwipeableUpcomingTripCard(
+                                    trip: trip,
+                                    openTripID: $openSwipeTripID,
+                                    deleteAction: {
+                                        store.send(.deleteButtonTapped(trip.id))
+                                    },
+                                    action: {
+                                        store.send(.viewScheduleButtonTapped(trip.id))
+                                    }
+                                )
+                            }
                         }
+                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.top, 15)
+                        .padding(.bottom, DDSpacing.xLarge)
                     }
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.top, 15)
-                    .padding(.bottom, DDSpacing.xLarge)
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -68,6 +73,9 @@ struct UpcomingTripsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: store.isAddTripMenuPresented)
+        .task {
+            store.send(.onAppear)
+        }
         .overlay {
             if store.isInviteCodeModalPresented {
                 ZStack {
@@ -144,6 +152,33 @@ struct UpcomingTripsView: View {
         } message: {
             Text(store.joinErrorMessage ?? "")
         }
+        .alert(
+            "여행을 삭제하지 못했어요",
+            isPresented: Binding(
+                get: { store.deletionErrorMessage != nil },
+                set: { if !$0 { store.send(.deletionErrorDismissed) } }
+            )
+        ) {
+            Button("확인", role: .cancel) {
+                store.send(.deletionErrorDismissed)
+            }
+        } message: {
+            Text(store.deletionErrorMessage ?? "")
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: DDSpacing.small) {
+            Text("아직 예정된 여행이 없어따.")
+                .ddTypography(.heading20)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text("+를 눌러 친구들과 여행 계획을 세워보세따!")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, DDSpacing.large)
     }
 
     private var header: some View {

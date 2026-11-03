@@ -21,6 +21,9 @@ enum FirebaseTripService {
         guard let userID = Auth.auth().currentUser?.uid else {
             throw TripServiceError.unauthenticated
         }
+        guard (1...4).contains(request.travelerCount) else {
+            throw TripServiceError.tripIsFull
+        }
 
         let database = Firestore.firestore()
         let userDocument = try await database.collection("users").document(userID).getDocument()
@@ -108,13 +111,19 @@ enum FirebaseTripService {
                             )
                         }
 
+                        var userData: [String: Any] = [
+                            "joinedTripIDs": FieldValue.arrayUnion([tripReference.documentID]),
+                            "dismissedTripIDs": FieldValue.arrayRemove([tripReference.documentID]),
+                            "updatedAt": FieldValue.serverTimestamp()
+                        ]
                         if storedAvatar != ownerAvatar {
-                            transaction.setData(
-                                ["avatarName": ownerAvatar.rawValue],
-                                forDocument: database.collection("users").document(userID),
-                                merge: true
-                            )
+                            userData["avatarName"] = ownerAvatar.rawValue
                         }
+                        transaction.setData(
+                            userData,
+                            forDocument: database.collection("users").document(userID),
+                            merge: true
+                        )
                         return tripReference.documentID
                     } catch {
                         errorPointer?.pointee = error as NSError
@@ -161,7 +170,24 @@ enum FirebaseTripService {
             .collection("participants")
             .order(by: "slotIndex")
             .getDocuments()
-        let participants = participantDocuments.documents.map { document in
+        var seenUserIDs = Set<String>()
+        let orderedDocuments = participantDocuments.documents.sorted { lhs, rhs in
+            let lhsUID = lhs.get("uid") as? String
+            let rhsUID = rhs.get("uid") as? String
+            let lhsIsCanonical = lhsUID != nil && lhs.documentID == lhsUID
+            let rhsIsCanonical = rhsUID != nil && rhs.documentID == rhsUID
+            if lhsIsCanonical != rhsIsCanonical { return lhsIsCanonical }
+            let lhsSlot = lhs.get("slotIndex") as? Int ?? 0
+            let rhsSlot = rhs.get("slotIndex") as? Int ?? 0
+            return lhsSlot < rhsSlot
+        }
+        let participants = Array(orderedDocuments.compactMap { document -> TripInvitationSnapshot.Participant? in
+            let status = document.get("status") as? String
+            guard status == "joined" || status == "waiting" else { return nil }
+            if let uid = document.get("uid") as? String,
+               !seenUserIDs.insert(uid).inserted {
+                return nil
+            }
             let slotIndex = document.get("slotIndex") as? Int ?? 0
             let name = document.get("name") as? String ?? "친구"
             let avatar = (document.get("avatarName") as? String)
@@ -176,7 +202,7 @@ enum FirebaseTripService {
                 hasJoined: document.get("status") as? String == "joined",
                 isCurrentUser: document.get("uid") as? String == currentUserID
             )
-        }
+        }.prefix(4))
 
         return TripInvitationSnapshot(
             tripID: tripID,
@@ -199,12 +225,6 @@ enum FirebaseTripService {
             throw TripServiceError.unauthenticated
         }
 
-        #if DEBUG
-        if inviteCode == "123456" {
-            try await seedDevelopmentTripIfNeeded(ownerID: userID)
-        }
-        #endif
-
         let database = Firestore.firestore()
         let inviteDocument = try await database
             .collection("inviteCodes")
@@ -224,7 +244,7 @@ enum FirebaseTripService {
 
         let userDocument = try await database.collection("users").document(userID).getDocument()
         let storedNickname = (userDocument.get("nickname") as? String) ?? "친구"
-        let nickname = inviteCode == "123456" ? "주니" : storedNickname
+        let nickname = storedNickname
         let tripReference = database.collection("trips").document(tripID)
         let participants = try await tripReference
             .collection("participants")
@@ -232,6 +252,14 @@ enum FirebaseTripService {
             .getDocuments()
 
         if participants.documents.contains(where: { $0.get("uid") as? String == userID }) {
+            try await database.collection("users").document(userID).setData(
+                [
+                    "joinedTripIDs": FieldValue.arrayUnion([tripID]),
+                    "dismissedTripIDs": FieldValue.arrayRemove([tripID]),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
             return try await fetchInvitation(tripID: tripID)
         }
         guard let waitingParticipant = participants.documents.first(where: {
@@ -254,6 +282,7 @@ enum FirebaseTripService {
             excluding: usedAvatars
         )
         let participantReference = waitingParticipant.reference
+        let joinedParticipantReference = participantReference.parent.document(userID)
 
         _ = try await database.runTransaction { transaction, errorPointer in
             do {
@@ -269,18 +298,34 @@ enum FirebaseTripService {
                     return nil
                 }
 
-                transaction.updateData(
+                transaction.setData(
                     [
+                        "slotIndex": latestParticipant.get("slotIndex") as? Int ?? 0,
                         "uid": userID,
                         "name": nickname,
                         "avatarName": avatar.rawValue,
+                        "role": "member",
                         "status": "joined",
-                        "joinedAt": FieldValue.serverTimestamp()
+                        "joinedAt": FieldValue.serverTimestamp(),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
+                    forDocument: joinedParticipantReference,
+                    merge: true
+                )
+                transaction.updateData(
+                    [
+                        "status": "migrated",
+                        "updatedAt": FieldValue.serverTimestamp()
                     ],
                     forDocument: participantReference
                 )
                 transaction.setData(
-                    ["avatarName": avatar.rawValue],
+                    [
+                        "avatarName": avatar.rawValue,
+                        "joinedTripIDs": FieldValue.arrayUnion([tripID]),
+                        "dismissedTripIDs": FieldValue.arrayRemove([tripID]),
+                        "updatedAt": FieldValue.serverTimestamp()
+                    ],
                     forDocument: database.collection("users").document(userID),
                     merge: true
                 )
@@ -294,133 +339,91 @@ enum FirebaseTripService {
         return try await fetchInvitation(tripID: tripID)
     }
 
-    private static func seedDevelopmentTripIfNeeded(ownerID: String) async throws {
+    static func fetchUpcomingTrips() async throws -> [UpcomingTripSnapshot] {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard let userID = Auth.auth().currentUser?.uid else {
+            throw TripServiceError.unauthenticated
+        }
+
         let database = Firestore.firestore()
-        let inviteReference = database.collection("inviteCodes").document("123456")
-        let tripReference = database.collection("trips").document("development-trip-123456")
-        let adminParticipantReference = tripReference
-            .collection("participants")
-            .document("development-admin")
-        let secondParticipantReference = tripReference
-            .collection("participants")
-            .document("slot_2")
-        let thirdParticipantReference = tripReference.collection("participants").document("slot_3")
-        let fourthParticipantReference = tripReference.collection("participants").document("slot_4")
-        let expiresAt = Date().addingTimeInterval(inviteDuration)
-        let inviteURL = makeInviteURL(code: "123456", expiresAt: expiresAt)
-        let startDate = Calendar.current.startOfDay(for: Date())
-        let endDate = Calendar.current.date(byAdding: .day, value: 3, to: startDate)!
+        let userReference = database.collection("users").document(userID)
+        let userDocument = try await userReference.getDocument()
+        var tripIDs = userDocument.get("joinedTripIDs") as? [String] ?? []
+        let dismissedTripIDs = Set(userDocument.get("dismissedTripIDs") as? [String] ?? [])
 
-        _ = try await database.runTransaction { transaction, errorPointer in
-            do {
-                let invitation = try transaction.getDocument(inviteReference)
-                if invitation.exists {
-                    transaction.setData(
-                        [
-                            "active": true,
-                            "expiresAt": Timestamp(date: expiresAt)
-                        ],
-                        forDocument: inviteReference,
-                        merge: true
-                    )
-                    transaction.setData(
-                        [
-                            "title": "3박 4일 도쿄여행",
-                            "destinationIDs": ["tokyo"],
-                            "destinations": [[
-                                "id": "tokyo",
-                                "country": "일본",
-                                "name": "도쿄"
-                            ]],
-                            "startAt": Timestamp(date: startDate),
-                            "endAt": Timestamp(date: endDate),
-                            "expiresAt": Timestamp(date: expiresAt),
-                            "travelerCount": 2,
-                            "updatedAt": FieldValue.serverTimestamp()
-                        ],
-                        forDocument: tripReference,
-                        merge: true
-                    )
-                    transaction.setData(
-                        ["name": "관리자관리자"],
-                        forDocument: adminParticipantReference,
-                        merge: true
-                    )
-                    transaction.setData(
-                        [
-                            "name": "주니",
-                            "avatarName": ParticipantAvatar.juni.rawValue
-                        ],
-                        forDocument: secondParticipantReference,
-                        merge: true
-                    )
-                    transaction.deleteDocument(thirdParticipantReference)
-                    transaction.deleteDocument(fourthParticipantReference)
-                    return nil
+        // 이전 버전에서 joinedTripIDs에 기록되지 않은 생성·참여 방도 항상 복구한다.
+        var discoveredTripIDs: [String] = []
+        if let tripDocuments = try? await database.collection("trips").getDocuments() {
+            for tripDocument in tripDocuments.documents {
+                guard !tripDocument.documentID.hasPrefix("development-trip-") else { continue }
+                guard let membership = try? await tripDocument.reference
+                    .collection("participants")
+                    .whereField("uid", isEqualTo: userID)
+                    .limit(to: 1)
+                    .getDocuments() else { continue }
+                if !membership.documents.isEmpty {
+                    discoveredTripIDs.append(tripDocument.documentID)
                 }
-
-                transaction.setData(
-                    [
-                        "ownerID": ownerID,
-                        "title": "3박 4일 도쿄여행",
-                        "destinationIDs": ["tokyo"],
-                        "destinations": [[
-                            "id": "tokyo",
-                            "country": "일본",
-                            "name": "도쿄"
-                        ]],
-                        "startAt": Timestamp(date: startDate),
-                        "endAt": Timestamp(date: endDate),
-                        "travelerCount": 2,
-                        "transportation": "",
-                        "maximumTravelMinutes": 0,
-                        "inviteCode": "123456",
-                        "inviteURL": inviteURL.absoluteString,
-                        "expiresAt": Timestamp(date: expiresAt),
-                        "status": "waiting",
-                        "createdAt": FieldValue.serverTimestamp(),
-                        "updatedAt": FieldValue.serverTimestamp()
-                    ],
-                    forDocument: tripReference
-                )
-                transaction.setData(
-                    [
-                        "tripID": tripReference.documentID,
-                        "active": true,
-                        "expiresAt": Timestamp(date: expiresAt),
-                        "createdAt": FieldValue.serverTimestamp()
-                    ],
-                    forDocument: inviteReference
-                )
-                transaction.setData(
-                    [
-                        "slotIndex": 0,
-                        "uid": "development-admin",
-                        "name": "관리자관리자",
-                        "avatarName": ParticipantAvatar.header.rawValue,
-                        "role": "owner",
-                        "status": "joined",
-                        "joinedAt": FieldValue.serverTimestamp()
-                    ],
-                    forDocument: adminParticipantReference
-                )
-                transaction.setData(
-                    [
-                        "slotIndex": 1,
-                        "uid": NSNull(),
-                        "name": "주니",
-                        "avatarName": ParticipantAvatar.juni.rawValue,
-                        "role": "member",
-                        "status": "waiting"
-                    ],
-                    forDocument: secondParticipantReference
-                )
-                return nil
-            } catch {
-                errorPointer?.pointee = error as NSError
-                return nil
             }
         }
+        tripIDs.append(contentsOf: discoveredTripIDs)
+        tripIDs = Array(Set(tripIDs)).filter {
+            !$0.hasPrefix("development-trip-") && !dismissedTripIDs.contains($0)
+        }
+        try await userReference.setData(
+            [
+                "joinedTripIDs": tripIDs,
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+
+        var trips: [UpcomingTripSnapshot] = []
+        for tripID in Set(tripIDs) {
+            let tripReference = database.collection("trips").document(tripID)
+            let tripDocument = try await tripReference.getDocument()
+            guard
+                tripDocument.exists,
+                let startDate = (tripDocument.get("startAt") as? Timestamp)?.dateValue(),
+                let endDate = (tripDocument.get("endAt") as? Timestamp)?.dateValue()
+            else { continue }
+
+            let destination = (tripDocument.get("destinations") as? [[String: Any]])?.first
+            trips.append(
+                UpcomingTripSnapshot(
+                    tripID: tripReference.documentID,
+                    destinationName: destination?["name"] as? String ?? "여행",
+                    countryName: destination?["country"] as? String ?? "",
+                    startDate: startDate,
+                    endDate: endDate
+                )
+            )
+        }
+
+        return trips.sorted { $0.startDate < $1.startDate }
+    }
+
+    static func deleteUpcomingTrip(tripID: String) async throws {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard let userID = Auth.auth().currentUser?.uid else {
+            throw TripServiceError.unauthenticated
+        }
+
+        try await Firestore.firestore()
+            .collection("users")
+            .document(userID)
+            .setData(
+                [
+                    "joinedTripIDs": FieldValue.arrayRemove([tripID]),
+                    "dismissedTripIDs": FieldValue.arrayUnion([tripID]),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
     }
 
     private static func makeInviteURL(code: String, expiresAt: Date) -> URL {

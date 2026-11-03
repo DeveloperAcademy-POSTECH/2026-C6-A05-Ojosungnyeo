@@ -20,7 +20,7 @@ struct PlaceGroupingDetailView: View {
                 groupHeading
                 memberList
                 preferenceHeading
-                if store.canJoin {
+                if store.canJoin && !store.showsEmptyState {
                     joinButton
                 }
                 if store.showsEmptyState {
@@ -28,13 +28,6 @@ struct PlaceGroupingDetailView: View {
                 } else {
                     placeList
                 }
-            }
-
-            if store.isToastPresented {
-                cancellationToast
-                    .padding(.top, 32)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(2)
             }
 
             if store.isJoinConfirmationPresented {
@@ -68,7 +61,6 @@ struct PlaceGroupingDetailView: View {
             .padding(.bottom, 11)
             .background(DDColor.surfaceDefault)
         }
-        .animation(.easeInOut(duration: 0.25), value: store.isToastPresented)
         .animation(
             .easeInOut(duration: 0.2),
             value: store.isJoinConfirmationPresented
@@ -126,23 +118,16 @@ struct PlaceGroupingDetailView: View {
     private var memberList: some View {
         HStack(alignment: .top, spacing: 8) {
             HStack(alignment: .top, spacing: -14) {
-                ForEach(
-                    store.members.filter {
-                        $0.id == "tae" || $0.id == "header"
-                    }
-                ) { member in
+                ForEach(Array(groupMembers.enumerated()), id: \.element.id) { index, member in
                     memberButton(
                         member,
                         isActive: store.selectedMemberIDs.contains(member.id)
                     )
+                    .zIndex(Double(groupMembers.count - index))
                 }
             }
 
-            ForEach(
-                store.members.filter {
-                    $0.id == "juni" || $0.id == "grae"
-                }
-            ) { member in
+            ForEach(individualMembers) { member in
                 memberButton(
                     member,
                     isActive: store.selectedMemberIDs.contains(member.id)
@@ -153,6 +138,14 @@ struct PlaceGroupingDetailView: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(height: 109, alignment: .top)
+    }
+
+    private var groupMembers: [PlaceGroupingDetailFeature.Member] {
+        store.members.filter { store.groupMemberIDs.contains($0.id) }
+    }
+
+    private var individualMembers: [PlaceGroupingDetailFeature.Member] {
+        store.members.filter { !store.groupMemberIDs.contains($0.id) }
     }
 
     private func memberButton(
@@ -211,20 +204,9 @@ struct PlaceGroupingDetailView: View {
                 .foregroundStyle(DDColor.textPrimary)
 
             if !store.showsEmptyState {
-                HStack(spacing: 0) {
-                    Text("쇼핑")
-                        .ddTypography(.bodyEmphasis16)
-                        .foregroundStyle(DDColor.actionPrimary)
-                    Text(" 그리고 ")
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textSecondary)
-                    Text("디저트")
-                        .ddTypography(.bodyEmphasis16)
-                        .foregroundStyle(DDColor.actionPrimary)
-                    Text(" 취향으로 모인 그룹이에요")
-                        .ddTypography(.body16)
-                        .foregroundStyle(DDColor.textSecondary)
-                }
+                Text("\(store.preferenceCategories.joined(separator: ", ")) 취향으로 모인 그룹이에요")
+                    .ddTypography(.body16)
+                    .foregroundStyle(DDColor.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -278,25 +260,6 @@ struct PlaceGroupingDetailView: View {
         .scrollIndicators(.hidden)
     }
 
-    private var cancellationToast: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(DDColor.actionPrimary)
-
-            Text("헤더가 수정함에 따라 확정이 취소되었어요.")
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textPrimary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Color(red: 37 / 255, green: 37 / 255, blue: 37 / 255))
-        .clipShape(.capsule)
-        .overlay {
-            Capsule()
-                .stroke(Color(red: 72 / 255, green: 72 / 255, blue: 72 / 255), lineWidth: 1)
-        }
-    }
 }
 
 private struct PlaceSwipeRow: View {
@@ -355,11 +318,21 @@ private struct PlaceSwipeRow: View {
 
     private var placeCard: some View {
         HStack(spacing: DDSpacing.large) {
-            Image(place.imageName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 40, height: 40)
-                .clipShape(.rect(cornerRadius: 8))
+            Group {
+                if let data = place.photoData, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Color(red: 52 / 255, green: 52 / 255, blue: 52 / 255)
+                        .overlay {
+                            Image(systemName: "photo")
+                                .foregroundStyle(DDColor.textSecondary)
+                        }
+                }
+            }
+            .frame(width: 40, height: 40)
+            .clipShape(.rect(cornerRadius: 8))
 
             Text(place.title)
                 .ddTypography(.bodyEmphasis16)

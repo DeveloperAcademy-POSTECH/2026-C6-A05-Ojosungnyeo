@@ -4,6 +4,7 @@
 //
 
 import ComposableArchitecture
+import Foundation
 
 struct HomeFeature: Reducer {
     enum MascotMessage: Int, CaseIterable, Equatable {
@@ -34,10 +35,16 @@ struct HomeFeature: Reducer {
         var userID = ""
         var nickname = ""
         var mascotMessage = MascotMessage.welcome
-        var upcomingTrips = UpcomingTripsPreviewData.state
+        var upcomingTrips = UpcomingTripsFeature.State()
         var isUpcomingTripsPresented = false
         var tripItinerary = TripItineraryFeature.State()
         var isTripItineraryPresented = false
+        var placeSelection = PlaceSelectionFeature.State()
+        var isPlaceSelectionPresented = false
+        var pendingPlaceSelectionTripID: String?
+        var placeGrouping = PlaceGroupingFeature.State()
+        var isPlaceAnalysisLoading = false
+        var isPlaceGroupingPresented = false
         var tripSearch = TripSearchFeature.State()
         var isTripSearchPresented = false
         var isMenuPresented = false
@@ -55,6 +62,10 @@ struct HomeFeature: Reducer {
         case exploreTripsButtonTapped
         case homeSwipedUp
         case upcomingTrips(UpcomingTripsFeature.Action)
+        case tripInvitationResponse(Result<TripInvitationSnapshot, Error>)
+        case placeSelection(PlaceSelectionFeature.Action)
+        case placeAnalysisFinished
+        case placeGrouping(PlaceGroupingFeature.Action)
         case tripItinerary(TripItineraryFeature.Action)
         case tripSearch(TripSearchFeature.Action)
         case mascotTapped
@@ -72,6 +83,7 @@ struct HomeFeature: Reducer {
     @Dependency(\.appleSignInClient) var appleSignInClient
     @Dependency(\.authClient) var authClient
     @Dependency(\.nicknameClient) var nicknameClient
+    @Dependency(\.tripClient) var tripClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -98,11 +110,50 @@ struct HomeFeature: Reducer {
             case .upcomingTrips(.backButtonTapped):
                 state.isUpcomingTripsPresented = false
                 return .none
-            case .upcomingTrips(.viewScheduleButtonTapped):
-                state.tripItinerary = TripItineraryFeature.State()
-                state.tripItinerary.selectedTab = .dailyItinerary
-                state.isTripItineraryPresented = true
+            case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
+                state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
+                state.pendingPlaceSelectionTripID = tripID
+                return .run { send in
+                    await send(
+                        .tripInvitationResponse(
+                            Result { try await tripClient.fetchInvitation(tripID) }
+                        )
+                    )
+                }
+                .cancellable(id: "place-selection-trip-request", cancelInFlight: true)
+            case let .tripInvitationResponse(.success(snapshot)):
+                guard state.pendingPlaceSelectionTripID == snapshot.tripID else {
+                    return .none
+                }
+                state.pendingPlaceSelectionTripID = nil
+                let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
+                state.placeSelection = waitingState.placeSelection
+                state.isPlaceSelectionPresented = true
+                return .none
+            case .tripInvitationResponse(.failure):
+                state.pendingPlaceSelectionTripID = nil
+                return .none
+            case .placeSelection(.delegate(.returnToUpcomingTrips)):
+                state.isPlaceSelectionPresented = false
+                state.isUpcomingTripsPresented = true
+                state.pendingPlaceSelectionTripID = nil
+                return .cancel(id: "place-selection-trip-request")
+            case .placeSelection(.delegate(.proceedToAnalysis)):
+                state.placeGrouping = PlaceGroupingFeature.State(
+                    placeSelection: state.placeSelection
+                )
+                state.isPlaceSelectionPresented = false
+                state.isPlaceGroupingPresented = false
+                state.isPlaceAnalysisLoading = true
+                return .none
+            case .placeAnalysisFinished:
+                state.isPlaceAnalysisLoading = false
+                state.isPlaceGroupingPresented = true
+                return .none
+            case .placeSelection:
+                return .none
+            case .placeGrouping:
                 return .none
             case .upcomingTrips(.createTripButtonTapped):
                 state.tripSearch = TripSearchFeature.State()
@@ -227,6 +278,14 @@ struct HomeFeature: Reducer {
             TripItineraryFeature()
         }
 
+        Scope(state: \.placeSelection, action: \.placeSelection) {
+            PlaceSelectionFeature()
+        }
+
+        Scope(state: \.placeGrouping, action: \.placeGrouping) {
+            PlaceGroupingFeature()
+        }
+
         Scope(state: \.tripSearch, action: \.tripSearch) {
             TripSearchFeature()
         }
@@ -235,4 +294,5 @@ struct HomeFeature: Reducer {
             SettingsFeature()
         }
     }
+
 }

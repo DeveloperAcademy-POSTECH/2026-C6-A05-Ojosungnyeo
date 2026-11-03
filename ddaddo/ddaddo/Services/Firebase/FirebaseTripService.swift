@@ -350,56 +350,44 @@ enum FirebaseTripService {
         let database = Firestore.firestore()
         let userReference = database.collection("users").document(userID)
         let userDocument = try await userReference.getDocument()
-        var tripIDs = userDocument.get("joinedTripIDs") as? [String] ?? []
+        let joinedTripIDs = userDocument.get("joinedTripIDs") as? [String] ?? []
         let dismissedTripIDs = Set(userDocument.get("dismissedTripIDs") as? [String] ?? [])
-
-        // 이전 버전에서 joinedTripIDs에 기록되지 않은 생성·참여 방도 항상 복구한다.
-        var discoveredTripIDs: [String] = []
-        if let tripDocuments = try? await database.collection("trips").getDocuments() {
-            for tripDocument in tripDocuments.documents {
-                guard !tripDocument.documentID.hasPrefix("development-trip-") else { continue }
-                guard let membership = try? await tripDocument.reference
-                    .collection("participants")
-                    .whereField("uid", isEqualTo: userID)
-                    .limit(to: 1)
-                    .getDocuments() else { continue }
-                if !membership.documents.isEmpty {
-                    discoveredTripIDs.append(tripDocument.documentID)
-                }
-            }
-        }
-        tripIDs.append(contentsOf: discoveredTripIDs)
-        tripIDs = Array(Set(tripIDs)).filter {
+        let tripIDs = Set(joinedTripIDs).filter {
             !$0.hasPrefix("development-trip-") && !dismissedTripIDs.contains($0)
         }
-        try await userReference.setData(
-            [
-                "joinedTripIDs": tripIDs,
-                "updatedAt": FieldValue.serverTimestamp()
-            ],
-            merge: true
-        )
 
-        var trips: [UpcomingTripSnapshot] = []
-        for tripID in Set(tripIDs) {
-            let tripReference = database.collection("trips").document(tripID)
-            let tripDocument = try await tripReference.getDocument()
-            guard
-                tripDocument.exists,
-                let startDate = (tripDocument.get("startAt") as? Timestamp)?.dateValue(),
-                let endDate = (tripDocument.get("endAt") as? Timestamp)?.dateValue()
-            else { continue }
+        let trips = try await withThrowingTaskGroup(
+            of: UpcomingTripSnapshot?.self,
+            returning: [UpcomingTripSnapshot].self
+        ) { group in
+            for tripID in tripIDs {
+                group.addTask {
+                    let document = try await Firestore.firestore()
+                        .collection("trips")
+                        .document(tripID)
+                        .getDocument()
+                    guard
+                        document.exists,
+                        let startDate = (document.get("startAt") as? Timestamp)?.dateValue(),
+                        let endDate = (document.get("endAt") as? Timestamp)?.dateValue()
+                    else { return nil }
 
-            let destination = (tripDocument.get("destinations") as? [[String: Any]])?.first
-            trips.append(
-                UpcomingTripSnapshot(
-                    tripID: tripReference.documentID,
-                    destinationName: destination?["name"] as? String ?? "여행",
-                    countryName: destination?["country"] as? String ?? "",
-                    startDate: startDate,
-                    endDate: endDate
-                )
-            )
+                    let destination = (document.get("destinations") as? [[String: Any]])?.first
+                    return UpcomingTripSnapshot(
+                        tripID: document.documentID,
+                        destinationName: destination?["name"] as? String ?? "여행",
+                        countryName: destination?["country"] as? String ?? "",
+                        startDate: startDate,
+                        endDate: endDate
+                    )
+                }
+            }
+
+            var snapshots: [UpcomingTripSnapshot] = []
+            for try await snapshot in group {
+                if let snapshot { snapshots.append(snapshot) }
+            }
+            return snapshots
         }
 
         return trips.sorted { $0.startDate < $1.startDate }

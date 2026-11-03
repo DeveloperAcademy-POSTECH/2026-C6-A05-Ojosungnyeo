@@ -1,6 +1,17 @@
 import ComposableArchitecture
 import Foundation
 
+struct TimeTableEditRow: Equatable, Identifiable {
+    enum Source: Equatable {
+        case schedule(TimeTableSchedule.ID)
+        case recommendationGroup(String)
+    }
+
+    let id: String
+    var sources: [Source]
+    var branchGroupID: String?
+}
+
 struct TimeTableEditFeature: Reducer {
     @ObservableState
     struct State: Equatable {
@@ -13,6 +24,9 @@ struct TimeTableEditFeature: Reducer {
         var placingGroupID: TimeTableGroup.ID?
         var editingDay: TripDay?
         var selectedMinuteOfDay: Int?
+        var rowsByDay: [TripDay: [TimeTableEditRow]] = [:]
+        var draftPlacements: [TimeTableSchedule] = []
+        var isSaveUnavailableAlertPresented = false
 
         var isTimeSelectionPresented: Bool {
             editingScheduleID != nil || placingGroupID != nil
@@ -40,6 +54,11 @@ struct TimeTableEditFeature: Reducer {
         case placeSearchResponse([PlaceSearchResult])
         case placeSearchFailed(String)
         case placeSearchResultTapped(PlaceSearchResult)
+        case recommendationDropped(String, before: TimeTableEditRow.ID?)
+        case scheduleRowMoved(TimeTableEditRow.ID, before: TimeTableEditRow.ID?)
+        case rowMerged(TimeTableEditRow.ID, into: TimeTableEditRow.ID)
+        case recommendationMerged(String, into: TimeTableEditRow.ID)
+        case saveUnavailableAlertDismissed
     }
 
     @Dependency(\.continuousClock) var clock
@@ -54,7 +73,12 @@ struct TimeTableEditFeature: Reducer {
                 return .cancel(id: "time-table-place-search")
 
             case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
-                 .groupAddButtonTapped, .timeSelectionDoneTapped:
+                 .groupAddButtonTapped, .timeSelectionDoneTapped,
+                 .recommendationDropped, .scheduleRowMoved, .rowMerged, .recommendationMerged:
+                return .none
+
+            case .saveUnavailableAlertDismissed:
+                state.isSaveUnavailableAlertPresented = false
                 return .none
 
             case let .timeSelectionChanged(minuteOfDay):

@@ -143,6 +143,7 @@ struct WaitingForConfirmationView: View {
 
             Button {
                 guard store.haveAllMembersConfirmed else { return }
+                store.send(.completionButtonTapped)
             } label: {
                 Text(
                     store.haveAllMembersConfirmed

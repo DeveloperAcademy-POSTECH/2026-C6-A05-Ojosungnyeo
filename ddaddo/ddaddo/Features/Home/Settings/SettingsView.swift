@@ -65,10 +65,10 @@ struct SettingsView: View {
 
     private var settings: some View {
         VStack(spacing: 0) {
-            header("닉네임 변경")
-            card {
+            header("설정")
+            card(minHeight: 86) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(store.nickname.isEmpty ? "지구인" : store.nickname).ddTypography(.bodyEmphasis16)
                         Text("Apple 계정으로 로그인").ddTypography(.caption12).foregroundStyle(DDColor.textSecondary)
                     }
@@ -80,7 +80,7 @@ struct SettingsView: View {
                         .background(DDColor.actionPrimary).clipShape(.capsule)
                 }
             }
-            .padding(.top, 36)
+            .padding(.top, 16)
 
             sectionTitle("앱 설정")
                 .padding(.top, 24)
@@ -100,7 +100,7 @@ struct SettingsView: View {
             }
 
             sectionTitle("계정")
-                .padding(.top, 32)
+                .padding(.top, 24)
                 .padding(.bottom, 4)
             Button { store.send(.accountManagementTapped) } label: {
                 card { HStack { rowText("계정 관리", "로그인과 회원 탈퇴를 관리해요"); Spacer(); Image(systemName: "chevron.right") } }
@@ -116,11 +116,11 @@ struct SettingsView: View {
                 Text("계정").ddTypography(.labelEmphasis14).foregroundStyle(DDColor.actionPrimary)
                 Text("어떻게 불러드릴까따?").ddTypography(.title24).foregroundStyle(DDColor.textPrimary)
                 Text("친구들에게 표시되는 이름을 바꿔요.").ddTypography(.label14).foregroundStyle(DDColor.textSecondary)
-            }.padding(.top, 22)
+            }.padding(.top, 2)
             Text("닉네임")
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textTertiary)
-                .padding(.top, 48)
+                .padding(.top, 32)
                 .padding(.bottom, 12)
             HStack {
                 TextField("닉네임", text: Binding(get: { store.nicknameDraft }, set: { store.send(.nicknameChanged($0)) }))
@@ -142,11 +142,20 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             header("계정 관리")
             sectionTitle("로그인 정보")
-                .padding(.top, 42)
+                .padding(.top, 24)
                 .padding(.bottom, 4)
-            card { rowText("Apple로 로그인", "현재 연결된 계정") }
+            card(minHeight: 78) {
+                VStack(alignment: .center, spacing: 4) {
+                    Text("Apple로 로그인")
+                        .ddTypography(.bodyEmphasis16)
+                    Text("현재 연결된 계정")
+                        .ddTypography(.caption12)
+                        .foregroundStyle(DDColor.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
             sectionTitle("계정 작업")
-                .padding(.top, 32)
+                .padding(.top, 24)
                 .padding(.bottom, 4)
             VStack(spacing: 0) {
                 accountAction("로그아웃", "로그아웃 후 로그인 화면으로 이동해요", color: DDColor.textPrimary) { store.send(.logoutTapped) }
@@ -232,8 +241,8 @@ struct SettingsView: View {
                 .foregroundStyle(DDColor.textPrimary).frame(height: 61)
         }.buttonStyle(.plain)
     }
-    private func sectionTitle(_ title: String) -> some View { Text(title).ddTypography(.labelEmphasis14).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4) }
-    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View { content().padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 74, alignment: .leading).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) } }
+    private func sectionTitle(_ title: String) -> some View { Text(title).ddTypography(.labelEmphasis14).frame(maxWidth: .infinity, alignment: .leading) }
+    private func card<Content: View>(minHeight: CGFloat = 74, @ViewBuilder _ content: () -> Content) -> some View { content().padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) } }
     private func rowText(_ title: String, _ subtitle: String) -> some View { VStack(alignment: .leading, spacing: 4) { Text(title).ddTypography(.bodyEmphasis16); Text(subtitle).ddTypography(.caption12).foregroundStyle(DDColor.textSecondary) } }
     private func accountAction(_ title: String, _ subtitle: String, color: Color, action: @escaping () -> Void) -> some View { Button(action: action) { HStack { rowText(title, subtitle).foregroundStyle(color); Spacer(); Image(systemName: "chevron.right").foregroundStyle(DDColor.textPrimary) }.frame(height: 76) }.buttonStyle(.plain) }
     private var withdrawalCheckbox: some View {

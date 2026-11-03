@@ -18,11 +18,250 @@ struct TimeTableView: View {
                 store: store.scope(state: \.edit, action: \.edit)
             )
         } else {
-            TimeTableContent(
+            TimeTableReadOnlyContent(
                 store: store,
                 onBack: { store.send(.backButtonTapped) },
                 onEdit: { store.send(.editButtonTapped) }
             )
+        }
+    }
+}
+
+private struct TimeTableReadOnlyContent: View {
+    let store: StoreOf<TimeTableFeature>
+    let onBack: () -> Void
+    let onEdit: () -> Void
+
+    private var scheduledCourses: [(schedule: TimeTableSchedule, course: TimeTableCourse)] {
+        store.placements.enumerated()
+            .filter {
+                $0.element.day == store.selectedDay &&
+                store.dayOfMonthByDay[$0.element.day] != nil
+            }
+            .compactMap { index, schedule in
+                store.coursesByID[schedule.courseID].map { (index, schedule, $0) }
+            }
+            .sorted {
+                let left = $0.1.timing.startMinuteOfDay
+                let right = $1.1.timing.startMinuteOfDay
+                return left == right ? $0.0 < $1.0 : left < right
+            }
+            .map { ($0.1, $0.2) }
+    }
+
+    private var tripDateText: String? {
+        if let startDate = store.tripStartDate, let endDate = store.tripEndDate {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .current
+            let startDay = calendar.startOfDay(for: startDate)
+            let endDay = calendar.startOfDay(for: endDate)
+            guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
+                  nights >= 0 else { return nil }
+
+            let startMonth = calendar.component(.month, from: startDay)
+            let startDayOfMonth = calendar.component(.day, from: startDay)
+            let endMonth = calendar.component(.month, from: endDay)
+            let endDayOfMonth = calendar.component(.day, from: endDay)
+            let sameMonth = calendar.component(.year, from: startDay)
+                == calendar.component(.year, from: endDay) && startMonth == endMonth
+            let endText = sameMonth ? "\(endDayOfMonth)일" : "\(endMonth)월 \(endDayOfMonth)일"
+            return "\(startMonth)월 \(startDayOfMonth)일 ~ \(endText) · \(nights)박 \(nights + 1)일"
+        }
+
+        guard store.tripStartDate == nil, store.tripEndDate == nil else { return nil }
+        let days = TripDay.allCases.compactMap { store.dayOfMonthByDay[$0] }
+        guard let first = days.first, let last = days.last else { return nil }
+        for index in 1..<days.count where days[index] != days[index - 1] + 1 {
+            return nil
+        }
+        let nights = days.count - 1
+        return "\(first)일 ~ \(last)일 · \(nights)박 \(nights + 1)일"
+    }
+
+    var body: some View {
+        ZStack {
+            DDColor.surfaceDefault.ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 0) {
+                navigationBar
+                tripHeader
+                dayPicker
+
+                ScrollView {
+                    scheduleSection
+                        .padding(.bottom, DDSpacing.xLarge)
+                }
+                .scrollIndicators(.hidden)
+                .id(store.selectedDay)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, DDSpacing.large)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var navigationBar: some View {
+        HStack {
+            Button(action: onBack) {
+                Image("DDTimeTableBack")
+                    .resizable()
+                    .frame(width: 20, height: 40)
+                    .frame(width: 44, height: 40, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button("편집", action: onEdit)
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(DDColor.textPrimary)
+                .frame(width: 64, height: 40)
+                .background(DDColor.surfaceControl)
+                .clipShape(.capsule)
+                .buttonStyle(.plain)
+        }
+        .frame(height: 40)
+        .padding(.horizontal, DDSpacing.large)
+        .padding(.top, 7)
+    }
+
+    private var tripHeader: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: DDSpacing.small) {
+                Text("여행 일정을 살펴보게따")
+                    .ddTypography(.title24)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .lineLimit(1)
+
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(DDColor.textPrimary)
+            }
+            .frame(height: 33, alignment: .leading)
+
+            if let tripDateText {
+                Text(tripDateText)
+                    .ddTypography(.body16)
+                    .foregroundStyle(DDColor.textSecondary)
+                    .lineLimit(1)
+                    .frame(height: 24, alignment: .leading)
+            }
+
+            Text("추천 그룹 추가는 편집 뷰에서 가능해요.")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+                .lineLimit(1)
+                .frame(height: 24, alignment: .leading)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .padding(.bottom, 5)
+    }
+
+    private var dayPicker: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: DDSpacing.small) {
+                ForEach(TripDay.allCases) { day in
+                    Button {
+                        store.send(.daySelected(day))
+                    } label: {
+                        Text(day.rawValue)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .frame(width: 64, height: 40)
+                            .background(
+                                day == store.selectedDay
+                                    ? Color(red: 118 / 255, green: 118 / 255, blue: 118 / 255)
+                                    : .clear
+                            )
+                            .clipShape(.capsule)
+                            .overlay {
+                                Capsule().stroke(
+                                    Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
+                                    lineWidth: 1
+                                )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, DDSpacing.large)
+        }
+        .scrollIndicators(.hidden)
+        .frame(height: 42, alignment: .top)
+        .padding(.top, DDSpacing.small)
+    }
+
+    private var scheduleSection: some View {
+        VStack(alignment: .leading, spacing: DDSpacing.large) {
+            Text("여행 일정")
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+                .padding(.horizontal, DDSpacing.medium)
+
+            LazyVStack(spacing: DDSpacing.large) {
+                ForEach(Array(scheduledCourses.enumerated()), id: \.element.schedule.id) { index, item in
+                    HStack(alignment: .top, spacing: 20) {
+                        timelineMarker(number: index + 1, isLast: index == scheduledCourses.count - 1)
+                        scheduleCard(item.course)
+                    }
+                    .padding(.leading, DDSpacing.medium)
+                    .padding(.trailing, DDSpacing.large)
+                }
+            }
+        }
+        .padding(.top, DDSpacing.xLarge)
+    }
+
+    private func timelineMarker(number: Int, isLast: Bool) -> some View {
+        ZStack(alignment: .top) {
+            if !isLast {
+                Rectangle()
+                    .fill(DDColor.textTertiary)
+                    .frame(width: 5, height: 87)
+                    .offset(y: 7)
+            }
+
+            Text("\(number)")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.black)
+                .frame(width: 15, height: 15)
+                .background(DDColor.actionPrimary, in: Circle())
+        }
+        .frame(width: 16, height: 71, alignment: .top)
+    }
+
+    private func scheduleCard(_ course: TimeTableCourse) -> some View {
+        VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
+            HStack(spacing: DDSpacing.xSmall) {
+                Text(course.title)
+                    .ddTypography(.bodyEmphasis16)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .lineLimit(1)
+
+                if course.kind(among: store.tripMembers) == .separate {
+                    HStack(spacing: -5) {
+                        ForEach(TripMember.allCases.filter(course.members.contains)) { member in
+                            Circle()
+                                .fill(member.routeAccentColor)
+                                .frame(width: 14, height: 14)
+                        }
+                    }
+                }
+            }
+
+            Text(course.placesSummary)
+                .ddTypography(.labelEmphasis14)
+                .foregroundStyle(DDColor.actionPrimary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, DDSpacing.xLarge)
+        .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
+        .background(DDColor.surfaceElevated)
+        .clipShape(.rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(DDColor.textTertiary, lineWidth: 1)
         }
     }
 }

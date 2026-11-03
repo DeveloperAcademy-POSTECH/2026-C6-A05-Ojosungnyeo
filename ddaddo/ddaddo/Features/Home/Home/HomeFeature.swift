@@ -113,6 +113,9 @@ struct HomeFeature: Reducer {
             case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
                 state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
+                let trip = state.upcomingTrips.trips.first { $0.id == tripID }
+                state.tripItinerary.timeTable.tripStartDate = trip?.startDate
+                state.tripItinerary.timeTable.tripEndDate = trip?.endDate
                 state.pendingPlaceSelectionTripID = tripID
                 return .run { send in
                     await send(

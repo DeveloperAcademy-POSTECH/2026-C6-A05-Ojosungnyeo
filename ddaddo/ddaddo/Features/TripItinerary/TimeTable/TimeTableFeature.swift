@@ -13,6 +13,8 @@ struct TimeTableFeature: Reducer {
     struct State: Equatable {
         var selectedDay = TripDay.day1
         var tripMembers = TripMember.allCases
+        var tripStartDate: Date? = nil
+        var tripEndDate: Date? = nil
         var dayOfMonthByDay: [TripDay: Int] = [
             .day1: 22, .day2: 23, .day3: 24, .day4: 25
         ]

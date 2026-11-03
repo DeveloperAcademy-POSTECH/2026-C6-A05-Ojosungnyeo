@@ -18,7 +18,8 @@ struct RouteOverviewFeature: Reducer {
         var stopsByDay = RouteStop.stopsByDay
         var draftStopsByDay: [TripDay: [RouteStop]]?
         let places = RoutePlace.mockPlaces
-        let currentMember = TripMember.tae
+        var memberOrder = TripMember.allCases
+        var currentMember = TripMember.tae
 
         private var currentStops: [RouteStop] {
             let source = draftStopsByDay ?? stopsByDay

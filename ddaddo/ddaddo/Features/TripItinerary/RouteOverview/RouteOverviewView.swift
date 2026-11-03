@@ -49,7 +49,8 @@ struct RouteOverviewView: View {
         RouteGoogleMapView(
             stops: store.visibleStops,
             selectedMembers: store.selectedMembers,
-            currentMember: store.currentMember
+            currentMember: store.currentMember,
+            memberOrder: store.memberOrder
         )
             .ignoresSafeArea()
     }
@@ -176,7 +177,7 @@ struct RouteOverviewView: View {
 
     private var editingHeader: some View {
         HStack(spacing: DDSpacing.xSmall) {
-            ForEach(TripMember.allCases) { member in
+            ForEach(store.memberOrder) { member in
                 Button {
                     store.send(.memberTapped(member))
                 } label: {
@@ -211,7 +212,7 @@ struct RouteOverviewView: View {
 
     private var memberFilter: some View {
         HStack(spacing: DDSpacing.xSmall) {
-            ForEach(TripMember.allCases) { member in
+            ForEach(store.memberOrder) { member in
                 Button {
                     store.send(.memberTapped(member))
                 } label: {
@@ -434,7 +435,7 @@ struct RouteOverviewView: View {
     @ViewBuilder
     private func participantDots(for stop: RouteStop) -> some View {
         if store.selectedMembers.count != 1,
-           stop.members.count < TripMember.allCases.count {
+           !Set(store.memberOrder).isSubset(of: stop.members) {
             HStack(spacing: -5) {
                 ForEach(members(for: stop)) { member in
                     Circle()
@@ -497,7 +498,7 @@ struct RouteOverviewView: View {
     }
 
     private func members(for stop: RouteStop) -> [TripMember] {
-        TripMember.allCases.filter { member in
+        store.memberOrder.filter { member in
             stop.members.contains(member)
                 && (store.selectedMembers.isEmpty || store.selectedMembers.contains(member))
         }

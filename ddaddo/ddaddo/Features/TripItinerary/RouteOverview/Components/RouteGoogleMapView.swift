@@ -12,6 +12,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
     let stops: [RouteStop]
     let selectedMembers: Set<TripMember>
     let currentMember: TripMember
+    let memberOrder: [TripMember]
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var signature = ""
@@ -90,18 +91,19 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
     private func updateRoute(on mapView: GMSMapView, coordinator: Coordinator) {
         let stopSignature = stops.map { stop in
-            let memberSignature = TripMember.allCases
+            let memberSignature = memberOrder
                 .filter(stop.members.contains)
                 .map(\.rawValue)
                 .joined(separator: ",")
             return "\(stop.id):\(stop.order):\(stop.latitude):\(stop.longitude):\(memberSignature)"
         }
         .joined(separator: "|")
-        let selectionSignature = TripMember.allCases
+        let selectionSignature = memberOrder
             .filter(selectedMembers.contains)
             .map(\.rawValue)
             .joined(separator: ",")
-        let signature = "\(selectionSignature)#\(currentMember.rawValue)#\(stopSignature)"
+        let orderSignature = memberOrder.map(\.rawValue).joined(separator: ",")
+        let signature = "\(selectionSignature)#\(currentMember.rawValue)#\(orderSignature)#\(stopSignature)"
         guard signature != coordinator.signature else { return }
         coordinator.signature = signature
         mapView.clear()
@@ -143,7 +145,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
     private func markerStyle(for stop: RouteStop) -> (assetName: String, badgeColor: UIColor) {
         if selectedMembers.isEmpty,
-           stop.members.count == TripMember.allCases.count {
+           Set(memberOrder).isSubset(of: stop.members) {
             return ("DDRouteUFONeon", Self.neonMarkerColor)
         }
 
@@ -162,8 +164,8 @@ struct RouteGoogleMapView: UIViewRepresentable {
         guard stops.count > 1 else { return }
 
         let displayedMembers = selectedMembers.isEmpty
-            ? TripMember.allCases
-            : TripMember.allCases.filter(selectedMembers.contains)
+            ? memberOrder
+            : memberOrder.filter(selectedMembers.contains)
 
         var membersByLeg: [RouteLeg: [TripMember]] = [:]
         var orderedLegs: [RouteLeg] = []
@@ -209,7 +211,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
                   let end = stopsByID[leg.endID],
                   let members = membersByLeg[leg] else { continue }
 
-            if members.count == TripMember.allCases.count {
+            if Set(memberOrder).isSubset(of: Set(members)) {
                 drawPolyline(
                     coordinates: [coordinate(for: start), coordinate(for: end)],
                     color: Self.neonRouteColor,
@@ -232,7 +234,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
             return currentMember
         }
 
-        return TripMember.allCases.first(where: members.contains)
+        return memberOrder.first(where: members.contains)
     }
 
     private struct RouteLeg: Hashable {

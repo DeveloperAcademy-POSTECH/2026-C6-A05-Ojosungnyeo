@@ -49,6 +49,7 @@ struct RouteOverviewView: View {
         RouteGoogleMapView(
             stops: store.visibleStops,
             selectedMembers: store.selectedMembers,
+            selectedMemberOrder: store.selectedMemberOrder,
             currentMember: store.currentMember,
             memberOrder: store.memberOrder
         )

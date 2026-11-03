@@ -13,6 +13,7 @@ struct RouteOverviewFeature: Reducer {
     struct State: Equatable {
         var selectedDay = TripDay.day1
         var selectedMembers: Set<TripMember> = []
+        var selectedMemberOrder: [TripMember] = []
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
         var isEditing = false
         var stopsByDay = RouteStop.stopsByDay
@@ -67,6 +68,7 @@ struct RouteOverviewFeature: Reducer {
             case .onAppear:
                 state.selectedDay = .day1
                 state.selectedMembers.removeAll()
+                state.selectedMemberOrder.removeAll()
                 state.isEditing = false
                 state.draftStopsByDay = nil
                 return .none
@@ -81,8 +83,10 @@ struct RouteOverviewFeature: Reducer {
             case let .memberTapped(member):
                 if state.selectedMembers.contains(member) {
                     state.selectedMembers.remove(member)
+                    state.selectedMemberOrder.removeAll { $0 == member }
                 } else {
                     state.selectedMembers.insert(member)
+                    state.selectedMemberOrder.append(member)
                 }
                 return .none
 

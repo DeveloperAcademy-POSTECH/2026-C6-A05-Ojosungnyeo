@@ -11,6 +11,7 @@ import SwiftUI
 struct RouteGoogleMapView: UIViewRepresentable {
     let stops: [RouteStop]
     let selectedMembers: Set<TripMember>
+    let selectedMemberOrder: [TripMember]
     let currentMember: TripMember
     let memberOrder: [TripMember]
 
@@ -102,8 +103,11 @@ struct RouteGoogleMapView: UIViewRepresentable {
             .filter(selectedMembers.contains)
             .map(\.rawValue)
             .joined(separator: ",")
+        let selectionOrderSignature = selectedMemberOrder
+            .map(\.rawValue)
+            .joined(separator: ",")
         let orderSignature = memberOrder.map(\.rawValue).joined(separator: ",")
-        let signature = "\(selectionSignature)#\(currentMember.rawValue)#\(orderSignature)#\(stopSignature)"
+        let signature = "\(selectionSignature)#\(selectionOrderSignature)#\(currentMember.rawValue)#\(orderSignature)#\(stopSignature)"
         guard signature != coordinator.signature else { return }
         coordinator.signature = signature
         mapView.clear()
@@ -153,7 +157,10 @@ struct RouteGoogleMapView: UIViewRepresentable {
             ? stop.members
             : stop.members.intersection(selectedMembers)
 
-        guard let member = representativeMember(in: visibleMembers) else {
+        guard let member = representativeMember(
+            in: visibleMembers,
+            prioritizingRecentSelection: !selectedMembers.isEmpty
+        ) else {
             return ("DDRouteUFONeon", Self.neonMarkerColor)
         }
 
@@ -220,7 +227,10 @@ struct RouteGoogleMapView: UIViewRepresentable {
                 continue
             }
 
-            guard let member = representativeMember(in: Set(members)) else { continue }
+            guard let member = representativeMember(
+                in: Set(members),
+                prioritizingRecentSelection: false
+            ) else { continue }
             drawPolyline(
                 coordinates: [coordinate(for: start), coordinate(for: end)],
                 color: UIColor(member.routePolylineColor),
@@ -229,7 +239,15 @@ struct RouteGoogleMapView: UIViewRepresentable {
         }
     }
 
-    private func representativeMember(in members: Set<TripMember>) -> TripMember? {
+    private func representativeMember(
+        in members: Set<TripMember>,
+        prioritizingRecentSelection: Bool
+    ) -> TripMember? {
+        if prioritizingRecentSelection,
+           let recentlySelectedMember = selectedMemberOrder.last(where: members.contains) {
+            return recentlySelectedMember
+        }
+
         if members.contains(currentMember) {
             return currentMember
         }

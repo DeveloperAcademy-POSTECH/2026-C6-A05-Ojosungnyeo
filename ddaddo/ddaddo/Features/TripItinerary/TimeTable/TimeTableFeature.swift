@@ -9,6 +9,10 @@ import ComposableArchitecture
 import Foundation
 
 struct TimeTableFeature: Reducer {
+    enum Delegate: Equatable {
+        case addPlaceRequested
+    }
+
     @ObservableState
     struct State: Equatable {
         var selectedDay = TripDay.day1
@@ -137,13 +141,17 @@ struct TimeTableFeature: Reducer {
         case groupAddButtonTapped(TimeTableGroup.ID)
         case scheduleTapped(TimeTableSchedule.ID)
         case edit(TimeTableEditFeature.Action)
+        case delegate(Delegate)
     }
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .backButtonTapped, .groupAddButtonTapped, .scheduleTapped:
+            case .backButtonTapped, .groupAddButtonTapped, .scheduleTapped, .delegate:
                 return .none
+
+            case .edit(.delegate(.addPlaceRequested)):
+                return .send(.delegate(.addPlaceRequested))
 
             case .editButtonTapped:
                 state.edit = TimeTableEditFeature.State()

@@ -13,30 +13,39 @@ struct TripItineraryView: View {
     private let tabItems = TripItineraryTabItemFactory.makeItems()
 
     var body: some View {
-        Group {
-            switch store.selectedTab {
-            case .dailyItinerary:
-                TimeTableView(
-                    store: store.scope(
-                        state: \.timeTable,
-                        action: \.timeTable
+        if store.isRouteEditorPresented {
+            RouteEditorView(
+                store: store.scope(
+                    state: \.routeEditor,
+                    action: \.routeEditor
+                )
+            )
+        } else {
+            Group {
+                switch store.selectedTab {
+                case .dailyItinerary:
+                    TimeTableView(
+                        store: store.scope(
+                            state: \.timeTable,
+                            action: \.timeTable
+                        )
                     )
-                )
 
-            case .routeOverview:
-                RouteOverviewView(
-                    store: store.scope(
-                        state: \.routeOverview,
-                        action: \.routeOverview
-                    ),
-                    onBack: {
-                        store.send(.delegate(.returnToUpcomingTrips))
-                    }
-                )
+                case .routeOverview:
+                    RouteOverviewView(
+                        store: store.scope(
+                            state: \.routeOverview,
+                            action: \.routeOverview
+                        ),
+                        onBack: {
+                            store.send(.delegate(.returnToUpcomingTrips))
+                        }
+                    )
+                }
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            itineraryTabBar
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                itineraryTabBar
+            }
         }
     }
 

@@ -175,6 +175,20 @@ enum FirebasePlaceSelectionService {
         }
     }
 
+    static func completeGrouping(tripID: String) async throws {
+        try await Firestore.firestore()
+            .collection("trips")
+            .document(tripID)
+            .setData(
+                [
+                    "status": "itinerary",
+                    "groupingCompletedAt": FieldValue.serverTimestamp(),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
+    }
+
     private static func currentParticipantReference(
         tripID: String
     ) async throws -> DocumentReference {

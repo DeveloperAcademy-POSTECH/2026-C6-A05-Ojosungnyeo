@@ -10,6 +10,10 @@ import CoreLocation
 import Foundation
 
 struct PlaceGroupingFeature: Reducer {
+    enum Delegate: Equatable {
+        case proceedToItinerary
+    }
+
     enum Tab: Equatable {
         case preferences
         case recommendedGroups
@@ -120,6 +124,7 @@ struct PlaceGroupingFeature: Reducer {
         case detail(PlaceGroupingDetailFeature.Action)
         case confirmButtonTapped
         case waitingForConfirmation(WaitingForConfirmationFeature.Action)
+        case delegate(Delegate)
     }
 
     @Dependency(\.placeClient) var placeClient
@@ -360,7 +365,12 @@ struct PlaceGroupingFeature: Reducer {
             case .waitingForConfirmation(.backButtonTapped):
                 state.isWaitingForConfirmationPresented = false
                 return .none
+            case .waitingForConfirmation(.delegate(.proceedToItinerary)):
+                state.isWaitingForConfirmationPresented = false
+                return .send(.delegate(.proceedToItinerary))
             case .waitingForConfirmation:
+                return .none
+            case .delegate:
                 return .none
             case let .tabSelected(tab):
                 state.selectedTab = tab

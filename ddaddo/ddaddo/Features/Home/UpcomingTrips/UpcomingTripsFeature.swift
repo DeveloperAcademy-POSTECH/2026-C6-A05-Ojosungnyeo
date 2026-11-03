@@ -17,6 +17,7 @@ struct UpcomingTripsFeature: Reducer {
         let destination: String
         let country: String
         let dateText: String
+        let isItineraryReady: Bool
     }
 
     @ObservableState
@@ -242,7 +243,8 @@ struct UpcomingTripsFeature: Reducer {
             id: snapshot.tripID,
             destination: destination,
             country: country,
-            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate)
+            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
+            isItineraryReady: snapshot.isItineraryReady
         )
     }
 

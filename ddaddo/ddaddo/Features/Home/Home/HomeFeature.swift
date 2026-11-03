@@ -111,6 +111,12 @@ struct HomeFeature: Reducer {
                 state.isUpcomingTripsPresented = false
                 return .none
             case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
+                if state.upcomingTrips.trips.first(where: { $0.id == tripID })?.isItineraryReady == true {
+                    state.tripItinerary = TripItineraryFeature.State(selectedTab: .dailyItinerary)
+                    state.isUpcomingTripsPresented = false
+                    state.isTripItineraryPresented = true
+                    return .none
+                }
                 state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
                 state.pendingPlaceSelectionTripID = tripID
@@ -152,6 +158,12 @@ struct HomeFeature: Reducer {
                 state.isPlaceGroupingPresented = true
                 return .none
             case .placeSelection:
+                return .none
+            case .placeGrouping(.delegate(.proceedToItinerary)):
+                state.isPlaceGroupingPresented = false
+                state.isPlaceAnalysisLoading = false
+                state.tripItinerary = TripItineraryFeature.State(selectedTab: .dailyItinerary)
+                state.isTripItineraryPresented = true
                 return .none
             case .placeGrouping:
                 return .none

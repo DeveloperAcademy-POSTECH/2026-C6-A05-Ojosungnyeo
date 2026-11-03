@@ -17,6 +17,7 @@ struct PlaceClient: DependencyKey, Sendable {
     var confirmPlaces: @Sendable (String) async throws -> Void
     var confirmGroups: @Sendable (String, [String]) async throws -> Void
     var fetchGroupConfirmations: @Sendable (String) async throws -> [MemberGroupConfirmation]
+    var completeGrouping: @Sendable (String) async throws -> Void
 
     static let liveValue: PlaceClient = {
         let service = GooglePlacesService()
@@ -53,6 +54,9 @@ struct PlaceClient: DependencyKey, Sendable {
             },
             fetchGroupConfirmations: { tripID in
                 try await FirebasePlaceSelectionService.fetchGroupConfirmations(tripID: tripID)
+            },
+            completeGrouping: { tripID in
+                try await FirebasePlaceSelectionService.completeGrouping(tripID: tripID)
             }
         )
     }()
@@ -78,7 +82,8 @@ struct PlaceClient: DependencyKey, Sendable {
         deletePlace: { _, _ in },
         confirmPlaces: { _ in },
         confirmGroups: { _, _ in },
-        fetchGroupConfirmations: { _ in [] }
+        fetchGroupConfirmations: { _ in [] },
+        completeGrouping: { _ in }
     )
 }
 

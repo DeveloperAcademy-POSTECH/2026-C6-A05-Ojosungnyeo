@@ -378,7 +378,8 @@ enum FirebaseTripService {
                         destinationName: destination?["name"] as? String ?? "여행",
                         countryName: destination?["country"] as? String ?? "",
                         startDate: startDate,
-                        endDate: endDate
+                        endDate: endDate,
+                        isItineraryReady: document.get("status") as? String == "itinerary"
                     )
                 }
             }

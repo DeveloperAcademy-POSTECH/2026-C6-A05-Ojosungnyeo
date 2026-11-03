@@ -10,7 +10,10 @@ import SwiftUI
 
 struct RouteGoogleMapView: UIViewRepresentable {
     let stops: [RouteStop]
-    let selectedMember: TripMember?
+    let selectedMembers: Set<TripMember>
+    let selectedMemberOrder: [TripMember]
+    let currentMember: TripMember
+    let memberOrder: [TripMember]
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var signature = ""
@@ -89,14 +92,22 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
     private func updateRoute(on mapView: GMSMapView, coordinator: Coordinator) {
         let stopSignature = stops.map { stop in
-            let memberSignature = TripMember.allCases
+            let memberSignature = memberOrder
                 .filter(stop.members.contains)
                 .map(\.rawValue)
                 .joined(separator: ",")
             return "\(stop.id):\(stop.order):\(stop.latitude):\(stop.longitude):\(memberSignature)"
         }
         .joined(separator: "|")
-        let signature = "\(selectedMember?.rawValue ?? "all")#\(stopSignature)"
+        let selectionSignature = memberOrder
+            .filter(selectedMembers.contains)
+            .map(\.rawValue)
+            .joined(separator: ",")
+        let selectionOrderSignature = selectedMemberOrder
+            .map(\.rawValue)
+            .joined(separator: ",")
+        let orderSignature = memberOrder.map(\.rawValue).joined(separator: ",")
+        let signature = "\(selectionSignature)#\(selectionOrderSignature)#\(currentMember.rawValue)#\(orderSignature)#\(stopSignature)"
         guard signature != coordinator.signature else { return }
         coordinator.signature = signature
         mapView.clear()
@@ -111,14 +122,31 @@ struct RouteGoogleMapView: UIViewRepresentable {
             uniqueKeysWithValues: orderedSteps.enumerated().map { ($0.element, $0.offset + 1) }
         )
 
+        var stopsByMarker: [RouteMarkerKey: [RouteStop]] = [:]
+        var orderedMarkerKeys: [RouteMarkerKey] = []
+
         for stop in stops {
+            let markerKey = RouteMarkerKey(stop: stop)
+            if stopsByMarker[markerKey] == nil {
+                orderedMarkerKeys.append(markerKey)
+            }
+            stopsByMarker[markerKey, default: []].append(stop)
+        }
+
+        for markerKey in orderedMarkerKeys {
+            guard let groupedStops = stopsByMarker[markerKey],
+                  let stop = groupedStops.first else { continue }
+
             let coordinate = coordinate(for: stop)
             bounds = bounds.includingCoordinate(coordinate)
 
             let marker = GMSMarker(position: coordinate)
             marker.groundAnchor = CGPoint(x: 0.5, y: 0.82)
             marker.map = mapView
-            let style = markerStyle(for: stop)
+            let groupedMembers = groupedStops.reduce(into: Set<TripMember>()) { members, stop in
+                members.formUnion(stop.members)
+            }
+            let style = markerStyle(for: groupedMembers)
             coordinator.numberedMarkers.append(
                 NumberedMarker(
                     marker: marker,
@@ -136,16 +164,20 @@ struct RouteGoogleMapView: UIViewRepresentable {
         mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 64))
     }
 
-    private func markerStyle(for stop: RouteStop) -> (assetName: String, badgeColor: UIColor) {
-        if let selectedMember {
-            return (
-                selectedMember.routeUFOAssetName,
-                UIColor(selectedMember.routeAccentColor)
-            )
+    private func markerStyle(for members: Set<TripMember>) -> (assetName: String, badgeColor: UIColor) {
+        if selectedMembers.isEmpty,
+           Set(memberOrder).isSubset(of: members) {
+            return ("DDRouteUFONeon", Self.neonMarkerColor)
         }
 
-        guard stop.members.count < TripMember.allCases.count,
-              let member = TripMember.allCases.first(where: stop.members.contains) else {
+        let visibleMembers = selectedMembers.isEmpty
+            ? members
+            : members.intersection(selectedMembers)
+
+        guard let member = representativeMember(
+            in: visibleMembers,
+            prioritizingRecentSelection: !selectedMembers.isEmpty
+        ) else {
             return ("DDRouteUFONeon", Self.neonMarkerColor)
         }
 
@@ -155,94 +187,132 @@ struct RouteGoogleMapView: UIViewRepresentable {
     private func drawRoutes(on mapView: GMSMapView) {
         guard stops.count > 1 else { return }
 
-        if let selectedMember {
-            drawPolyline(
-                coordinates: stops.map { coordinate(for: $0) },
-                color: UIColor(selectedMember.routePolylineColor),
-                on: mapView
-            )
-            return
-        }
+        let displayedMembers = selectedMembers.isEmpty
+            ? memberOrder
+            : selectedMemberOrder.filter(selectedMembers.contains)
 
-        var membersByLeg: [RouteLeg: [TripMember]] = [:]
+        var membersByLeg: [RouteLeg: Set<TripMember>] = [:]
+        var coordinatesByLeg: [RouteLeg: (start: CLLocationCoordinate2D, end: CLLocationCoordinate2D)] = [:]
         var orderedLegs: [RouteLeg] = []
 
-        for member in TripMember.allCases {
-            let memberStops = stops.filter { $0.members.contains(member) }
+        for member in displayedMembers {
+            var seenStops: Set<RouteMarkerKey> = []
+            let memberStops = stops
+                .filter { $0.members.contains(member) }
+                .sorted {
+                    if $0.order == $1.order {
+                        return $0.id < $1.id
+                    }
+                    return $0.order < $1.order
+                }
+                .filter { seenStops.insert(RouteMarkerKey(stop: $0)).inserted }
 
             for (start, end) in zip(memberStops, memberStops.dropFirst()) {
-                let leg = RouteLeg(startID: start.id, endID: end.id)
+                let leg = RouteLeg(start: start, end: end)
                 if membersByLeg[leg] == nil {
                     orderedLegs.append(leg)
+                    coordinatesByLeg[leg] = (
+                        start: coordinate(for: start),
+                        end: coordinate(for: end)
+                    )
                 }
-                membersByLeg[leg, default: []].append(member)
+                membersByLeg[leg, default: []].insert(member)
             }
         }
 
-        let stopsByID = Dictionary(uniqueKeysWithValues: stops.map { ($0.id, $0) })
+        if !selectedMembers.isEmpty {
+            for leg in orderedLegs {
+                guard let coordinates = coordinatesByLeg[leg],
+                      let members = membersByLeg[leg],
+                      let member = representativeMember(
+                        in: members,
+                        prioritizingRecentSelection: true
+                      ) else { continue }
+
+                drawPolyline(
+                    coordinates: [coordinates.start, coordinates.end],
+                    color: UIColor(member.routePolylineColor),
+                    on: mapView
+                )
+            }
+            return
+        }
 
         for leg in orderedLegs {
-            guard let start = stopsByID[leg.startID],
-                  let end = stopsByID[leg.endID],
+            guard let coordinates = coordinatesByLeg[leg],
                   let members = membersByLeg[leg] else { continue }
 
-            if members.count == TripMember.allCases.count {
+            if Set(memberOrder).isSubset(of: members) {
                 drawPolyline(
-                    coordinates: [coordinate(for: start), coordinate(for: end)],
+                    coordinates: [coordinates.start, coordinates.end],
                     color: Self.neonRouteColor,
                     on: mapView
                 )
                 continue
             }
 
-            for (memberIndex, member) in members.enumerated() {
-                let offset = Double(memberIndex) - Double(members.count - 1) / 2
-                drawPolyline(
-                    coordinates: offsetCoordinates(
-                        from: coordinate(for: start),
-                        to: coordinate(for: end),
-                        offset: offset * 0.00010
-                    ),
-                    color: UIColor(member.routePolylineColor),
-                    on: mapView
-                )
-            }
+            guard let member = representativeMember(
+                in: members,
+                prioritizingRecentSelection: false
+            ) else { continue }
+            drawPolyline(
+                coordinates: [coordinates.start, coordinates.end],
+                color: UIColor(member.routePolylineColor),
+                on: mapView
+            )
         }
     }
 
+    private func representativeMember(
+        in members: Set<TripMember>,
+        prioritizingRecentSelection: Bool
+    ) -> TripMember? {
+        if prioritizingRecentSelection,
+           let recentlySelectedMember = selectedMemberOrder.last(where: members.contains) {
+            return recentlySelectedMember
+        }
+
+        if members.contains(currentMember) {
+            return currentMember
+        }
+
+        return memberOrder.first(where: members.contains)
+    }
+
     private struct RouteLeg: Hashable {
-        let startID: RouteStop.ID
-        let endID: RouteStop.ID
+        let start: RouteCoordinateKey
+        let end: RouteCoordinateKey
+
+        init(start: RouteStop, end: RouteStop) {
+            self.start = RouteCoordinateKey(stop: start)
+            self.end = RouteCoordinateKey(stop: end)
+        }
+    }
+
+    private struct RouteMarkerKey: Hashable {
+        let order: Int
+        let coordinate: RouteCoordinateKey
+
+        init(stop: RouteStop) {
+            order = stop.order
+            coordinate = RouteCoordinateKey(stop: stop)
+        }
+    }
+
+    private struct RouteCoordinateKey: Hashable {
+        private static let precision = 100_000.0
+
+        let latitude: Int
+        let longitude: Int
+
+        init(stop: RouteStop) {
+            latitude = Int((stop.latitude * Self.precision).rounded())
+            longitude = Int((stop.longitude * Self.precision).rounded())
+        }
     }
 
     private func coordinate(for stop: RouteStop) -> CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)
-    }
-
-    private func offsetCoordinates(
-        from start: CLLocationCoordinate2D,
-        to end: CLLocationCoordinate2D,
-        offset: Double
-    ) -> [CLLocationCoordinate2D] {
-        guard offset != 0 else { return [start, end] }
-
-        let latitudeDelta = end.latitude - start.latitude
-        let longitudeDelta = end.longitude - start.longitude
-        let length = hypot(latitudeDelta, longitudeDelta)
-        guard length > 0 else { return [start, end] }
-
-        let latitudeOffset = -longitudeDelta / length * offset
-        let longitudeOffset = latitudeDelta / length * offset
-        return [
-            CLLocationCoordinate2D(
-                latitude: start.latitude + latitudeOffset,
-                longitude: start.longitude + longitudeOffset
-            ),
-            CLLocationCoordinate2D(
-                latitude: end.latitude + latitudeOffset,
-                longitude: end.longitude + longitudeOffset
-            )
-        ]
     }
 
     private func drawPolyline(
@@ -315,8 +385,8 @@ struct RouteGoogleMapView: UIViewRepresentable {
     )
 
     private static let neonRouteColor = UIColor(
-        red: 138 / 255,
-        green: 150 / 255,
+        red: 182 / 255,
+        green: 198 / 255,
         blue: 0,
         alpha: 1
     )

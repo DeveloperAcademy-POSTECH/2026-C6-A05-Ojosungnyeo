@@ -119,6 +119,14 @@ struct HomeFeature: Reducer {
                 }
                 state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
+                let trip = state.upcomingTrips.trips.first { $0.id == tripID }
+                state.tripItinerary.timeTable.tripStartDate = trip?.startDate
+                state.tripItinerary.timeTable.tripEndDate = trip?.endDate
+                if state.tripItinerary.timeTable.recommendationTripID != tripID {
+                    state.tripItinerary.timeTable.recommendationTripID = nil
+                    state.tripItinerary.timeTable.recommendations = []
+                    state.tripItinerary.timeTable.edit.rowsByDay = [:]
+                }
                 state.pendingPlaceSelectionTripID = tripID
                 return .run { send in
                     await send(
@@ -159,10 +167,44 @@ struct HomeFeature: Reducer {
                 return .none
             case .placeSelection:
                 return .none
-            case .placeGrouping(.delegate(.proceedToItinerary)):
+            case .placeGrouping(.confirmButtonTapped):
+                guard state.placeGrouping.haveAllRecommendedGroupsConfirmed,
+                      let source = state.placeGrouping.sourcePlaceSelection
+                else { return .none }
+
+                state.tripItinerary.timeTable.tripTitle = state.placeGrouping.tripTitle
+                state.tripItinerary.timeTable.tripStartDate = source.tripStartDate
+                state.tripItinerary.timeTable.tripEndDate = source.tripEndDate
+                state.tripItinerary.timeTable.recommendationTripID = source.tripID
+                state.tripItinerary.timeTable.recommendations = state.placeGrouping.recommendedGroups
+                    .filter { state.placeGrouping.confirmedGroupIDs.contains($0.id) }
+                    .flatMap { group in
+                        group.places.map { place in
+                            let ownerIDs = source.memberPlaces.compactMap { member, places in
+                                group.memberIDs.contains(member.rawValue) &&
+                                places.contains(where: { $0.id == place.id })
+                                    ? member.rawValue : nil
+                            }.sorted()
+                            return TimeTableRecommendation(
+                                id: "\(group.id)-\(place.id)",
+                                groupID: group.id,
+                                placeID: place.id,
+                                placeName: place.name,
+                                category: place.category,
+                                memberIDs: group.memberIDs,
+                                placeOwnerMemberIDs: ownerIDs
+                            )
+                        }
+                    }
+                return .none
+
+            case .placeGrouping(.waitingForConfirmation(.completionButtonTapped)):
+                let waiting = state.placeGrouping.waitingForConfirmation
+                guard waiting.haveAllMembersConfirmed,
+                      state.tripItinerary.timeTable.recommendationTripID == waiting.tripID
+                else { return .none }
+                state.tripItinerary.selectedTab = .dailyItinerary
                 state.isPlaceGroupingPresented = false
-                state.isPlaceAnalysisLoading = false
-                state.tripItinerary = TripItineraryFeature.State(selectedTab: .dailyItinerary)
                 state.isTripItineraryPresented = true
                 return .none
             case .placeGrouping:

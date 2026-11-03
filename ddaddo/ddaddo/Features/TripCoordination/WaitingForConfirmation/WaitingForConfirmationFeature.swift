@@ -64,6 +64,7 @@ struct WaitingForConfirmationFeature: Reducer {
         case confirmationsResponse([MemberGroupConfirmation])
         case confirmationsFailed
         case backButtonTapped
+        case completionButtonTapped
         case nudgeButtonTapped(String)
         case completionButtonTapped
         case groupingCompleted
@@ -101,7 +102,7 @@ struct WaitingForConfirmationFeature: Reducer {
                     )
                 }
                 return .none
-            case .confirmationsFailed, .nudgeButtonTapped:
+            case .confirmationsFailed, .nudgeButtonTapped, .completionButtonTapped:
                 return .none
             case .completionButtonTapped:
                 guard state.haveAllMembersConfirmed else { return .none }

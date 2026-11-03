@@ -17,6 +17,8 @@ struct UpcomingTripsFeature: Reducer {
         let destination: String
         let country: String
         let dateText: String
+        var startDate: Date? = nil
+        var endDate: Date? = nil
         let isItineraryReady: Bool
     }
 
@@ -243,8 +245,7 @@ struct UpcomingTripsFeature: Reducer {
             id: snapshot.tripID,
             destination: destination,
             country: country,
-            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
-            isItineraryReady: snapshot.isItineraryReady
+            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate)
         )
     }
 

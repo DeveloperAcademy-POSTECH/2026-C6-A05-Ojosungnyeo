@@ -105,6 +105,10 @@ struct PlaceGroupingFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case onAppear
+        case onDisappear
+        case refreshMemberPlaces
+        case memberPlacesResponse([MemberPlacePins])
+        case memberPlacesFailed
         case placePhotoResponse(String, Data?)
         case travelCriteriaChangeTapped
         case transportationSheetDismissed
@@ -119,36 +123,117 @@ struct PlaceGroupingFeature: Reducer {
     }
 
     @Dependency(\.placeClient) var placeClient
+    @Dependency(\.continuousClock) var clock
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                guard !state.hasRequestedPlacePhotos else { return .none }
-                state.hasRequestedPlacePhotos = true
-                let placesByID = state.recommendedGroups
-                    .flatMap(\.places)
-                    .reduce(into: [String: PinnedPlace]()) { result, place in
-                        result[place.id] = place
-                    }
-                return .merge(placesByID.values.map { place in
-                    .run { send in
-                        if let image = place.photoData.first {
-                            await send(.placePhotoResponse(place.id, image))
-                            return
+                var effects: [Effect<Action>] = []
+                if !state.hasRequestedPlacePhotos {
+                    state.hasRequestedPlacePhotos = true
+                    let placesByID = state.recommendedGroups
+                        .flatMap(\.places)
+                        .reduce(into: [String: PinnedPlace]()) { result, place in
+                            result[place.id] = place
                         }
-                        do {
-                            guard let result = try await placeClient.autocomplete(place.name).first else {
-                                await send(.placePhotoResponse(place.id, nil))
+                    effects.append(contentsOf: placesByID.values.map { place in
+                        .run { send in
+                            if let image = place.photoData.first {
+                                await send(.placePhotoResponse(place.id, image))
                                 return
                             }
-                            let details = try await placeClient.fetchDetails(result)
-                            await send(.placePhotoResponse(place.id, details.photoData.first))
-                        } catch {
-                            await send(.placePhotoResponse(place.id, nil))
+                            do {
+                                guard let result = try await placeClient.autocomplete(place.name).first else {
+                                    await send(.placePhotoResponse(place.id, nil))
+                                    return
+                                }
+                                let details = try await placeClient.fetchDetails(result)
+                                await send(.placePhotoResponse(place.id, details.photoData.first))
+                            } catch {
+                                await send(.placePhotoResponse(place.id, nil))
+                            }
                         }
+                    })
+                }
+                if let tripID = state.sourcePlaceSelection?.tripID {
+                    effects.append(fetchMemberPlacesEffect(tripID: tripID))
+                    effects.append(
+                        .run { send in
+                            while !Task.isCancelled {
+                                try await clock.sleep(for: .seconds(2))
+                                await send(.refreshMemberPlaces)
+                            }
+                        }
+                        .cancellable(id: "place-grouping-member-places", cancelInFlight: true)
+                    )
+                }
+                return .merge(effects)
+
+            case .onDisappear:
+                return .cancel(id: "place-grouping-member-places")
+
+            case .refreshMemberPlaces:
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return fetchMemberPlacesEffect(tripID: tripID)
+
+            case let .memberPlacesResponse(memberPins):
+                guard var source = state.sourcePlaceSelection else { return .none }
+                for pins in memberPins {
+                    source.memberPlaces[pins.member] = pins.places
+                    if let index = source.participants.firstIndex(where: {
+                        $0.member == pins.member
+                    }) {
+                        source.participants[index].isConfirmed = pins.isConfirmed
                     }
-                })
+                }
+                state.sourcePlaceSelection = source
+                let refreshed = PlaceGroupingEngine.makeGroups(
+                    from: source,
+                    selection: state.transportationSelection
+                )
+                let photoDataByID = state.recommendedGroups
+                    .flatMap(\.places)
+                    .reduce(into: [String: [Data]]()) { result, place in
+                        if !place.photoData.isEmpty { result[place.id] = place.photoData }
+                    }
+                let enrich: (PinnedPlace) -> PinnedPlace = { place in
+                    guard let photoData = photoDataByID[place.id] else { return place }
+                    return PinnedPlace(
+                        id: place.id,
+                        name: place.name,
+                        description: place.description,
+                        thumbnailName: place.thumbnailName,
+                        category: place.category,
+                        photoData: photoData,
+                        latitude: place.latitude,
+                        longitude: place.longitude
+                    )
+                }
+                state.members = refreshed.members
+                state.placeGroups = refreshed.mapGroups.map { group in
+                    MapPlaceGroup(
+                        id: group.id,
+                        name: group.name,
+                        places: group.places.map(enrich),
+                        radius: group.radius
+                    )
+                }
+                state.recommendedGroups = refreshed.recommendedGroups.map { group in
+                    RecommendedGroup(
+                        id: group.id,
+                        title: group.title,
+                        participantSummary: group.participantSummary,
+                        memberIDs: group.memberIDs,
+                        categories: group.categories,
+                        places: group.places.map(enrich)
+                    )
+                }
+                state.confirmedGroupIDs.formIntersection(state.recommendedGroups.map(\.id))
+                return .none
+
+            case .memberPlacesFailed:
+                return .none
 
             case let .placePhotoResponse(placeID, data):
                 guard let data else { return .none }
@@ -299,6 +384,17 @@ struct PlaceGroupingFeature: Reducer {
 
         Scope(state: \.transportationSheet, action: \.transportationSheet) {
             TripSetUpTransportationFeature()
+        }
+    }
+
+    private func fetchMemberPlacesEffect(tripID: String) -> Effect<Action> {
+        .run { send in
+            do {
+                let memberPlaces = try await placeClient.fetchMemberPlaces(tripID)
+                await send(.memberPlacesResponse(memberPlaces))
+            } catch {
+                await send(.memberPlacesFailed)
+            }
         }
     }
 }

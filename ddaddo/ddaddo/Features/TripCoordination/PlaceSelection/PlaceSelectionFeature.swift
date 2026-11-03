@@ -103,9 +103,7 @@ struct PlaceSelectionFeature: Reducer {
             self.participants = participants
             self.selectedMember = selectedMember
             self.memberPlaces = memberPlaces
-            self.remainingSeconds = tripID.hasPrefix("development-trip-")
-                ? 60
-                : remainingSeconds
+            self.remainingSeconds = remainingSeconds
         }
 
         var numberOfNights: Int {
@@ -234,9 +232,7 @@ struct PlaceSelectionFeature: Reducer {
             self.tripStartDate = tripStartDate
             self.tripEndDate = tripEndDate
             self.participants = participants
-            self.remainingSeconds = tripID.hasPrefix("development-trip-")
-                ? 60
-                : remainingSeconds
+            self.remainingSeconds = remainingSeconds
 
             let selectableMembers = participants.filter(\.hasJoined).map(\.member)
             if !selectableMembers.contains(selectedMember) {
@@ -408,14 +404,6 @@ struct PlaceSelectionFeature: Reducer {
 
             case let .memberPlacesResponse(memberPins):
                 for pins in memberPins {
-                    // 개발용 도쿄 방은 로컬에 준비한 관리자 핀을 서버의 빈 배열로
-                    // 덮어쓰지 않는다. 서버에 값이 생기면 그 값을 우선 사용한다.
-                    if state.tripID == "development-trip-123456",
-                       pins.member == .header,
-                       pins.places.isEmpty,
-                       !(state.memberPlaces[.header] ?? []).isEmpty {
-                        continue
-                    }
                     state.memberPlaces[pins.member] = pins.places
                     if let index = state.participants.firstIndex(where: {
                         $0.member == pins.member

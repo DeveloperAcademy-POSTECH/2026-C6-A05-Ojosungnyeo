@@ -28,6 +28,8 @@ struct UpcomingTripsFeature: Reducer {
         var isJoiningTrip = false
         var joinErrorMessage: String?
         var pendingDeletionTripID: Trip.ID?
+        var isDeletingTrip = false
+        var deletionErrorMessage: String?
         var waitingForParticipants: WaitingForParticipantsFeature.State?
         var isWaitingForParticipantsPresented = false
 
@@ -54,6 +56,8 @@ struct UpcomingTripsFeature: Reducer {
         case deleteButtonTapped(Trip.ID)
         case deleteCancelButtonTapped
         case deleteConfirmButtonTapped
+        case deleteTripResponse(Trip.ID, Result<Void, Error>)
+        case deletionErrorDismissed
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
         case delegate(Delegate)
@@ -156,9 +160,31 @@ struct UpcomingTripsFeature: Reducer {
                 return .none
 
             case .deleteConfirmButtonTapped:
-                guard state.pendingDeletionTripID != nil else { return .none }
-                // TODO: 삭제 API 연결 후 이 ID로 요청하고 성공했을 때만 목록에서 제거한다.
+                guard let tripID = state.pendingDeletionTripID,
+                      !state.isDeletingTrip else { return .none }
+                state.isDeletingTrip = true
                 state.pendingDeletionTripID = nil
+                return .run { send in
+                    await send(
+                        .deleteTripResponse(
+                            tripID,
+                            Result { try await tripClient.deleteUpcomingTrip(tripID) }
+                        )
+                    )
+                }
+
+            case let .deleteTripResponse(tripID, .success):
+                state.isDeletingTrip = false
+                state.trips.removeAll { $0.id == tripID }
+                return .none
+
+            case let .deleteTripResponse(_, .failure(error)):
+                state.isDeletingTrip = false
+                state.deletionErrorMessage = error.localizedDescription
+                return .none
+
+            case .deletionErrorDismissed:
+                state.deletionErrorMessage = nil
                 return .none
 
             case .waitingForParticipantsDismissed,
@@ -203,18 +229,9 @@ struct UpcomingTripsFeature: Reducer {
     }
 
     private static func makeTrip(from snapshot: UpcomingTripSnapshot) -> Trip {
-        let destination = switch snapshot.destinationName {
-        case "도쿄": "TOKYO"
-        case "상하이": "SHANGHAI"
-        case "시드니": "SYDNEY"
-        default: snapshot.destinationName.uppercased()
-        }
-        let country = switch snapshot.countryName {
-        case "일본": "Japan"
-        case "중국": "China"
-        case "호주": "Australia"
-        default: snapshot.countryName
-        }
+        let destination = (englishCityNames[snapshot.destinationName] ?? snapshot.destinationName)
+            .uppercased()
+        let country = englishCountryNames[snapshot.countryName] ?? snapshot.countryName
 
         return Trip(
             id: snapshot.tripID,
@@ -223,6 +240,94 @@ struct UpcomingTripsFeature: Reducer {
             dateText: dateText(from: snapshot.startDate, to: snapshot.endDate)
         )
     }
+
+    private static let englishCountryNames: [String: String] = [
+        "일본": "Japan",
+        "대만": "Taiwan",
+        "중국": "China",
+        "홍콩": "Hong Kong",
+        "마카오": "Macau",
+        "몽골": "Mongolia",
+        "태국": "Thailand",
+        "베트남": "Vietnam",
+        "필리핀": "Philippines",
+        "싱가포르": "Singapore",
+        "말레이시아": "Malaysia",
+        "프랑스": "France",
+        "영국": "United Kingdom",
+        "이탈리아": "Italy",
+        "스페인": "Spain",
+        "스위스": "Switzerland",
+        "체코": "Czechia",
+        "오스트리아": "Austria",
+        "미국": "United States",
+        "캐나다": "Canada",
+        "호주": "Australia",
+        "뉴질랜드": "New Zealand"
+    ]
+
+    private static let englishCityNames: [String: String] = [
+        "도쿄": "Tokyo",
+        "오사카": "Osaka",
+        "교토": "Kyoto",
+        "후쿠오카": "Fukuoka",
+        "삿포로": "Sapporo",
+        "오키나와": "Okinawa",
+        "나고야": "Nagoya",
+        "고베": "Kobe",
+        "나라": "Nara",
+        "다카마쓰": "Takamatsu",
+        "요코하마": "Yokohama",
+        "가나자와": "Kanazawa",
+        "히로시마": "Hiroshima",
+        "타이베이": "Taipei",
+        "타이중": "Taichung",
+        "가오슝": "Kaohsiung",
+        "타이난": "Tainan",
+        "상하이": "Shanghai",
+        "베이징": "Beijing",
+        "칭다오": "Qingdao",
+        "청두": "Chengdu",
+        "홍콩": "Hong Kong",
+        "마카오": "Macau",
+        "울란바토르": "Ulaanbaatar",
+        "방콕": "Bangkok",
+        "다낭": "Da Nang",
+        "하노이": "Hanoi",
+        "호찌민": "Ho Chi Minh City",
+        "세부": "Cebu",
+        "마닐라": "Manila",
+        "보라카이": "Boracay",
+        "싱가포르": "Singapore",
+        "쿠알라룸푸르": "Kuala Lumpur",
+        "파리": "Paris",
+        "런던": "London",
+        "로마": "Rome",
+        "피렌체": "Florence",
+        "베네치아": "Venice",
+        "밀라노": "Milan",
+        "바르셀로나": "Barcelona",
+        "마드리드": "Madrid",
+        "취리히": "Zurich",
+        "인터라켄": "Interlaken",
+        "프라하": "Prague",
+        "빈": "Vienna",
+        "뉴욕": "New York",
+        "로스앤젤레스": "Los Angeles",
+        "샌프란시스코": "San Francisco",
+        "라스베이거스": "Las Vegas",
+        "시애틀": "Seattle",
+        "시카고": "Chicago",
+        "보스턴": "Boston",
+        "워싱턴 D.C.": "Washington, D.C.",
+        "샌디에이고": "San Diego",
+        "호놀룰루": "Honolulu",
+        "밴쿠버": "Vancouver",
+        "토론토": "Toronto",
+        "시드니": "Sydney",
+        "멜버른": "Melbourne",
+        "오클랜드": "Auckland"
+    ]
 
     private static func dateText(from startDate: Date, to endDate: Date) -> String {
         let calendar = Calendar(identifier: .gregorian)

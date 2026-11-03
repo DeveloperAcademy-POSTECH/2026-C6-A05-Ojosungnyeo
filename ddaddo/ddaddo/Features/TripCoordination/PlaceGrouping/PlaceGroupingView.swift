@@ -97,7 +97,10 @@ struct PlaceGroupingView: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            await store.send(.onAppear).finish()
+            store.send(.onAppear)
+        }
+        .onDisappear {
+            store.send(.onDisappear)
         }
     }
 

@@ -28,6 +28,8 @@ struct UpcomingTripsFeature: Reducer {
         var isJoiningTrip = false
         var joinErrorMessage: String?
         var pendingDeletionTripID: Trip.ID?
+        var isDeletingTrip = false
+        var deletionErrorMessage: String?
         var waitingForParticipants: WaitingForParticipantsFeature.State?
         var isWaitingForParticipantsPresented = false
 
@@ -54,6 +56,8 @@ struct UpcomingTripsFeature: Reducer {
         case deleteButtonTapped(Trip.ID)
         case deleteCancelButtonTapped
         case deleteConfirmButtonTapped
+        case deleteTripResponse(Trip.ID, Result<Void, Error>)
+        case deletionErrorDismissed
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
         case delegate(Delegate)
@@ -156,9 +160,31 @@ struct UpcomingTripsFeature: Reducer {
                 return .none
 
             case .deleteConfirmButtonTapped:
-                guard state.pendingDeletionTripID != nil else { return .none }
-                // TODO: 삭제 API 연결 후 이 ID로 요청하고 성공했을 때만 목록에서 제거한다.
+                guard let tripID = state.pendingDeletionTripID,
+                      !state.isDeletingTrip else { return .none }
+                state.isDeletingTrip = true
                 state.pendingDeletionTripID = nil
+                return .run { send in
+                    await send(
+                        .deleteTripResponse(
+                            tripID,
+                            Result { try await tripClient.deleteUpcomingTrip(tripID) }
+                        )
+                    )
+                }
+
+            case let .deleteTripResponse(tripID, .success):
+                state.isDeletingTrip = false
+                state.trips.removeAll { $0.id == tripID }
+                return .none
+
+            case let .deleteTripResponse(_, .failure(error)):
+                state.isDeletingTrip = false
+                state.deletionErrorMessage = error.localizedDescription
+                return .none
+
+            case .deletionErrorDismissed:
+                state.deletionErrorMessage = nil
                 return .none
 
             case .waitingForParticipantsDismissed,

@@ -12,6 +12,7 @@ struct TripClient: DependencyKey, Sendable {
     var fetchInvitation: @MainActor @Sendable (String) async throws -> TripInvitationSnapshot
     var joinTrip: @MainActor @Sendable (String) async throws -> TripInvitationSnapshot
     var fetchUpcomingTrips: @MainActor @Sendable () async throws -> [UpcomingTripSnapshot]
+    var deleteUpcomingTrip: @MainActor @Sendable (String) async throws -> Void
 
     static let liveValue = Self(
         createTrip: { request in
@@ -25,6 +26,9 @@ struct TripClient: DependencyKey, Sendable {
         },
         fetchUpcomingTrips: {
             try await FirebaseTripService.fetchUpcomingTrips()
+        },
+        deleteUpcomingTrip: { tripID in
+            try await FirebaseTripService.deleteUpcomingTrip(tripID: tripID)
         }
     )
 
@@ -32,7 +36,8 @@ struct TripClient: DependencyKey, Sendable {
         createTrip: { _ in throw CancellationError() },
         fetchInvitation: { _ in throw CancellationError() },
         joinTrip: { _ in throw CancellationError() },
-        fetchUpcomingTrips: { [] }
+        fetchUpcomingTrips: { [] },
+        deleteUpcomingTrip: { _ in }
     )
 }
 

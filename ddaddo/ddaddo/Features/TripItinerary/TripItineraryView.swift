@@ -8,7 +8,7 @@
 import ComposableArchitecture
 import SwiftUI
 
-struct: View {
+struct TripItineraryView: View {
     let store: StoreOf<TripItineraryFeature>
     private let tabItems = TripItineraryTabItemFactory.makeItems()
 

@@ -204,9 +204,8 @@ struct PlaceGroupingDetailView: View {
                 .foregroundStyle(DDColor.textPrimary)
 
             if !store.showsEmptyState {
-                Text("\(store.preferenceCategories.joined(separator: ", ")) 취향으로 모인 그룹이에요")
+                preferenceDescription
                     .ddTypography(.body16)
-                    .foregroundStyle(DDColor.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -217,22 +216,46 @@ struct PlaceGroupingDetailView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Text("휑")
-                .font(
-                    .custom(
-                        "Pretendard-Black",
-                        size: 128,
-                        relativeTo: .largeTitle
-                    )
-                )
+                .font(.system(size: 128, weight: .black))
                 .foregroundStyle(.white)
+                .minimumScaleFactor(1)
                 .frame(height: 122)
 
-            Text("그레는 이 지역에 그룹핑된 장소가 없어요")
+            Text("\(emptyStateMemberName)는 이 지역에 그룹핑된 장소가 없어요")
                 .ddTypography(.body16)
                 .foregroundStyle(DDColor.textPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 76)
+    }
+
+    private var emptyStateMemberName: String {
+        store.members.first(where: { store.selectedMemberIDs.contains($0.id) })?.name
+            ?? store.members.first?.name
+            ?? "선택한 멤버"
+    }
+
+    private var preferenceDescription: Text {
+        let categories = store.preferenceCategories
+        guard !categories.isEmpty else {
+            return Text("비슷한 취향으로 모인 그룹이에요")
+                .foregroundColor(DDColor.textSecondary)
+        }
+
+        var result = Text("")
+        for (index, category) in categories.enumerated() {
+            if index > 0 {
+                let separator = index == categories.count - 1 ? " 그리고 " : ", "
+                result = result + Text(separator).foregroundColor(DDColor.textSecondary)
+            }
+            result = result + Text(category)
+                .font(.custom("Pretendard-SemiBold", size: 16, relativeTo: .body))
+                .foregroundColor(DDColor.actionPrimary)
+        }
+
+        return result
+            + Text(" 취향으로 모인 그룹이에요")
+                .foregroundColor(DDColor.textSecondary)
     }
 
     private var placeList: some View {
@@ -323,6 +346,10 @@ private struct PlaceSwipeRow: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
+                } else if let image = UIImage(named: place.imageName) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
                 } else {
                     Color(red: 52 / 255, green: 52 / 255, blue: 52 / 255)
                         .overlay {
@@ -341,9 +368,7 @@ private struct PlaceSwipeRow: View {
             Spacer(minLength: 0)
 
             if isEditable {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(DDColor.textSecondary)
+                dragHandle
             }
         }
         .padding(.horizontal, 12)
@@ -355,6 +380,22 @@ private struct PlaceSwipeRow: View {
                 .stroke(DDColor.borderDefault, lineWidth: 1)
         }
         .contentShape(Rectangle())
+    }
+
+    private var dragHandle: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Circle()
+                            .fill(DDColor.iconDefault)
+                            .frame(width: 3, height: 3)
+                    }
+                }
+            }
+        }
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
     }
 
     private var swipeGesture: some Gesture {

@@ -48,13 +48,25 @@ struct PlacePinCard: View {
                 .frame(width: 44, height: 44)
                 .clipped()
                 .clipShape(.rect(cornerRadius: 12))
-        } else {
-            Image(place.thumbnailName)
+        } else if !place.thumbnailName.isEmpty,
+                  let image = UIImage(named: place.thumbnailName) {
+            Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 44, height: 44)
                 .clipped()
                 .clipShape(.rect(cornerRadius: 12))
+        } else {
+            ZStack {
+                DDColor.surfaceControl
+
+                Image("DDEarth")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 39, height: 36)
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(.rect(cornerRadius: 12))
         }
     }
 }

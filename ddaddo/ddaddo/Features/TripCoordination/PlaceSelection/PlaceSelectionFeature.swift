@@ -77,6 +77,8 @@ struct PlaceSelectionFeature: Reducer {
         var hasSelectionEnded = false
         var isEditingConfirmedPlaces = false
         var completionAlert: CompletionAlert?
+        var placeSyncErrorMessage: String?
+        var requestedPhotoPlaceIDs: Set<String> = []
         var placeSearch = PlaceSearchFeature.State()
 
         init(
@@ -280,7 +282,7 @@ struct PlaceSelectionFeature: Reducer {
                     id: "tae-village",
                     name: "스머프 빌리지",
                     description: "진짜 스머프가 살았던 곳입니다. 버섯 스프를 만들어 먹을 수 있습니다.",
-                    thumbnailName: "DDMockPlaceVillage",
+                    thumbnailName: "",
                     category: "관광지",
                     latitude: 35.6619,
                     longitude: 139.7004
@@ -300,7 +302,7 @@ struct PlaceSelectionFeature: Reducer {
                     id: "header-village",
                     name: "도쿄 골목 산책",
                     description: "조용한 골목과 작은 상점이 이어지는 산책 코스입니다.",
-                    thumbnailName: "DDMockPlaceVillage",
+                    thumbnailName: "",
                     category: "쇼핑",
                     latitude: 35.6727,
                     longitude: 139.7038
@@ -320,7 +322,7 @@ struct PlaceSelectionFeature: Reducer {
                     id: "grae-village",
                     name: "하라주쿠 스트리트",
                     description: "개성 있는 숍과 전시 공간이 모여 있는 거리입니다.",
-                    thumbnailName: "DDMockPlaceVillage",
+                    thumbnailName: "",
                     category: "관광지",
                     latitude: 35.6702,
                     longitude: 139.7026
@@ -343,9 +345,13 @@ struct PlaceSelectionFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case onAppear
+        case onDisappear
+        case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
-        case placeMutationFailed
+        case placePhotoResponse(String, [Data])
+        case placeMutationFailed(String)
+        case placeSyncErrorDismissed
         case backButtonTapped
         case searchFieldTapped
         case searchTextChanged(String)
@@ -384,36 +390,121 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    return .send(.delegate(.proceedToAnalysis))
+                    return .merge(
+                        loadMemberPlacesEffect(tripID: state.tripID),
+                        .send(.delegate(.proceedToAnalysis))
+                    )
                 }
 
-                guard !state.isTimerRunning, !state.hasSelectionEnded else {
-                    return .none
-                }
-                state.isTimerRunning = true
-                return .merge(
-                    loadMemberPlacesEffect(tripID: state.tripID),
-                    .run { send in
-                        while !Task.isCancelled {
-                            try await clock.sleep(for: .seconds(1))
-                            await send(.timerTicked)
+                let tripID = state.tripID
+                var effects: [Effect<Action>] = [
+                    loadMemberPlacesEffect(tripID: tripID),
+                    observeMemberPlacesEffect(tripID: tripID)
+                    .cancellable(id: "place-selection-sync", cancelInFlight: true)
+                ]
+                if !state.isTimerRunning && !state.hasSelectionEnded {
+                    state.isTimerRunning = true
+                    effects.append(
+                        .run { send in
+                            while !Task.isCancelled {
+                                try await clock.sleep(for: .seconds(1))
+                                await send(.timerTicked)
+                            }
                         }
-                    }
-                    .cancellable(id: "place-selection-timer", cancelInFlight: true)
+                        .cancellable(id: "place-selection-timer", cancelInFlight: true)
+                    )
+                }
+                return .merge(effects)
+
+            case .onDisappear:
+                state.isTimerRunning = false
+                return .merge(
+                    .cancel(id: "place-selection-timer"),
+                    .cancel(id: "place-selection-sync")
                 )
 
+            case .refreshMemberPlaces:
+                return loadMemberPlacesEffect(tripID: state.tripID)
+
             case let .memberPlacesResponse(memberPins):
+                let cachedPhotoData = state.memberPlaces
+                    .values
+                    .flatMap { $0 }
+                    .reduce(into: [String: [Data]]()) { result, place in
+                        if !place.photoData.isEmpty {
+                            result[place.id] = place.photoData
+                        }
+                    }
+                var photoEffects: [Effect<Action>] = []
+
                 for pins in memberPins {
-                    state.memberPlaces[pins.member] = pins.places
+                    state.memberPlaces[pins.member] = pins.places.map { place in
+                        guard place.photoData.isEmpty,
+                              let photoData = cachedPhotoData[place.id]
+                        else { return place }
+                        return placeWithPhotoData(place, photoData: photoData)
+                    }
                     if let index = state.participants.firstIndex(where: {
                         $0.member == pins.member
                     }) {
                         state.participants[index].isConfirmed = pins.isConfirmed
                     }
                 }
+
+                let placesNeedingPhotos = state.memberPlaces
+                    .values
+                    .flatMap { $0 }
+                    .reduce(into: [String: PinnedPlace]()) { result, place in
+                        guard place.photoData.isEmpty,
+                              !state.requestedPhotoPlaceIDs.contains(place.id)
+                        else { return }
+                        result[place.id] = place
+                    }
+                state.requestedPhotoPlaceIDs.formUnion(placesNeedingPhotos.keys)
+                photoEffects = placesNeedingPhotos.values.map(loadPlacePhotoEffect)
+
+                if state.isCurrentUserConfirmed,
+                   state.haveAllJoinedParticipantsConfirmed,
+                   !state.hasSelectionEnded,
+                   state.completionAlert == nil {
+                    state.isTimerRunning = false
+                    state.hasSelectionEnded = true
+                    state.completionAlert = .allMembersConfirmed
+                    return .merge(
+                        .merge(photoEffects),
+                        .cancel(id: "place-selection-timer"),
+                        .cancel(id: "place-selection-sync")
+                    )
+                }
+                return photoEffects.isEmpty ? .none : .merge(photoEffects)
+
+            case .memberPlacesFailed:
                 return .none
 
-            case .memberPlacesFailed, .placeMutationFailed:
+            case let .placePhotoResponse(placeID, photoData):
+                guard !photoData.isEmpty else { return .none }
+                for member in state.memberPlaces.keys {
+                    state.memberPlaces[member] = state.memberPlaces[member, default: []]
+                        .map { place in
+                            guard place.id == placeID else { return place }
+                            return placeWithPhotoData(place, photoData: photoData)
+                        }
+                }
+                if let selectedPinnedPlace = state.selectedPinnedPlace,
+                   selectedPinnedPlace.id == placeID {
+                    state.selectedPinnedPlace = placeWithPhotoData(
+                        selectedPinnedPlace,
+                        photoData: photoData
+                    )
+                }
+                return .none
+
+            case let .placeMutationFailed(message):
+                state.placeSyncErrorMessage = message
+                return loadMemberPlacesEffect(tripID: state.tripID)
+
+            case .placeSyncErrorDismissed:
+                state.placeSyncErrorMessage = nil
                 return .none
 
             case .backButtonTapped:
@@ -466,7 +557,7 @@ struct PlaceSelectionFeature: Reducer {
                         id: selectedPlace.id,
                         name: selectedPlace.name,
                         description: selectedPlace.address,
-                        thumbnailName: "DDMockPlaceVillage",
+                        thumbnailName: "",
                         category: selectedPlace.category,
                         photoData: selectedPlace.photoData,
                         latitude: selectedPlace.latitude,
@@ -484,7 +575,7 @@ struct PlaceSelectionFeature: Reducer {
                     do {
                         try await placeClient.savePlace(tripID, pinnedPlace)
                     } catch {
-                        await send(.placeMutationFailed)
+                        await send(.placeMutationFailed(error.localizedDescription))
                     }
                 }
 
@@ -546,7 +637,7 @@ struct PlaceSelectionFeature: Reducer {
                     do {
                         try await placeClient.deletePlace(tripID, placeID)
                     } catch {
-                        await send(.placeMutationFailed)
+                        await send(.placeMutationFailed(error.localizedDescription))
                     }
                 }
 
@@ -685,12 +776,57 @@ struct PlaceSelectionFeature: Reducer {
         }
     }
 
+    private func observeMemberPlacesEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observeMemberPlaces(tripID)
+        return .run { send in
+            do {
+                for try await memberPlaces in stream {
+                    await send(.memberPlacesResponse(memberPlaces))
+                }
+            } catch {
+                await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func loadPlacePhotoEffect(_ place: PinnedPlace) -> Effect<Action> {
+        .run { send in
+            do {
+                let result = PlaceSearchResult(
+                    id: place.id,
+                    name: place.name,
+                    address: place.description
+                )
+                let details = try await placeClient.fetchDetails(result)
+                await send(.placePhotoResponse(place.id, details.photoData))
+            } catch {
+                await send(.placePhotoResponse(place.id, []))
+            }
+        }
+    }
+
+    private func placeWithPhotoData(
+        _ place: PinnedPlace,
+        photoData: [Data]
+    ) -> PinnedPlace {
+        PinnedPlace(
+            id: place.id,
+            name: place.name,
+            description: place.description,
+            thumbnailName: "",
+            category: place.category,
+            photoData: photoData,
+            latitude: place.latitude,
+            longitude: place.longitude
+        )
+    }
+
     private func confirmPlacesEffect(tripID: String) -> Effect<Action> {
         .run { send in
             do {
                 try await placeClient.confirmPlaces(tripID)
             } catch {
-                await send(.placeMutationFailed)
+                await send(.placeMutationFailed(error.localizedDescription))
             }
         }
     }

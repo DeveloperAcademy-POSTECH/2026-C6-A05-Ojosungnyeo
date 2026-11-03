@@ -10,6 +10,7 @@ struct WaitingForParticipantsFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
         case returnToUpcomingTrips
+        case proceedToAnalysis(PlaceSelectionFeature.State)
     }
 
     struct Participant: Equatable, Identifiable {
@@ -244,9 +245,7 @@ struct WaitingForParticipantsFeature: Reducer {
                 return .send(.delegate(.returnToUpcomingTrips))
 
             case .placeSelection(.delegate(.proceedToAnalysis)):
-                // The analysis destination is implemented by the grouping flow owner.
-                // Keep this explicit hand-off point so it can be connected when that screen lands.
-                return .none
+                return .send(.delegate(.proceedToAnalysis(state.placeSelection)))
 
             case .placeSelection:
                 return .none

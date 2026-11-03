@@ -47,6 +47,39 @@ struct RouteOverviewFeature: Reducer {
         var selectedPlace: RoutePlace {
             places.first { $0.id == selectedPlaceID } ?? places[0]
         }
+
+        mutating func replaceItinerary(
+            placements: [TimeTableSchedule],
+            coursesByID: [TimeTableCourse.ID: TimeTableCourse]
+        ) {
+            let groupedByDay = Dictionary(grouping: placements, by: \.day)
+            stopsByDay = groupedByDay.mapValues { schedules in
+                schedules
+                    .sorted {
+                        if $0.timing.startMinuteOfDay == $1.timing.startMinuteOfDay {
+                            return $0.id < $1.id
+                        }
+                        return $0.timing.startMinuteOfDay < $1.timing.startMinuteOfDay
+                    }
+                    .enumerated()
+                    .compactMap { index, schedule in
+                        guard let course = coursesByID[schedule.courseID] else { return nil }
+                        return RouteStop(
+                            id: schedule.id,
+                            order: index,
+                            name: course.title,
+                            category: course.placesSummary,
+                            latitude: 35.6812 + Double(index) * 0.006,
+                            longitude: 139.7671 + Double(index % 2 == 0 ? index : -index) * 0.005,
+                            members: Set(course.members),
+                            scheduleID: schedule.id
+                        )
+                    }
+            }
+            selectedPlaceID = nil
+            draftStopsByDay = nil
+            isEditing = false
+        }
     }
 
     enum Action: Equatable {
@@ -184,6 +217,27 @@ struct RouteStop: Equatable, Identifiable {
     let latitude: Double
     let longitude: Double
     let members: Set<TripMember>
+    let scheduleID: TimeTableSchedule.ID?
+
+    init(
+        id: Int,
+        order: Int,
+        name: String,
+        category: String,
+        latitude: Double,
+        longitude: Double,
+        members: Set<TripMember>,
+        scheduleID: TimeTableSchedule.ID? = nil
+    ) {
+        self.id = id
+        self.order = order
+        self.name = name
+        self.category = category
+        self.latitude = latitude
+        self.longitude = longitude
+        self.members = members
+        self.scheduleID = scheduleID
+    }
 
     func with(order: Int) -> Self {
         RouteStop(
@@ -193,7 +247,8 @@ struct RouteStop: Equatable, Identifiable {
             category: category,
             latitude: latitude,
             longitude: longitude,
-            members: members
+            members: members,
+            scheduleID: scheduleID
         )
     }
 

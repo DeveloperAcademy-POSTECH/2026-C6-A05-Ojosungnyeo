@@ -10,6 +10,10 @@ import CoreLocation
 import Foundation
 
 struct PlaceGroupingFeature: Reducer {
+    enum Delegate: Equatable {
+        case proceedToItinerary
+    }
+
     enum Tab: Equatable {
         case preferences
         case recommendedGroups
@@ -120,10 +124,10 @@ struct PlaceGroupingFeature: Reducer {
         case detail(PlaceGroupingDetailFeature.Action)
         case confirmButtonTapped
         case waitingForConfirmation(WaitingForConfirmationFeature.Action)
+        case delegate(Delegate)
     }
 
     @Dependency(\.placeClient) var placeClient
-    @Dependency(\.continuousClock) var clock
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -159,12 +163,7 @@ struct PlaceGroupingFeature: Reducer {
                 if let tripID = state.sourcePlaceSelection?.tripID {
                     effects.append(fetchMemberPlacesEffect(tripID: tripID))
                     effects.append(
-                        .run { send in
-                            while !Task.isCancelled {
-                                try await clock.sleep(for: .seconds(2))
-                                await send(.refreshMemberPlaces)
-                            }
-                        }
+                        observeMemberPlacesEffect(tripID: tripID)
                         .cancellable(id: "place-grouping-member-places", cancelInFlight: true)
                     )
                 }
@@ -342,6 +341,29 @@ struct PlaceGroupingFeature: Reducer {
                 }
                 state.isDetailPresented = false
                 return .none
+            case let .detail(.delegate(.placeDeleted(placeID))):
+                guard let selectedGroupID = state.selectedGroupID else { return .none }
+                state.recommendedGroups = state.recommendedGroups.map { group in
+                    guard group.id == selectedGroupID else { return group }
+                    return RecommendedGroup(
+                        id: group.id,
+                        title: group.title,
+                        participantSummary: group.participantSummary,
+                        memberIDs: group.memberIDs,
+                        categories: group.categories,
+                        places: group.places.filter { $0.id != placeID }
+                    )
+                }
+                state.placeGroups = state.placeGroups.map { group in
+                    guard group.id == selectedGroupID else { return group }
+                    return MapPlaceGroup(
+                        id: group.id,
+                        name: group.name,
+                        places: group.places.filter { $0.id != placeID },
+                        radius: group.radius
+                    )
+                }
+                return .none
             case .detail(.backButtonTapped):
                 state.isDetailPresented = false
                 return .none
@@ -366,7 +388,12 @@ struct PlaceGroupingFeature: Reducer {
             case .waitingForConfirmation(.backButtonTapped):
                 state.isWaitingForConfirmationPresented = false
                 return .none
+            case .waitingForConfirmation(.delegate(.proceedToItinerary)):
+                state.isWaitingForConfirmationPresented = false
+                return .send(.delegate(.proceedToItinerary))
             case .waitingForConfirmation:
+                return .none
+            case .delegate:
                 return .none
             case let .tabSelected(tab):
                 state.selectedTab = tab
@@ -392,6 +419,19 @@ struct PlaceGroupingFeature: Reducer {
             do {
                 let memberPlaces = try await placeClient.fetchMemberPlaces(tripID)
                 await send(.memberPlacesResponse(memberPlaces))
+            } catch {
+                await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func observeMemberPlacesEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observeMemberPlaces(tripID)
+        return .run { send in
+            do {
+                for try await memberPlaces in stream {
+                    await send(.memberPlacesResponse(memberPlaces))
+                }
             } catch {
                 await send(.memberPlacesFailed)
             }

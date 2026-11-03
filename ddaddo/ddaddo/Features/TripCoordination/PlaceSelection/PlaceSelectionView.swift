@@ -123,7 +123,10 @@ struct PlaceSelectionView: View {
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
         .task {
-            await store.send(.onAppear).finish()
+            store.send(.onAppear)
+        }
+        .onDisappear {
+            store.send(.onDisappear)
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -160,6 +163,19 @@ struct PlaceSelectionView: View {
                     )
                 }
             }
+        }
+        .alert(
+            "장소를 서버에 저장하지 못했어요",
+            isPresented: Binding(
+                get: { store.placeSyncErrorMessage != nil },
+                set: { if !$0 { store.send(.placeSyncErrorDismissed) } }
+            )
+        ) {
+            Button("확인", role: .cancel) {
+                store.send(.placeSyncErrorDismissed)
+            }
+        } message: {
+            Text(store.placeSyncErrorMessage ?? "")
         }
     }
 

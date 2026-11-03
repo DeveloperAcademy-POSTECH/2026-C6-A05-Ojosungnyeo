@@ -43,4 +43,5 @@ struct UpcomingTripSnapshot: Equatable, Sendable {
     let countryName: String
     let startDate: Date
     let endDate: Date
+    let isItineraryReady: Bool
 }

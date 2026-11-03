@@ -125,17 +125,25 @@ struct SelectedPlaceBottomSheet: View {
     @ViewBuilder
     private var photoStrip: some View {
         if place.photoData.isEmpty {
-            if let fallbackImageName {
-                Image(fallbackImageName)
+            if let fallbackImageName,
+               let image = UIImage(named: fallbackImageName) {
+                Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 205, height: 154)
                     .clipped()
                     .clipShape(.rect(cornerRadius: 20))
             } else {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(DDColor.surfaceElevated)
+                ZStack {
+                    DDColor.surfaceElevated
+
+                    Image("DDEarth")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 78, height: 72)
+                }
                     .frame(width: 205, height: 154)
+                    .clipShape(.rect(cornerRadius: 20))
             }
         } else {
             ScrollView(.horizontal, showsIndicators: false) {

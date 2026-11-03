@@ -10,19 +10,22 @@ enum UpcomingTripsPreviewData {
                 id: "tokyo",
                 destination: "TOKYO",
                 country: "Japan",
-                dateText: "11월 22일~25일"
+            dateText: "11월 22일~25일",
+            isItineraryReady: true
             ),
             .init(
                 id: "shanghai",
                 destination: "SHANGHAI",
                 country: "China",
-                dateText: "12월 5일~8일"
+            dateText: "12월 5일~8일",
+            isItineraryReady: true
             ),
             .init(
                 id: "sydney",
                 destination: "SYDNEY",
                 country: "Australia",
-                dateText: "27년 3월 2일~9일"
+            dateText: "27년 3월 2일~9일",
+            isItineraryReady: true
             )
         ]
 

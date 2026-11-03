@@ -111,6 +111,12 @@ struct HomeFeature: Reducer {
                 state.isUpcomingTripsPresented = false
                 return .none
             case let .upcomingTrips(.viewScheduleButtonTapped(tripID)):
+                if state.upcomingTrips.trips.first(where: { $0.id == tripID })?.isItineraryReady == true {
+                    state.tripItinerary = TripItineraryFeature.State(selectedTab: .dailyItinerary)
+                    state.isUpcomingTripsPresented = false
+                    state.isTripItineraryPresented = true
+                    return .none
+                }
                 state.isTripItineraryPresented = false
                 state.isUpcomingTripsPresented = true
                 let trip = state.upcomingTrips.trips.first { $0.id == tripID }
@@ -192,12 +198,17 @@ struct HomeFeature: Reducer {
                     }
                 return .none
 
-            case .placeGrouping(.waitingForConfirmation(.completionButtonTapped)):
+            case .placeGrouping(.delegate(.proceedToItinerary)):
                 let waiting = state.placeGrouping.waitingForConfirmation
                 guard waiting.haveAllMembersConfirmed,
                       state.tripItinerary.timeTable.recommendationTripID == waiting.tripID
                 else { return .none }
                 state.tripItinerary.selectedTab = .dailyItinerary
+                state.tripItinerary.timeTable.resetScheduledItinerary()
+                state.tripItinerary.routeOverview.replaceItinerary(
+                    placements: state.tripItinerary.timeTable.placements,
+                    coursesByID: state.tripItinerary.timeTable.coursesByID
+                )
                 state.isPlaceGroupingPresented = false
                 state.isTripItineraryPresented = true
                 return .none
@@ -209,6 +220,16 @@ struct HomeFeature: Reducer {
                 return .none
             case .upcomingTrips(.delegate(.returnHome)):
                 state.isUpcomingTripsPresented = false
+                return .none
+            case let .upcomingTrips(.delegate(.proceedToAnalysis(placeSelection))):
+                state.placeSelection = placeSelection
+                state.placeGrouping = PlaceGroupingFeature.State(
+                    placeSelection: placeSelection
+                )
+                state.isUpcomingTripsPresented = false
+                state.isPlaceSelectionPresented = false
+                state.isPlaceGroupingPresented = false
+                state.isPlaceAnalysisLoading = true
                 return .none
             case .upcomingTrips:
                 return .none

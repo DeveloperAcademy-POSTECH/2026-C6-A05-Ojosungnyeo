@@ -13,6 +13,10 @@ struct TimeTableEditRow: Equatable, Identifiable {
 }
 
 struct TimeTableEditFeature: Reducer {
+    enum Delegate: Equatable {
+        case addPlaceRequested
+    }
+
     @ObservableState
     struct State: Equatable {
         var isAddSchedulePresented = false
@@ -59,6 +63,7 @@ struct TimeTableEditFeature: Reducer {
         case rowMerged(TimeTableEditRow.ID, into: TimeTableEditRow.ID)
         case recommendationMerged(String, into: TimeTableEditRow.ID)
         case saveUnavailableAlertDismissed
+        case delegate(Delegate)
     }
 
     @Dependency(\.continuousClock) var clock
@@ -74,7 +79,8 @@ struct TimeTableEditFeature: Reducer {
 
             case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
                  .groupAddButtonTapped, .timeSelectionDoneTapped,
-                 .recommendationDropped, .scheduleRowMoved, .rowMerged, .recommendationMerged:
+                 .recommendationDropped, .scheduleRowMoved, .rowMerged, .recommendationMerged,
+                 .delegate:
                 return .none
 
             case .saveUnavailableAlertDismissed:
@@ -92,11 +98,7 @@ struct TimeTableEditFeature: Reducer {
                 return .none
 
             case .addScheduleButtonTapped:
-                state.isAddSchedulePresented = true
-                state.placeSearchText = ""
-                state.placeSearchErrorMessage = nil
-                state.isPlaceSearchLoading = true
-                return searchPlaces(query: "도쿄 인기 여행지", debounce: false)
+                return .send(.delegate(.addPlaceRequested))
 
             case .addScheduleDismissed:
                 state.isAddSchedulePresented = false

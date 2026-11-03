@@ -22,6 +22,8 @@ struct TripItineraryFeature: Reducer {
         var selectedTab: Tab = .routeOverview
         var timeTable = TimeTableFeature.State()
         var routeOverview = RouteOverviewFeature.State()
+        var routeEditor = RouteEditorFeature.State()
+        var isRouteEditorPresented = false
     }
 
     @CasePathable
@@ -29,6 +31,7 @@ struct TripItineraryFeature: Reducer {
         case tabSelected(Tab)
         case timeTable(TimeTableFeature.Action)
         case routeOverview(RouteOverviewFeature.Action)
+        case routeEditor(RouteEditorFeature.Action)
         case delegate(Delegate)
     }
 
@@ -37,12 +40,33 @@ struct TripItineraryFeature: Reducer {
             switch action {
             case let .tabSelected(tab):
                 state.selectedTab = tab
+                if tab == .routeOverview {
+                    state.synchronizeRouteWithTimeTable()
+                }
+                return .none
+
+            case .routeOverview(.editingDoneButtonTapped):
+                state.applyRouteEditsToTimeTable()
                 return .none
 
             case .routeOverview(.backButtonTapped):
                 return .send(.delegate(.returnToUpcomingTrips))
 
-            case .timeTable, .routeOverview, .delegate:
+            case .timeTable(.delegate(.addPlaceRequested)):
+                state.routeEditor = RouteEditorFeature.State()
+                state.isRouteEditorPresented = true
+                return .none
+
+            case .routeEditor(.delegate(.dismissed)):
+                state.isRouteEditorPresented = false
+                return .none
+
+            case let .routeEditor(.delegate(.placeAdded(place, day))):
+                state.addPlace(place, to: day)
+                state.isRouteEditorPresented = false
+                return .none
+
+            case .timeTable, .routeOverview, .routeEditor, .delegate:
                 return .none
             }
         }
@@ -54,5 +78,88 @@ struct TripItineraryFeature: Reducer {
         Scope(state: \.routeOverview, action: \.routeOverview) {
             RouteOverviewFeature()
         }
+
+        Scope(state: \.routeEditor, action: \.routeEditor) {
+            RouteEditorFeature()
+        }
+    }
+}
+
+private extension TripItineraryFeature.State {
+    mutating func synchronizeRouteWithTimeTable() {
+        routeOverview.replaceItinerary(
+            placements: timeTable.placements,
+            coursesByID: timeTable.coursesByID
+        )
+    }
+
+    mutating func applyRouteEditsToTimeTable() {
+        guard let draftStopsByDay = routeOverview.draftStopsByDay else { return }
+
+        let retainedScheduleIDs = Set(
+            draftStopsByDay.values
+                .flatMap { $0 }
+                .compactMap(\.scheduleID)
+        )
+        timeTable.placements.removeAll { !retainedScheduleIDs.contains($0.id) }
+
+        for day in TripDay.allCases {
+            let orderedStops = draftStopsByDay[day, default: []].sorted {
+                $0.order == $1.order ? $0.id < $1.id : $0.order < $1.order
+            }
+            let existingMinutes = timeTable.placements
+                .filter { $0.day == day }
+                .map(\.timing.startMinuteOfDay)
+                .sorted()
+
+            for (index, stop) in orderedStops.enumerated() {
+                guard let scheduleID = stop.scheduleID,
+                      let placementIndex = timeTable.placements.firstIndex(where: { $0.id == scheduleID })
+                else { continue }
+                let fallbackMinute = (existingMinutes.last ?? 9 * 60) + max(0, index - existingMinutes.count + 1) * 60
+                timeTable.placements[placementIndex].timing.startMinuteOfDay =
+                    existingMinutes.indices.contains(index) ? existingMinutes[index] : fallbackMinute
+            }
+        }
+    }
+
+    mutating func addPlace(_ place: PlaceDetails, to day: TripDay) {
+        let nextCourseID = (timeTable.coursesByID.keys.max() ?? -1) + 1
+        timeTable.coursesByID[nextCourseID] = TimeTableCourse(
+            id: nextCourseID,
+            title: place.name,
+            placeCount: 1,
+            placeNames: [place.name],
+            members: timeTable.tripMembers,
+            durationMinutes: 60
+        )
+
+        let existingPlacementIDs = timeTable.edit.draftPlacements.map(\.id)
+            + timeTable.placements.map(\.id)
+        let nextScheduleID = (existingPlacementIDs.max() ?? -1) + 1
+        let dayPlacements = timeTable.edit.draftPlacements.filter { $0.day == day }
+        let startMinute = min(
+            dayPlacements.compactMap { placement in
+                timeTable.coursesByID[placement.courseID].map {
+                    placement.timing.startMinuteOfDay + $0.durationMinutes
+                }
+            }.max() ?? 9 * 60,
+            23 * 60
+        )
+        let placement = TimeTableSchedule(
+            id: nextScheduleID,
+            courseID: nextCourseID,
+            day: day,
+            timing: .init(startMinuteOfDay: startMinute),
+            branchGroupID: nil
+        )
+        timeTable.edit.draftPlacements.append(placement)
+        timeTable.edit.rowsByDay[day, default: []].append(
+            TimeTableEditRow(
+                id: "\(day.rawValue)-schedule-\(nextScheduleID)",
+                sources: [.schedule(nextScheduleID)]
+            )
+        )
+        timeTable.selectedDay = day
     }
 }

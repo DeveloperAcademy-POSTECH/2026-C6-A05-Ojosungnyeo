@@ -9,6 +9,7 @@ import Foundation
 struct UpcomingTripsFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
+        case proceedToAnalysis(PlaceSelectionFeature.State)
     }
 
     struct Trip: Equatable, Identifiable {
@@ -18,6 +19,7 @@ struct UpcomingTripsFeature: Reducer {
         let dateText: String
         var startDate: Date? = nil
         var endDate: Date? = nil
+        let isItineraryReady: Bool
     }
 
     @ObservableState
@@ -205,6 +207,10 @@ struct UpcomingTripsFeature: Reducer {
                 state.isWaitingForParticipantsPresented = false
                 return fetchUpcomingTripsEffect()
 
+            case let .waitingForParticipants(.delegate(.proceedToAnalysis(placeSelection))):
+                state.isWaitingForParticipantsPresented = false
+                return .send(.delegate(.proceedToAnalysis(placeSelection)))
+
             case .waitingForParticipants:
                 return .none
 
@@ -241,7 +247,8 @@ struct UpcomingTripsFeature: Reducer {
             country: country,
             dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
             startDate: snapshot.startDate,
-            endDate: snapshot.endDate
+            endDate: snapshot.endDate,
+            isItineraryReady: snapshot.isItineraryReady
         )
     }
 

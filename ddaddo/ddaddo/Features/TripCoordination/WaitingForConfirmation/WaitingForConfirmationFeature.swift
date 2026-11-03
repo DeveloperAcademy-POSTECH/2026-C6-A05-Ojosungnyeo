@@ -8,6 +8,10 @@
 import ComposableArchitecture
 
 struct WaitingForConfirmationFeature: Reducer {
+    enum Delegate: Equatable {
+        case proceedToItinerary
+    }
+
     struct Member: Equatable, Identifiable {
         let id: String
         let name: String
@@ -60,8 +64,10 @@ struct WaitingForConfirmationFeature: Reducer {
         case confirmationsResponse([MemberGroupConfirmation])
         case confirmationsFailed
         case backButtonTapped
-        case completionButtonTapped
         case nudgeButtonTapped(String)
+        case completionButtonTapped
+        case groupingCompleted
+        case delegate(Delegate)
     }
 
     @Dependency(\.placeClient) var placeClient
@@ -95,7 +101,21 @@ struct WaitingForConfirmationFeature: Reducer {
                     )
                 }
                 return .none
-            case .confirmationsFailed, .nudgeButtonTapped, .completionButtonTapped:
+            case .confirmationsFailed, .nudgeButtonTapped:
+                return .none
+            case .completionButtonTapped:
+                guard state.haveAllMembersConfirmed else { return .none }
+                let tripID = state.tripID
+                return .run { send in
+                    try await placeClient.completeGrouping(tripID)
+                    await send(.groupingCompleted)
+                }
+            case .groupingCompleted:
+                return .merge(
+                    .cancel(id: "group-confirmation-poll"),
+                    .send(.delegate(.proceedToItinerary))
+                )
+            case .delegate:
                 return .none
             case .onDisappear, .backButtonTapped:
                 return .cancel(id: "group-confirmation-poll")

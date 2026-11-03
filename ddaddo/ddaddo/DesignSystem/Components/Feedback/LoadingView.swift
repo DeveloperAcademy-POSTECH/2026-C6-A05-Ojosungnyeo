@@ -13,12 +13,11 @@ struct LoadingView: View {
             Color(red: 15 / 255, green: 15 / 255, blue: 15 / 255)
                 .ignoresSafeArea()
 
-            VStack(spacing: 14) {
+            VStack(spacing: 10) {
                 Image("DDLoadingMascots")
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: 192, height: 128)
-                    .clipped()
+                    .scaledToFit()
+                    .frame(width: 99, height: 129)
                     .accessibilityHidden(true)
 
                 Text(message)
@@ -27,7 +26,7 @@ struct LoadingView: View {
                     .frame(width: 346, height: 24)
                     .multilineTextAlignment(.center)
             }
-            .offset(y: 8)
+            .offset(y: 2)
         }
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .combine)

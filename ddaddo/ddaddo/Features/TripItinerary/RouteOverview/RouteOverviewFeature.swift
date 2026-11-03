@@ -12,12 +12,13 @@ struct RouteOverviewFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var selectedDay = TripDay.day1
-        var selectedMember: TripMember?
+        var selectedMembers: Set<TripMember> = []
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
         var isEditing = false
         var stopsByDay = RouteStop.stopsByDay
         var draftStopsByDay: [TripDay: [RouteStop]]?
         let places = RoutePlace.mockPlaces
+        let currentMember = TripMember.tae
 
         private var currentStops: [RouteStop] {
             let source = draftStopsByDay ?? stopsByDay
@@ -26,10 +27,10 @@ struct RouteOverviewFeature: Reducer {
 
         var visibleStopGroups: [RouteStopGroup] {
             let stops: [RouteStop]
-            if let selectedMember {
-                stops = currentStops.filter { $0.members.contains(selectedMember) }
-            } else {
+            if selectedMembers.isEmpty {
                 stops = currentStops
+            } else {
+                stops = currentStops.filter { !$0.members.isDisjoint(with: selectedMembers) }
             }
 
             return Dictionary(grouping: stops, by: \.order)
@@ -64,7 +65,7 @@ struct RouteOverviewFeature: Reducer {
             switch action {
             case .onAppear:
                 state.selectedDay = .day1
-                state.selectedMember = nil
+                state.selectedMembers.removeAll()
                 state.isEditing = false
                 state.draftStopsByDay = nil
                 return .none
@@ -77,7 +78,11 @@ struct RouteOverviewFeature: Reducer {
                 return .none
 
             case let .memberTapped(member):
-                state.selectedMember = state.selectedMember == member ? nil : member
+                if state.selectedMembers.contains(member) {
+                    state.selectedMembers.remove(member)
+                } else {
+                    state.selectedMembers.insert(member)
+                }
                 return .none
 
             case .editButtonTapped:

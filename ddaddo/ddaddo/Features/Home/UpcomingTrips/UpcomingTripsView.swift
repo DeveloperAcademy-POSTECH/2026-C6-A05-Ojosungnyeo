@@ -124,7 +124,7 @@ struct UpcomingTripsView: View {
                         .ignoresSafeArea()
 
                     DDConfirmationAlert(
-                        title: "여행 삭제하기",
+                        title: "내 여행 목록에서 삭제하기",
                         message: "예정된 여행을 진짜 삭제할까요?",
                         cancelTitle: "아니요",
                         confirmTitle: "네",

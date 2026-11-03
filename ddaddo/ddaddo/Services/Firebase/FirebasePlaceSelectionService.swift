@@ -247,7 +247,7 @@ enum FirebasePlaceSelectionService {
             id: document.get("id") as? String ?? document.documentID,
             name: name,
             description: document.get("description") as? String ?? "",
-            thumbnailName: "DDMockPlaceVillage",
+            thumbnailName: "",
             category: document.get("category") as? String ?? "장소",
             latitude: latitude,
             longitude: longitude
@@ -265,7 +265,7 @@ enum FirebasePlaceSelectionService {
             id: id,
             name: name,
             description: data["description"] as? String ?? "",
-            thumbnailName: "DDMockPlaceVillage",
+            thumbnailName: "",
             category: data["category"] as? String ?? "장소",
             latitude: latitude,
             longitude: longitude

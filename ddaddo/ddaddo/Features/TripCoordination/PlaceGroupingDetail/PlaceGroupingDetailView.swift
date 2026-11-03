@@ -445,10 +445,12 @@ private struct PlaceDraggableRow: View {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    Color(red: 52 / 255, green: 52 / 255, blue: 52 / 255)
+                    DDColor.surfaceControl
                         .overlay {
-                            Image(systemName: "photo")
-                                .foregroundStyle(DDColor.textSecondary)
+                            Image("DDEarth")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 35, height: 33)
                         }
                 }
             }
@@ -522,6 +524,12 @@ private struct PlaceDragPreview: View {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
                     DDColor.surfaceControl
+                        .overlay {
+                            Image("DDEarth")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 35, height: 33)
+                        }
                 }
             }
             .frame(width: 40, height: 40)

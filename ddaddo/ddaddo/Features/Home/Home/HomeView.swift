@@ -68,6 +68,38 @@ struct HomeView: View {
                 .transition(.move(edge: .trailing))
             }
 
+            if store.isPlaceSelectionPresented {
+                PlaceSelectionView(
+                    store: store.scope(
+                        state: \.placeSelection,
+                        action: \.placeSelection
+                    )
+                )
+                .transition(.move(edge: .trailing))
+            }
+
+            if store.isPlaceAnalysisLoading {
+                LoadingView(message: "여행 취향과 장소를 분석 중...")
+                    .transition(.opacity)
+                    .zIndex(5)
+                    .task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        guard !Task.isCancelled else { return }
+                        store.send(.placeAnalysisFinished)
+                    }
+            }
+
+            if store.isPlaceGroupingPresented {
+                PlaceGroupingView(
+                    store: store.scope(
+                        state: \.placeGrouping,
+                        action: \.placeGrouping
+                    )
+                )
+                .transition(.opacity)
+                .zIndex(4)
+            }
+
             if store.isTripSearchPresented {
                 TripSearchView(
                     store: store.scope(
@@ -85,6 +117,9 @@ struct HomeView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
+        .animation(.easeInOut(duration: 0.3), value: store.isPlaceSelectionPresented)
+        .animation(.easeInOut(duration: 0.25), value: store.isPlaceAnalysisLoading)
+        .animation(.easeInOut(duration: 0.3), value: store.isPlaceGroupingPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripSearchPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isSettingsPresented)
         .task {

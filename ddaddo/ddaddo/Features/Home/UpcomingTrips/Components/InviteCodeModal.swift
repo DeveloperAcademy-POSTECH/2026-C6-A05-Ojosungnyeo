@@ -25,7 +25,7 @@ struct InviteCodeModal: View {
                     .font(.custom("Pretendard-SemiBold", size: 17, relativeTo: .headline))
                     .foregroundStyle(DDColor.textPrimary)
 
-                Text("친구로부터 전달받은\n6자리 숫자를 입력해 주세요.")
+                Text("친구로부터 전달받은\n6자리 초대 코드를 입력해 주세요.")
                     .font(.custom("Pretendard-Regular", size: 13, relativeTo: .footnote))
                     .foregroundStyle(Color(red: 204 / 255, green: 204 / 255, blue: 204 / 255))
                     .multilineTextAlignment(.center)

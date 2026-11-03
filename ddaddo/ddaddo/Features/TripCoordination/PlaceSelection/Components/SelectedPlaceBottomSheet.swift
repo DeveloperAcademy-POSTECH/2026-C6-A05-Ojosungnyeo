@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SelectedPlaceBottomSheet: View {
     let place: PlaceDetails
@@ -13,6 +14,7 @@ struct SelectedPlaceBottomSheet: View {
     let canAdd: Bool
     let isAlreadyAdded: Bool
     let fallbackImageName: String?
+    let closeButtonTapped: () -> Void
     let addButtonTapped: () -> Void
 
     var body: some View {
@@ -23,45 +25,66 @@ struct SelectedPlaceBottomSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 19)
 
-            HStack(alignment: .top, spacing: DDSpacing.small) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(place.name)
-                        .ddTypography(.heading18)
+            HStack {
+                Button(action: closeButtonTapped) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(DDColor.textPrimary)
-                        .lineLimit(1)
-
-                    ratingView
+                        .frame(width: 32, height: 32)
+                        .background(DDColor.surfaceElevated)
+                        .clipShape(Circle())
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("장소 상세 닫기")
 
                 Spacer(minLength: DDSpacing.small)
 
                 Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
                     .ddTypography(.label14)
-                    .foregroundStyle(canAdd ? DDColor.textPrimary : DDColor.textTertiary)
+                    .foregroundStyle(canAdd ? DDColor.textOnPrimary : DDColor.textTertiary)
                     .padding(.horizontal, 12)
                     .frame(height: 28)
-                    .background(DDColor.surfaceControl)
+                    .background(canAdd ? DDColor.actionPrimary : DDColor.surfaceControl)
                     .clipShape(.capsule)
                     .disabled(!canAdd)
             }
-            .padding(.top, 36)
+            .padding(.top, 10)
+
+            Text(place.name)
+                .ddTypography(.heading18)
+                .foregroundStyle(DDColor.textPrimary)
+                .lineLimit(1)
+                .padding(.top, 8)
+
+            ratingView
+                .padding(.top, 2)
 
             Text(place.category)
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.top, DDSpacing.small)
 
-            HStack(alignment: .bottom, spacing: DDSpacing.xSmall) {
-                Text(place.address)
-                    .ddTypography(.label14)
-                    .foregroundStyle(DDColor.textTertiary)
-                    .underline()
-                    .lineLimit(2)
+            Button {
+                UIPasteboard.general.string = place.address
+            } label: {
+                HStack(alignment: .bottom, spacing: DDSpacing.xSmall) {
+                    Text(place.address)
+                        .ddTypography(.label14)
+                        .foregroundStyle(DDColor.textTertiary)
+                        .underline()
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
 
-                Image(systemName: "document.on.document")
-                    .font(.system(size: 14))
-                    .foregroundStyle(DDColor.textTertiary)
+                    Image(systemName: "document.on.document")
+                        .font(.system(size: 14))
+                        .foregroundStyle(DDColor.textTertiary)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("주소 복사")
+            .accessibilityHint("클립보드에 장소 주소를 복사합니다")
             .padding(.top, 2)
 
             photoStrip

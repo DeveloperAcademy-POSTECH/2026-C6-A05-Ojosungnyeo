@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
+    @Environment(\.dismiss) private var dismiss
     @GestureState private var sheetDragTranslation: CGFloat = 0
 
     var body: some View {
@@ -18,7 +19,7 @@ struct PlaceSelectionView: View {
                 selectedPlace: store.selectedPlace,
                 showsSelectedPlaceMarker: false,
                 pinnedPlaces: store.mapPlaces,
-                showsPinnedPlaceNumbers: store.isShowingConfirmedPlaces,
+                showsPinnedPlaceNumbers: false,
                 onPinnedPlaceTapped: { place in
                     store.send(.pinnedPlaceTapped(place))
                 }
@@ -48,14 +49,7 @@ struct PlaceSelectionView: View {
             if store.isShowingConfirmedPlaces {
                 ConfirmedPlacesBottomSheet(
                     participants: store.participants,
-                    places: store.confirmedPlaces,
-                    isEditing: store.isEditingConfirmedPlaces,
-                    editButtonTapped: {
-                        store.send(.confirmedPlacesEditButtonTapped)
-                    },
-                    deletePlace: { place in
-                        store.send(.deleteConfirmedPlaceButtonTapped(place.id))
-                    }
+                    places: store.confirmedPlaces
                 )
                 .frame(height: 413, alignment: .top)
                 .clipped()
@@ -66,10 +60,14 @@ struct PlaceSelectionView: View {
                     isLoading: store.isPlaceDetailsLoading,
                     canAdd: store.canAddSelectedPlace,
                     isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
-                    fallbackImageName: store.selectedPinnedPlace?.thumbnailName
-                ) {
-                    store.send(.addSelectedPlaceButtonTapped)
-                }
+                    fallbackImageName: store.selectedPinnedPlace?.thumbnailName,
+                    closeButtonTapped: {
+                        store.send(.clearSelectedPlaceButtonTapped)
+                    },
+                    addButtonTapped: {
+                        store.send(.addSelectedPlaceButtonTapped)
+                    }
+                )
                 .ignoresSafeArea(edges: .bottom)
             } else if store.isMemberPlacesSheetPresented {
                 MemberPlacesBottomSheet(
@@ -166,45 +164,21 @@ struct PlaceSelectionView: View {
     }
 
     private var navigationBar: some View {
-        Group {
-            if store.isShowingConfirmedPlaces {
-                confirmedNavigationBar
-            } else {
-                placeSelectionNavigationBar
-            }
-        }
-    }
-
-    private var confirmedNavigationBar: some View {
-        ZStack {
-            Text(store.navigationTitle)
-                .ddTypography(.bodyEmphasis16)
-                .foregroundStyle(DDColor.textPrimary)
-
-            HStack {
-                Button {
-                    store.send(.backButtonTapped)
-                } label: {
-                    PlaceSelectionBackIcon()
-                        .frame(width: 24, height: 40)
-                }
-                .buttonStyle(.plain)
-
-                Spacer(minLength: 0)
-            }
-        }
-        .padding(.horizontal, DDSpacing.large)
-        .frame(height: 62)
+        placeSelectionNavigationBar
     }
 
     private var placeSelectionNavigationBar: some View {
         HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
+                dismiss()
             } label: {
                 PlaceSelectionBackIcon()
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("예정된 여행으로 돌아가기")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
@@ -361,6 +335,7 @@ private struct PlaceSelectionBackIcon: View {
             style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
         )
         .frame(width: 24, height: 24)
+        .allowsHitTesting(false)
     }
 }
 

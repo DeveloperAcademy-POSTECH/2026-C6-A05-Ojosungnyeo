@@ -9,6 +9,7 @@ import Foundation
 struct WaitingForParticipantsFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
+        case returnToUpcomingTrips
     }
 
     struct Participant: Equatable, Identifiable {
@@ -123,6 +124,7 @@ struct WaitingForParticipantsFeature: Reducer {
 
         mutating func synchronizePlaceSelection() {
             placeSelection.updateTripContext(
+                tripID: invitation.tripID,
                 tripTitle: invitation.title,
                 destinationName: invitation.destinationName,
                 tripStartDate: invitation.startDate,
@@ -233,9 +235,13 @@ struct WaitingForParticipantsFeature: Reducer {
                 state.isPlaceSelectionPresented = true
                 return .none
 
-            case .placeSelectionDismissed, .placeSelection(.backButtonTapped):
+            case .placeSelectionDismissed:
                 state.isPlaceSelectionPresented = false
-                return .none
+                return .send(.delegate(.returnToUpcomingTrips))
+
+            case .placeSelection(.delegate(.returnToUpcomingTrips)):
+                state.isPlaceSelectionPresented = false
+                return .send(.delegate(.returnToUpcomingTrips))
 
             case .placeSelection(.delegate(.proceedToAnalysis)):
                 // The analysis destination is implemented by the grouping flow owner.

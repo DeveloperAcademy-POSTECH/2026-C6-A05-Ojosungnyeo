@@ -37,3 +37,15 @@ struct PinnedPlace: Equatable, Identifiable, Sendable {
         self.longitude = longitude
     }
 }
+
+struct MemberPlacePins: Equatable, Sendable {
+    let member: TripMember
+    let places: [PinnedPlace]
+    let isConfirmed: Bool
+}
+
+struct MemberGroupConfirmation: Equatable, Sendable {
+    let member: TripMember
+    let name: String
+    let isConfirmed: Bool
+}

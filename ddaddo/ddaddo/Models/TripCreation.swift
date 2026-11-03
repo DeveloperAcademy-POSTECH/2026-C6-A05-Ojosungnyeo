@@ -36,3 +36,11 @@ struct TripInvitationSnapshot: Equatable, Sendable {
     let expiresAt: Date
     let participants: [Participant]
 }
+
+struct UpcomingTripSnapshot: Equatable, Sendable {
+    let tripID: String
+    let destinationName: String
+    let countryName: String
+    let startDate: Date
+    let endDate: Date
+}

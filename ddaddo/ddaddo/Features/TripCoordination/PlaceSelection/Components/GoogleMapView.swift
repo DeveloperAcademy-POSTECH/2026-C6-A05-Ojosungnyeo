@@ -48,8 +48,7 @@ struct GoogleMapView: UIViewRepresentable {
 
         func updateMarkerScale(for zoom: Float) {
             currentZoom = zoom
-            let zoomDifference = CGFloat(zoom - 13)
-            let scale = min(max(pow(1.22, zoomDifference), 0.48), 1.35)
+            let scale = GoogleMapView.markerScale(for: zoom)
             guard abs(scale - markerScale) >= 0.05 else { return }
             markerScale = scale
 
@@ -296,9 +295,24 @@ struct GoogleMapView: UIViewRepresentable {
         let marker = GMSMarker(position: coordinate)
         marker.groundAnchor = CGPoint(x: 0.5, y: 1)
         marker.userData = place
+
+        let scale = coordinator.markerScale > 0
+            ? coordinator.markerScale
+            : Self.markerScale(for: coordinator.currentZoom)
+        if let number {
+            marker.iconView = Self.numberedMarkerView(number: number, scale: scale)
+        } else {
+            marker.icon = Self.markerImage(scale: scale)
+        }
+
         marker.map = mapView
         coordinator.ufoMarkers.append((marker, number))
         coordinator.updateMarkerScale(for: coordinator.currentZoom)
+    }
+
+    fileprivate static func markerScale(for zoom: Float) -> CGFloat {
+        let zoomDifference = CGFloat(zoom - 13)
+        return min(max(pow(1.22, zoomDifference), 0.48), 1.35)
     }
 
     fileprivate static func markerImage(scale: CGFloat) -> UIImage? {

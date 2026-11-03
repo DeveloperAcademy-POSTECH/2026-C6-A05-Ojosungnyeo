@@ -68,6 +68,9 @@ struct UpcomingTripsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: store.isAddTripMenuPresented)
+        .task {
+            store.send(.onAppear)
+        }
         .overlay {
             if store.isInviteCodeModalPresented {
                 ZStack {
@@ -144,6 +147,20 @@ struct UpcomingTripsView: View {
         } message: {
             Text(store.joinErrorMessage ?? "")
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: DDSpacing.small) {
+            Text("아직 예정된 여행이 없어따.")
+                .ddTypography(.heading20)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text("+를 눌러 친구들과 여행 계획을 세워보세따!")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, DDSpacing.large)
     }
 
     private var header: some View {

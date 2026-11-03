@@ -10,6 +10,7 @@ struct DDConfirmationAlert: View {
     let message: String
     let cancelTitle: String?
     let confirmTitle: String
+    var cancelColor: Color?
     var confirmColor: Color = DDColor.actionPrimary
     let onCancel: (() -> Void)?
     let onConfirm: () -> Void
@@ -22,6 +23,7 @@ struct DDConfirmationAlert: View {
         message: String,
         cancelTitle: String? = nil,
         confirmTitle: String,
+        cancelColor: Color? = nil,
         confirmColor: Color = DDColor.actionPrimary,
         onCancel: (() -> Void)? = nil,
         onConfirm: @escaping () -> Void
@@ -30,6 +32,7 @@ struct DDConfirmationAlert: View {
         self.message = message
         self.cancelTitle = cancelTitle
         self.confirmTitle = confirmTitle
+        self.cancelColor = cancelColor
         self.confirmColor = confirmColor
         self.onCancel = onCancel
         self.onConfirm = onConfirm
@@ -58,7 +61,11 @@ struct DDConfirmationAlert: View {
 
             if let cancelTitle, let onCancel {
                 HStack(spacing: DDSpacing.zero) {
-                    actionButton(title: cancelTitle, color: secondaryTextColor, action: onCancel)
+                    actionButton(
+                        title: cancelTitle,
+                        color: cancelColor ?? secondaryTextColor,
+                        action: onCancel
+                    )
 
                     dividerColor.frame(width: 0.5)
 

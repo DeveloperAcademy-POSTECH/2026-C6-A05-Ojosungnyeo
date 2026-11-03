@@ -89,11 +89,18 @@ private struct TimeTableEditContent: View {
 
     @State private var activeDropTarget: DropTarget?
 
+    private struct ConfirmedRecommendationGroup: Identifiable {
+        let id: String
+        let title: String
+        let category: String
+        let memberIDs: [String]
+    }
+
     private var rows: [TimeTableEditRow] {
         store.rowsByDay[timeTableStore.selectedDay] ?? []
     }
 
-    private var availableRecommendations: [TimeTableRecommendation] {
+    private var availableRecommendationGroups: [ConfirmedRecommendationGroup] {
         let placedGroupIDs = Set(
             store.rowsByDay.values
                 .flatMap { $0 }
@@ -103,9 +110,35 @@ private struct TimeTableEditContent: View {
                     return groupID
                 }
         )
-        var seen: Set<String> = []
-        return timeTableStore.recommendations.filter {
-            !placedGroupIDs.contains($0.groupID) && seen.insert($0.groupID).inserted
+        let orderedGroupIDs = timeTableStore.recommendations.reduce(into: [String]()) { result, item in
+            guard !result.contains(item.groupID) else { return }
+            result.append(item.groupID)
+        }
+
+        return orderedGroupIDs.compactMap { groupID in
+            guard !placedGroupIDs.contains(groupID) else { return nil }
+            let places = timeTableStore.recommendations.filter { $0.groupID == groupID }
+            guard let first = places.first else { return nil }
+
+            let categories = places.reduce(into: [String]()) { result, place in
+                guard !result.contains(place.category) else { return }
+                result.append(place.category)
+            }
+            let memberIDs = places
+                .flatMap(\.memberIDs)
+                .reduce(into: [String]()) { result, memberID in
+                    guard !result.contains(memberID) else { return }
+                    result.append(memberID)
+                }
+
+            return ConfirmedRecommendationGroup(
+                id: groupID,
+                title: places.count > 1
+                    ? "\(first.placeName) 외 \(places.count - 1)곳"
+                    : first.placeName,
+                category: categories.joined(separator: " · "),
+                memberIDs: memberIDs
+            )
         }
     }
 
@@ -240,14 +273,13 @@ private struct TimeTableEditContent: View {
 
             ScrollView(.horizontal) {
                 HStack(spacing: DDSpacing.large) {
-                    ForEach(availableRecommendations) { recommendation in
-                        let places = timeTableStore.recommendations.filter { $0.groupID == recommendation.groupID }
+                    ForEach(availableRecommendationGroups) { group in
                         editCard(
-                            title: places.count > 1 ? "\(recommendation.placeName) 외 \(places.count - 1)곳" : recommendation.placeName,
-                            subtitle: recommendation.category,
-                            memberIDs: recommendation.memberIDs,
+                            title: group.title,
+                            subtitle: group.category,
+                            memberIDs: group.memberIDs,
                             width: 200,
-                            drag: .recommendation(recommendation.groupID)
+                            drag: .recommendation(group.id)
                         )
                     }
                 }

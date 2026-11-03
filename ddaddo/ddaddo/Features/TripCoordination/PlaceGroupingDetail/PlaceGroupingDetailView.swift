@@ -6,9 +6,24 @@
 import ComposableArchitecture
 import SwiftUI
 
+private struct PlaceGroupingDropFramesKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
 struct PlaceGroupingDetailView: View {
     let store: StoreOf<PlaceGroupingDetailFeature>
     var onBack: () -> Void = {}
+
+    @State private var draggingPlaceID: String?
+    @State private var dragLocation: CGPoint?
+    @State private var dropFrames: [String: CGRect] = [:]
+    @State private var targetedPlaceID: String?
+    @State private var isTrashTargeted = false
+    @State private var containerHeight: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -51,6 +66,39 @@ struct PlaceGroupingDetailView: View {
                 .frame(maxHeight: .infinity)
                 .zIndex(4)
             }
+
+            if store.isDeleteConfirmationPresented {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(5)
+
+                DDConfirmationAlert(
+                    title: "장소 삭제하기",
+                    message: "이 장소를 진짜 삭제할까요?",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    cancelColor: DDColor.actionPrimary,
+                    onCancel: {
+                        store.send(.deleteConfirmationCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.deleteConfirmationConfirmTapped)
+                    }
+                )
+                .frame(maxHeight: .infinity)
+                .zIndex(6)
+            }
+        }
+        .coordinateSpace(name: "placeGroupingDetailDrag")
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { containerHeight = proxy.size.height }
+                    .onChange(of: proxy.size.height) { _, height in
+                        containerHeight = height
+                    }
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             DDCTAButton(title: "확정하기") {
@@ -61,9 +109,32 @@ struct PlaceGroupingDetailView: View {
             .padding(.bottom, 11)
             .background(DDColor.surfaceDefault)
         }
+        .overlay(alignment: .bottom) {
+            if draggingPlaceID != nil {
+                trashDropOverlay
+                    .transition(.opacity)
+                    .zIndex(10)
+            }
+        }
+        .overlay {
+            if let draggingPlaceID,
+               let dragLocation,
+               let place = store.places.first(where: { $0.id == draggingPlaceID }) {
+                PlaceDragPreview(place: place)
+                    .frame(width: 370, height: 58)
+                    .position(dragLocation)
+                    .allowsHitTesting(false)
+                    .zIndex(11)
+            }
+        }
+        .onPreferenceChange(PlaceGroupingDropFramesKey.self) { dropFrames = $0 }
         .animation(
             .easeInOut(duration: 0.2),
             value: store.isJoinConfirmationPresented
+        )
+        .animation(
+            .easeInOut(duration: 0.2),
+            value: store.isDeleteConfirmationPresented
         )
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -117,7 +188,7 @@ struct PlaceGroupingDetailView: View {
 
     private var memberList: some View {
         HStack(alignment: .top, spacing: 8) {
-            HStack(alignment: .top, spacing: -14) {
+            HStack(alignment: .top, spacing: -29) {
                 ForEach(Array(groupMembers.enumerated()), id: \.element.id) { index, member in
                     memberButton(
                         member,
@@ -262,19 +333,22 @@ struct PlaceGroupingDetailView: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(store.places) { place in
-                    PlaceSwipeRow(
+                    PlaceDraggableRow(
                         place: place,
                         isEditable: store.canEditPlaces,
-                        onDelete: { store.send(.deletePlaceTapped(place.id)) },
-                        onMove: { sourceID in
-                            store.send(
-                                .placeMoved(
-                                    sourceID: sourceID,
-                                    beforeID: place.id
-                                )
-                            )
+                        isTargeted: targetedPlaceID == place.id,
+                        onDragChanged: { location in
+                            draggingPlaceID = place.id
+                            dragLocation = location
+                            updateDropTarget(at: location)
+                        },
+                        onDragEnded: { location in
+                            dragLocation = location
+                            updateDropTarget(at: location)
+                            commitDrop()
                         }
                     )
+                    .background(dropFrame("row:\(place.id)"))
                 }
             }
             .padding(.horizontal, DDSpacing.large)
@@ -283,60 +357,81 @@ struct PlaceGroupingDetailView: View {
         .scrollIndicators(.hidden)
     }
 
-}
-
-private struct PlaceSwipeRow: View {
-    private let actionWidth: CGFloat = 58
-    private let revealOffset: CGFloat = 70
-
-    let place: PlaceGroupingDetailFeature.Place
-    let isEditable: Bool
-    let onDelete: () -> Void
-    let onMove: (String) -> Void
-
-    @State private var horizontalOffset: CGFloat = 0
-    @State private var settledOffset: CGFloat = 0
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            if isEditable {
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(DDColor.actionPrimary)
-                        .frame(width: actionWidth, height: 58)
-                        .background(DDColor.actionSecondary)
-                        .clipShape(.rect(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-            }
-
-            interactivePlaceCard
+    private var trashDropOverlay: some View {
+        LinearGradient(
+            colors: [.clear, Color.black.opacity(0.8)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 246)
+        .overlay(alignment: .bottom) {
+            Image(systemName: "trash")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(DDColor.actionPrimary)
+                .frame(width: 56, height: 56)
+                .scaleEffect(isTrashTargeted ? 1.15 : 1)
+                .padding(.bottom, 22)
+                .animation(.easeInOut(duration: 0.15), value: isTrashTargeted)
         }
-        .frame(height: 58)
-        .clipped()
-        .onChange(of: isEditable) { _, isEditable in
-            guard !isEditable else { return }
-            horizontalOffset = 0
-            settledOffset = 0
+        .background(alignment: .bottom) {
+            Color.clear
+                .frame(height: 124)
+                .background(dropFrame("trash"))
+        }
+        .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(false)
+    }
+
+    private func dropFrame(_ id: String) -> some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: PlaceGroupingDropFramesKey.self,
+                value: [id: proxy.frame(in: .named("placeGroupingDetailDrag"))]
+            )
         }
     }
 
-    @ViewBuilder
-    private var interactivePlaceCard: some View {
-        if isEditable {
-            placeCard
-                .offset(x: horizontalOffset)
-                .gesture(swipeGesture)
-                .draggable(place.id)
-                .dropDestination(for: String.self) { items, _ in
-                    guard let sourceID = items.first else { return false }
-                    onMove(sourceID)
-                    return true
-                }
-        } else {
-            placeCard
+    private func updateDropTarget(at location: CGPoint) {
+        isTrashTargeted = containerHeight > 0 && location.y >= containerHeight - 124
+        targetedPlaceID = isTrashTargeted
+            ? nil
+            : store.places.first(where: {
+                $0.id != draggingPlaceID &&
+                dropFrames["row:\($0.id)"]?.contains(location) == true
+            })?.id
+    }
+
+    private func commitDrop() {
+        defer { finishDrag() }
+        guard let draggingPlaceID else { return }
+
+        if isTrashTargeted {
+            store.send(.deletePlaceTapped(draggingPlaceID))
+        } else if let targetedPlaceID {
+            store.send(.placeMoved(sourceID: draggingPlaceID, beforeID: targetedPlaceID))
         }
+    }
+
+    private func finishDrag() {
+        draggingPlaceID = nil
+        dragLocation = nil
+        targetedPlaceID = nil
+        isTrashTargeted = false
+    }
+
+}
+
+private struct PlaceDraggableRow: View {
+    let place: PlaceGroupingDetailFeature.Place
+    let isEditable: Bool
+    let isTargeted: Bool
+    let onDragChanged: (CGPoint) -> Void
+    let onDragEnded: (CGPoint) -> Void
+
+    var body: some View {
+        placeCard
+        .frame(height: 58)
+        .background(isTargeted ? DDColor.actionPrimary.opacity(0.12) : .clear)
     }
 
     private var placeCard: some View {
@@ -367,9 +462,7 @@ private struct PlaceSwipeRow: View {
 
             Spacer(minLength: 0)
 
-            if isEditable {
-                dragHandle
-            }
+            dragHandle
         }
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58)
@@ -383,43 +476,70 @@ private struct PlaceSwipeRow: View {
     }
 
     private var dragHandle: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<2, id: \.self) { _ in
-                VStack(spacing: 4) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        Circle()
-                            .fill(DDColor.iconDefault)
-                            .frame(width: 3, height: 3)
-                    }
-                }
-            }
+        HStack(spacing: 3.39) {
+            verticalEllipsis
+            verticalEllipsis
         }
-        .frame(width: 24, height: 24)
+        .frame(width: 12, height: 22)
+        .frame(width: 44, height: 44, alignment: .trailing)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(
+                minimumDistance: 0,
+                coordinateSpace: .named("placeGroupingDetailDrag")
+            )
+                .onChanged { drag in
+                    guard isEditable else { return }
+                    onDragChanged(drag.location)
+                }
+                .onEnded { drag in
+                    guard isEditable else { return }
+                    onDragEnded(drag.location)
+                }
+        )
         .accessibilityHidden(true)
     }
 
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else {
-                    return
-                }
-                horizontalOffset = min(
-                    0,
-                    max(-revealOffset, settledOffset + value.translation.width)
-                )
-            }
-            .onEnded { value in
-                let predictedOffset = settledOffset + value.predictedEndTranslation.width
-                let destination: CGFloat = predictedOffset < -(revealOffset / 2)
-                    ? -revealOffset
-                    : 0
+    private var verticalEllipsis: some View {
+        Image(systemName: "ellipsis")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 18, height: 4)
+            .rotationEffect(.degrees(90))
+            .frame(width: 4, height: 18)
+            .foregroundStyle(Color(red: 222 / 255, green: 222 / 255, blue: 222 / 255))
+    }
+}
 
-                withAnimation(.snappy(duration: 0.25)) {
-                    horizontalOffset = destination
-                    settledOffset = destination
+private struct PlaceDragPreview: View {
+    let place: PlaceGroupingDetailFeature.Place
+
+    var body: some View {
+        HStack(spacing: DDSpacing.large) {
+            Group {
+                if let data = place.photoData, let image = UIImage(data: data) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else if let image = UIImage(named: place.imageName) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    DDColor.surfaceControl
                 }
             }
+            .frame(width: 40, height: 40)
+            .clipShape(.rect(cornerRadius: 8))
+
+            Text(place.title)
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .background(DDColor.surfaceElevated, in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(DDColor.borderDefault, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
     }
 }
 

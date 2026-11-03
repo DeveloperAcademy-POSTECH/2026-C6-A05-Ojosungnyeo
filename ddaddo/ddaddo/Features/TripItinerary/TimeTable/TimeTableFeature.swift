@@ -114,6 +114,19 @@ struct TimeTableFeature: Reducer {
             return !hasTimeSelectionConflict
         }
 
+        mutating func resetScheduledItinerary() {
+            selectedDay = .day1
+            coursesByID = [:]
+            groups = []
+            placements = []
+            isEditing = false
+            edit = TimeTableEditFeature.State()
+            #if DEBUG
+            savedPreviewRowsByDay = nil
+            savedPreviewPlacements = nil
+            #endif
+        }
+
     }
 
     @CasePathable

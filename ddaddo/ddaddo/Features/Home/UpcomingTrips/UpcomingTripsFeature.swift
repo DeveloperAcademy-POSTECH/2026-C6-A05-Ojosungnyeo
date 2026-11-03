@@ -245,7 +245,10 @@ struct UpcomingTripsFeature: Reducer {
             id: snapshot.tripID,
             destination: destination,
             country: country,
-            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate)
+            dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
+            startDate: snapshot.startDate,
+            endDate: snapshot.endDate,
+            isItineraryReady: snapshot.isItineraryReady
         )
     }
 

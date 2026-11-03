@@ -10,6 +10,7 @@ struct PlaceGroupingDetailFeature: Reducer {
     enum Delegate: Equatable {
         case confirmed
         case joined
+        case placeDeleted(String)
     }
 
     @ObservableState
@@ -25,6 +26,11 @@ struct PlaceGroupingDetailFeature: Reducer {
         var preferenceCategories: [String] = ["쇼핑", "디저트"]
         var currentMemberID = "juni"
         var isJoinConfirmationPresented = false
+        var pendingDeletionPlaceID: String?
+
+        var isDeleteConfirmationPresented: Bool {
+            pendingDeletionPlaceID != nil
+        }
 
         var canJoin: Bool {
             !groupMemberIDs.contains(currentMemberID)
@@ -107,6 +113,8 @@ struct PlaceGroupingDetailFeature: Reducer {
         case joinConfirmationCancelTapped
         case joinConfirmationConfirmTapped
         case deletePlaceTapped(String)
+        case deleteConfirmationCancelTapped
+        case deleteConfirmationConfirmTapped
         case placeMoved(sourceID: String, beforeID: String)
         case confirmButtonTapped
         case delegate(Delegate)
@@ -136,9 +144,26 @@ struct PlaceGroupingDetailFeature: Reducer {
                 return .send(.delegate(.joined))
 
             case let .deletePlaceTapped(id):
-                guard state.canEditPlaces else { return .none }
-                state.places.removeAll { $0.id == id }
+                guard state.canEditPlaces,
+                      state.places.contains(where: { $0.id == id })
+                else { return .none }
+                state.pendingDeletionPlaceID = id
                 return .none
+
+            case .deleteConfirmationCancelTapped:
+                state.pendingDeletionPlaceID = nil
+                return .none
+
+            case .deleteConfirmationConfirmTapped:
+                guard state.canEditPlaces,
+                      let id = state.pendingDeletionPlaceID
+                else {
+                    state.pendingDeletionPlaceID = nil
+                    return .none
+                }
+                state.places.removeAll { $0.id == id }
+                state.pendingDeletionPlaceID = nil
+                return .send(.delegate(.placeDeleted(id)))
 
             case let .placeMoved(sourceID, beforeID):
                 guard state.canEditPlaces else { return .none }

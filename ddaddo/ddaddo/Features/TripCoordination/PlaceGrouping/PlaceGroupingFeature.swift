@@ -341,6 +341,29 @@ struct PlaceGroupingFeature: Reducer {
                 }
                 state.isDetailPresented = false
                 return .none
+            case let .detail(.delegate(.placeDeleted(placeID))):
+                guard let selectedGroupID = state.selectedGroupID else { return .none }
+                state.recommendedGroups = state.recommendedGroups.map { group in
+                    guard group.id == selectedGroupID else { return group }
+                    return RecommendedGroup(
+                        id: group.id,
+                        title: group.title,
+                        participantSummary: group.participantSummary,
+                        memberIDs: group.memberIDs,
+                        categories: group.categories,
+                        places: group.places.filter { $0.id != placeID }
+                    )
+                }
+                state.placeGroups = state.placeGroups.map { group in
+                    guard group.id == selectedGroupID else { return group }
+                    return MapPlaceGroup(
+                        id: group.id,
+                        name: group.name,
+                        places: group.places.filter { $0.id != placeID },
+                        radius: group.radius
+                    )
+                }
+                return .none
             case .detail(.backButtonTapped):
                 state.isDetailPresented = false
                 return .none

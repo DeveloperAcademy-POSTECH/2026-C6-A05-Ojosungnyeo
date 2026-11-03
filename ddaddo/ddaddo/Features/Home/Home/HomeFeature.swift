@@ -198,12 +198,17 @@ struct HomeFeature: Reducer {
                     }
                 return .none
 
-            case .placeGrouping(.waitingForConfirmation(.completionButtonTapped)):
+            case .placeGrouping(.delegate(.proceedToItinerary)):
                 let waiting = state.placeGrouping.waitingForConfirmation
                 guard waiting.haveAllMembersConfirmed,
                       state.tripItinerary.timeTable.recommendationTripID == waiting.tripID
                 else { return .none }
                 state.tripItinerary.selectedTab = .dailyItinerary
+                state.tripItinerary.timeTable.resetScheduledItinerary()
+                state.tripItinerary.routeOverview.replaceItinerary(
+                    placements: state.tripItinerary.timeTable.placements,
+                    coursesByID: state.tripItinerary.timeTable.coursesByID
+                )
                 state.isPlaceGroupingPresented = false
                 state.isTripItineraryPresented = true
                 return .none

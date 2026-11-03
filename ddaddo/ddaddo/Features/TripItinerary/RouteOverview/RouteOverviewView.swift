@@ -48,7 +48,10 @@ struct RouteOverviewView: View {
     private var routeMap: some View {
         RouteGoogleMapView(
             stops: store.visibleStops,
-            selectedMember: store.selectedMember
+            selectedMembers: store.selectedMembers,
+            selectedMemberOrder: store.selectedMemberOrder,
+            currentMember: store.currentMember,
+            memberOrder: store.memberOrder
         )
             .ignoresSafeArea()
     }
@@ -175,20 +178,20 @@ struct RouteOverviewView: View {
 
     private var editingHeader: some View {
         HStack(spacing: DDSpacing.xSmall) {
-            ForEach(TripMember.allCases) { member in
+            ForEach(store.memberOrder) { member in
                 Button {
                     store.send(.memberTapped(member))
                 } label: {
                     DDMiniHeadAvatar(character: member.routeAvatarCharacter, size: 37)
                         .opacity(
-                            store.selectedMember == nil || store.selectedMember == member
+                            store.selectedMembers.isEmpty || store.selectedMembers.contains(member)
                                 ? 1
                                 : 0.35
                         )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(member.accessibilityName) 일정 보기")
-                .accessibilityValue(store.selectedMember == member ? "선택됨" : "선택 안 됨")
+                .accessibilityValue(store.selectedMembers.contains(member) ? "선택됨" : "선택 안 됨")
             }
 
             Spacer(minLength: 0)
@@ -210,20 +213,20 @@ struct RouteOverviewView: View {
 
     private var memberFilter: some View {
         HStack(spacing: DDSpacing.xSmall) {
-            ForEach(TripMember.allCases) { member in
+            ForEach(store.memberOrder) { member in
                 Button {
                     store.send(.memberTapped(member))
                 } label: {
                     DDMiniHeadAvatar(character: member.routeAvatarCharacter, size: 37)
                         .opacity(
-                            store.selectedMember == nil || store.selectedMember == member
+                            store.selectedMembers.isEmpty || store.selectedMembers.contains(member)
                                 ? 1
                                 : 0.35
                         )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(member.accessibilityName) 일정 보기")
-                .accessibilityValue(store.selectedMember == member ? "선택됨" : "선택 안 됨")
+                .accessibilityValue(store.selectedMembers.contains(member) ? "선택됨" : "선택 안 됨")
             }
 
             Spacer(minLength: 0)
@@ -432,8 +435,8 @@ struct RouteOverviewView: View {
 
     @ViewBuilder
     private func participantDots(for stop: RouteStop) -> some View {
-        if store.selectedMember == nil,
-           stop.members.count < TripMember.allCases.count {
+        if store.selectedMembers.count != 1,
+           !Set(store.memberOrder).isSubset(of: stop.members) {
             HStack(spacing: -5) {
                 ForEach(members(for: stop)) { member in
                     Circle()
@@ -496,7 +499,10 @@ struct RouteOverviewView: View {
     }
 
     private func members(for stop: RouteStop) -> [TripMember] {
-        TripMember.allCases.filter(stop.members.contains)
+        store.memberOrder.filter { member in
+            stop.members.contains(member)
+                && (store.selectedMembers.isEmpty || store.selectedMembers.contains(member))
+        }
     }
 }
 

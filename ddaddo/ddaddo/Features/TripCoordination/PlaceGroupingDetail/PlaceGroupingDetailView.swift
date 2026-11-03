@@ -285,16 +285,15 @@ struct PlaceGroupingDetailView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Text("휑")
-                .font(.system(size: 128, weight: .black))
-                .foregroundStyle(.white)
-                .minimumScaleFactor(1)
-                .frame(height: 122)
+        VStack(spacing: DDSpacing.large) {
+            Image("Empty")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 159, height: 170)
 
             Text("\(emptyStateMemberName)는 이 지역에 그룹핑된 장소가 없어요")
                 .ddTypography(.body16)
-                .foregroundStyle(DDColor.textPrimary)
+                .foregroundStyle(DDColor.borderSubtle)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 76)

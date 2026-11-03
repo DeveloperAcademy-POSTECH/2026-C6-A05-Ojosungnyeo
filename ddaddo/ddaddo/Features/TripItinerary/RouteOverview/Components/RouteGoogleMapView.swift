@@ -342,8 +342,8 @@ struct RouteGoogleMapView: UIViewRepresentable {
     )
 
     private static let neonRouteColor = UIColor(
-        red: 138 / 255,
-        green: 150 / 255,
+        red: 182 / 255,
+        green: 198 / 255,
         blue: 0,
         alpha: 1
     )

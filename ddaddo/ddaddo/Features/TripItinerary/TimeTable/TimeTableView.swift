@@ -49,35 +49,6 @@ private struct TimeTableReadOnlyContent: View {
             .map { ($0.1, $0.2) }
     }
 
-    private var tripDateText: String? {
-        if let startDate = store.tripStartDate, let endDate = store.tripEndDate {
-            var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = .current
-            let startDay = calendar.startOfDay(for: startDate)
-            let endDay = calendar.startOfDay(for: endDate)
-            guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
-                  nights >= 0 else { return nil }
-
-            let startMonth = calendar.component(.month, from: startDay)
-            let startDayOfMonth = calendar.component(.day, from: startDay)
-            let endMonth = calendar.component(.month, from: endDay)
-            let endDayOfMonth = calendar.component(.day, from: endDay)
-            let sameMonth = calendar.component(.year, from: startDay)
-                == calendar.component(.year, from: endDay) && startMonth == endMonth
-            let endText = sameMonth ? "\(endDayOfMonth)일" : "\(endMonth)월 \(endDayOfMonth)일"
-            return "\(startMonth)월 \(startDayOfMonth)일 ~ \(endText) · \(nights)박 \(nights + 1)일"
-        }
-
-        guard store.tripStartDate == nil, store.tripEndDate == nil else { return nil }
-        let days = TripDay.allCases.compactMap { store.dayOfMonthByDay[$0] }
-        guard let first = days.first, let last = days.last else { return nil }
-        for index in 1..<days.count where days[index] != days[index - 1] + 1 {
-            return nil
-        }
-        let nights = days.count - 1
-        return "\(first)일 ~ \(last)일 · \(nights)박 \(nights + 1)일"
-    }
-
     var body: some View {
         ZStack {
             DDColor.surfaceDefault.ignoresSafeArea()
@@ -140,7 +111,7 @@ private struct TimeTableReadOnlyContent: View {
             }
             .frame(height: 33, alignment: .leading)
 
-            if let tripDateText {
+            if let tripDateText = store.tripDateText {
                 Text(tripDateText)
                     .ddTypography(.body16)
                     .foregroundStyle(DDColor.textSecondary)

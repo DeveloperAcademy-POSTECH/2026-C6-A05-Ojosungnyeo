@@ -60,6 +60,7 @@ struct WaitingForConfirmationFeature: Reducer {
         case confirmationsResponse([MemberGroupConfirmation])
         case confirmationsFailed
         case backButtonTapped
+        case completionButtonTapped
         case nudgeButtonTapped(String)
     }
 
@@ -94,7 +95,7 @@ struct WaitingForConfirmationFeature: Reducer {
                     )
                 }
                 return .none
-            case .confirmationsFailed, .nudgeButtonTapped:
+            case .confirmationsFailed, .nudgeButtonTapped, .completionButtonTapped:
                 return .none
             case .onDisappear, .backButtonTapped:
                 return .cancel(id: "group-confirmation-poll")

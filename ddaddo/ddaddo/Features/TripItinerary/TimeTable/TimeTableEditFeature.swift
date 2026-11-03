@@ -1,6 +1,16 @@
 import ComposableArchitecture
 import Foundation
 
+struct TimeTableEditRow: Equatable, Identifiable {
+    enum Source: Equatable {
+        case schedules([TimeTableSchedule.ID])
+        case recommendation(TimeTableRecommendation.ID)
+    }
+
+    let id: String
+    let source: Source
+}
+
 struct TimeTableEditFeature: Reducer {
     @ObservableState
     struct State: Equatable {
@@ -13,6 +23,7 @@ struct TimeTableEditFeature: Reducer {
         var placingGroupID: TimeTableGroup.ID?
         var editingDay: TripDay?
         var selectedMinuteOfDay: Int?
+        var rowsByDay: [TripDay: [TimeTableEditRow]] = [:]
 
         var isTimeSelectionPresented: Bool {
             editingScheduleID != nil || placingGroupID != nil
@@ -40,6 +51,8 @@ struct TimeTableEditFeature: Reducer {
         case placeSearchResponse([PlaceSearchResult])
         case placeSearchFailed(String)
         case placeSearchResultTapped(PlaceSearchResult)
+        case recommendationDropped(TimeTableRecommendation.ID, before: TimeTableEditRow.ID?)
+        case scheduleRowMoved(TimeTableEditRow.ID, before: TimeTableEditRow.ID?)
     }
 
     @Dependency(\.continuousClock) var clock
@@ -54,7 +67,8 @@ struct TimeTableEditFeature: Reducer {
                 return .cancel(id: "time-table-place-search")
 
             case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
-                 .groupAddButtonTapped, .timeSelectionDoneTapped:
+                 .groupAddButtonTapped, .timeSelectionDoneTapped,
+                 .recommendationDropped, .scheduleRowMoved:
                 return .none
 
             case let .timeSelectionChanged(minuteOfDay):

@@ -15,6 +15,9 @@ struct TimeTableFeature: Reducer {
         var tripMembers = TripMember.allCases
         var tripStartDate: Date? = nil
         var tripEndDate: Date? = nil
+        var tripTitle: String?
+        var recommendationTripID: String?
+        var recommendations: [TimeTableRecommendation] = []
         var dayOfMonthByDay: [TripDay: Int] = [
             .day1: 22, .day2: 23, .day3: 24, .day4: 25
         ]
@@ -23,6 +26,35 @@ struct TimeTableFeature: Reducer {
         var placements = TimeTableSchedule.mockPlacements
         var isEditing = false
         var edit = TimeTableEditFeature.State()
+
+        var tripDateText: String? {
+            if let startDate = tripStartDate, let endDate = tripEndDate {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = .current
+                let startDay = calendar.startOfDay(for: startDate)
+                let endDay = calendar.startOfDay(for: endDate)
+                guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
+                      nights >= 0 else { return nil }
+
+                let startMonth = calendar.component(.month, from: startDay)
+                let startDayOfMonth = calendar.component(.day, from: startDay)
+                let endMonth = calendar.component(.month, from: endDay)
+                let endDayOfMonth = calendar.component(.day, from: endDay)
+                let sameMonth = calendar.component(.year, from: startDay)
+                    == calendar.component(.year, from: endDay) && startMonth == endMonth
+                let endText = sameMonth ? "\(endDayOfMonth)일" : "\(endMonth)월 \(endDayOfMonth)일"
+                return "\(startMonth)월 \(startDayOfMonth)일 ~ \(endText) · \(nights)박 \(nights + 1)일"
+            }
+
+            guard tripStartDate == nil, tripEndDate == nil else { return nil }
+            let days = TripDay.allCases.compactMap { dayOfMonthByDay[$0] }
+            guard let first = days.first, let last = days.last else { return nil }
+            for index in 1..<days.count where days[index] != days[index - 1] + 1 {
+                return nil
+            }
+            let nights = days.count - 1
+            return "\(first)일 ~ \(last)일 · \(nights)박 \(nights + 1)일"
+        }
 
         var unplacedGroups: [TimeTableGroup] {
             let placedCourseIDs = Set(placements.map(\.courseID))
@@ -96,7 +128,41 @@ struct TimeTableFeature: Reducer {
                 return .none
 
             case .editButtonTapped:
+                if state.edit.rowsByDay.isEmpty {
+                    for day in TripDay.allCases {
+                        state.edit.rowsByDay[day] = Self.initialRows(
+                            on: day,
+                            placements: state.placements
+                        )
+                    }
+                }
                 state.isEditing = true
+                return .none
+
+            case let .edit(.recommendationDropped(id, before: targetID)):
+                guard state.recommendations.contains(where: { $0.id == id }),
+                      !state.edit.rowsByDay.values.flatMap({ $0 }).contains(where: {
+                          $0.source == .recommendation(id)
+                      }) else { return .none }
+                var rows = state.edit.rowsByDay[state.selectedDay, default: []]
+                let row = TimeTableEditRow(id: "recommendation-\(id)", source: .recommendation(id))
+                let index = targetID.flatMap { targetID in
+                    rows.firstIndex(where: { $0.id == targetID })
+                } ?? rows.endIndex
+                rows.insert(row, at: index)
+                state.edit.rowsByDay[state.selectedDay] = rows
+                return .none
+
+            case let .edit(.scheduleRowMoved(id, before: targetID)):
+                var rows = state.edit.rowsByDay[state.selectedDay, default: []]
+                guard let sourceIndex = rows.firstIndex(where: { $0.id == id }),
+                      targetID != id else { return .none }
+                let row = rows.remove(at: sourceIndex)
+                let targetIndex = targetID.flatMap { targetID in
+                    rows.firstIndex(where: { $0.id == targetID })
+                } ?? rows.endIndex
+                rows.insert(row, at: targetIndex)
+                state.edit.rowsByDay[state.selectedDay] = rows
                 return .none
 
             case .edit(.backButtonTapped), .edit(.saveButtonTapped):
@@ -172,6 +238,106 @@ struct TimeTableFeature: Reducer {
             TimeTableEditFeature()
         }
     }
+
+    private static func initialRows(
+        on day: TripDay,
+        placements: [TimeTableSchedule]
+    ) -> [TimeTableEditRow] {
+        let schedules = placements.filter { $0.day == day }
+        var seenBranchIDs: Set<Int> = []
+        var rows: [(minute: Int, index: Int, row: TimeTableEditRow)] = []
+
+        for (index, schedule) in schedules.enumerated() {
+            if let branchID = schedule.branchGroupID {
+                guard seenBranchIDs.insert(branchID).inserted else { continue }
+                let branch = schedules.filter { $0.branchGroupID == branchID }
+                rows.append((
+                    branch.map(\.timing.startMinuteOfDay).min() ?? 0,
+                    index,
+                    TimeTableEditRow(
+                        id: "\(day.rawValue)-branch-\(branchID)",
+                        source: .schedules(branch.map(\.id))
+                    )
+                ))
+            } else {
+                rows.append((
+                    schedule.timing.startMinuteOfDay,
+                    index,
+                    TimeTableEditRow(
+                        id: "\(day.rawValue)-schedule-\(schedule.id)",
+                        source: .schedules([schedule.id])
+                    )
+                ))
+            }
+        }
+
+        return rows.sorted {
+            $0.minute == $1.minute ? $0.index < $1.index : $0.minute < $1.minute
+        }.map(\.row)
+    }
+
+    #if DEBUG
+    static var debugEditPreviewState: State {
+        var state = State()
+        state.recommendations = TimeTableRecommendation.debugTokyoRecommendations
+        for day in TripDay.allCases {
+            state.edit.rowsByDay[day] = initialRows(on: day, placements: state.placements)
+        }
+        state.isEditing = true
+        return state
+    }
+    #endif
+}
+
+struct TimeTableRecommendation: Equatable, Identifiable {
+    let id: String
+    let groupID: String
+    let placeID: String
+    let placeName: String
+    let category: String
+    let memberIDs: [String]
+    let placeOwnerMemberIDs: [String]
+
+    #if DEBUG
+    static let debugTokyoRecommendations: [Self] = [
+        Self(
+            id: "debug-tokyo-stussy-debug-tokyo-place-stussy",
+            groupID: "debug-tokyo-stussy",
+            placeID: "debug-tokyo-place-stussy",
+            placeName: "스투시 도쿄점",
+            category: "쇼핑",
+            memberIDs: [TripMember.grae.rawValue],
+            placeOwnerMemberIDs: [TripMember.grae.rawValue]
+        ),
+        Self(
+            id: "debug-tokyo-goods-debug-tokyo-place-goods",
+            groupID: "debug-tokyo-goods",
+            placeID: "debug-tokyo-place-goods",
+            placeName: "물만두 굿즈샵",
+            category: "쇼핑",
+            memberIDs: [TripMember.juni.rawValue],
+            placeOwnerMemberIDs: [TripMember.juni.rawValue]
+        ),
+        Self(
+            id: "debug-tokyo-asakusa-debug-tokyo-place-sensoji",
+            groupID: "debug-tokyo-asakusa",
+            placeID: "debug-tokyo-place-sensoji",
+            placeName: "센소지",
+            category: "관광지",
+            memberIDs: [TripMember.tae.rawValue, TripMember.header.rawValue],
+            placeOwnerMemberIDs: [TripMember.tae.rawValue]
+        ),
+        Self(
+            id: "debug-tokyo-asakusa-debug-tokyo-place-nakamise",
+            groupID: "debug-tokyo-asakusa",
+            placeID: "debug-tokyo-place-nakamise",
+            placeName: "나카미세도리",
+            category: "관광지",
+            memberIDs: [TripMember.tae.rawValue, TripMember.header.rawValue],
+            placeOwnerMemberIDs: [TripMember.header.rawValue]
+        )
+    ]
+    #endif
 }
 
 enum TripDay: String, CaseIterable, Equatable, Identifiable {

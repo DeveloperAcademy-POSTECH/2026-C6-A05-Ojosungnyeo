@@ -172,7 +172,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
         let displayedMembers = selectedMembers.isEmpty
             ? memberOrder
-            : memberOrder.filter(selectedMembers.contains)
+            : selectedMemberOrder.filter(selectedMembers.contains)
 
         var membersByLeg: [RouteLeg: [TripMember]] = [:]
         var orderedLegs: [RouteLeg] = []
@@ -195,20 +195,17 @@ struct RouteGoogleMapView: UIViewRepresentable {
             for leg in orderedLegs {
                 guard let start = stopsByID[leg.startID],
                       let end = stopsByID[leg.endID],
-                      let members = membersByLeg[leg] else { continue }
+                      let members = membersByLeg[leg],
+                      let member = representativeMember(
+                        in: Set(members),
+                        prioritizingRecentSelection: true
+                      ) else { continue }
 
-                for (memberIndex, member) in members.enumerated() {
-                    let offset = Double(memberIndex) - Double(members.count - 1) / 2
-                    drawPolyline(
-                        coordinates: offsetCoordinates(
-                            from: coordinate(for: start),
-                            to: coordinate(for: end),
-                            offset: offset * 0.00010
-                        ),
-                        color: UIColor(member.routePolylineColor),
-                        on: mapView
-                    )
-                }
+                drawPolyline(
+                    coordinates: [coordinate(for: start), coordinate(for: end)],
+                    color: UIColor(member.routePolylineColor),
+                    on: mapView
+                )
             }
             return
         }
@@ -262,32 +259,6 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
     private func coordinate(for stop: RouteStop) -> CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)
-    }
-
-    private func offsetCoordinates(
-        from start: CLLocationCoordinate2D,
-        to end: CLLocationCoordinate2D,
-        offset: Double
-    ) -> [CLLocationCoordinate2D] {
-        guard offset != 0 else { return [start, end] }
-
-        let latitudeDelta = end.latitude - start.latitude
-        let longitudeDelta = end.longitude - start.longitude
-        let length = hypot(latitudeDelta, longitudeDelta)
-        guard length > 0 else { return [start, end] }
-
-        let latitudeOffset = -longitudeDelta / length * offset
-        let longitudeOffset = latitudeDelta / length * offset
-        return [
-            CLLocationCoordinate2D(
-                latitude: start.latitude + latitudeOffset,
-                longitude: start.longitude + longitudeOffset
-            ),
-            CLLocationCoordinate2D(
-                latitude: end.latitude + latitudeOffset,
-                longitude: end.longitude + longitudeOffset
-            )
-        ]
     }
 
     private func drawPolyline(

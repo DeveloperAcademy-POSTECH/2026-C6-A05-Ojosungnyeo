@@ -171,18 +171,92 @@ private struct TimeTableReadOnlyContent: View {
                 .padding(.horizontal, DDSpacing.medium)
 
             LazyVStack(spacing: DDSpacing.large) {
-                ForEach(Array(scheduledCourses.enumerated()), id: \.element.schedule.id) { index, item in
-                    HStack(alignment: .top, spacing: 20) {
-                        timelineMarker(number: index + 1, isLast: index == scheduledCourses.count - 1)
-                        scheduleCard(item.course)
+                #if DEBUG
+                if store.isLocalPreview, store.recommendationTripID == nil,
+                   let savedRows = store.savedPreviewRowsByDay?[store.selectedDay] {
+                    ForEach(Array(savedRows.enumerated()), id: \.element.id) { index, row in
+                        HStack(alignment: .top, spacing: 20) {
+                            timelineMarker(number: index + 1, isLast: index == savedRows.count - 1)
+                            savedPreviewRow(row)
+                        }
+                        .padding(.leading, DDSpacing.medium)
+                        .padding(.trailing, DDSpacing.large)
                     }
-                    .padding(.leading, DDSpacing.medium)
-                    .padding(.trailing, DDSpacing.large)
+                } else {
+                    originalScheduleRows
                 }
+                #else
+                originalScheduleRows
+                #endif
             }
         }
         .padding(.top, DDSpacing.xLarge)
     }
+
+    private var originalScheduleRows: some View {
+        ForEach(Array(scheduledCourses.enumerated()), id: \.element.schedule.id) { index, item in
+            HStack(alignment: .top, spacing: 20) {
+                timelineMarker(number: index + 1, isLast: index == scheduledCourses.count - 1)
+                scheduleCard(item.course)
+            }
+            .padding(.leading, DDSpacing.medium)
+            .padding(.trailing, DDSpacing.large)
+        }
+    }
+
+    #if DEBUG
+    @ViewBuilder
+    private func savedPreviewRow(_ row: TimeTableEditRow) -> some View {
+        if row.sources.count > 1 {
+            ScrollView(.horizontal) {
+                HStack(spacing: DDSpacing.small) {
+                    ForEach(Array(row.sources.enumerated()), id: \.offset) { item in
+                        savedPreviewCard(item.element).frame(width: 200)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+        } else if let source = row.sources.first {
+            savedPreviewCard(source)
+        }
+    }
+
+    @ViewBuilder
+    private func savedPreviewCard(_ source: TimeTableEditRow.Source) -> some View {
+        switch source {
+        case let .schedule(id):
+            if let schedule = store.savedPreviewPlacements?.first(where: { $0.id == id }),
+               let course = store.coursesByID[schedule.courseID] {
+                scheduleCard(course)
+            }
+        case let .recommendationGroup(id):
+            let places = store.recommendations.filter { $0.groupID == id }
+            if let first = places.first {
+                VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
+                    HStack(spacing: DDSpacing.xSmall) {
+                        Text(places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName)
+                            .ddTypography(.bodyEmphasis16)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .lineLimit(1)
+                        HStack(spacing: -5) {
+                            ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
+                                Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                            }
+                        }
+                    }
+                    Text(first.category)
+                        .ddTypography(.labelEmphasis14)
+                        .foregroundStyle(DDColor.actionPrimary)
+                }
+                .padding(.horizontal, DDSpacing.xLarge)
+                .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
+                .background(DDColor.surfaceElevated)
+                .clipShape(.rect(cornerRadius: 20))
+                .overlay { RoundedRectangle(cornerRadius: 20).stroke(DDColor.textTertiary, lineWidth: 1) }
+            }
+        }
+    }
+    #endif
 
     private func timelineMarker(number: Int, isLast: Bool) -> some View {
         ZStack(alignment: .top) {

@@ -1,6 +1,14 @@
 import ComposableArchitecture
 import SwiftUI
 
+private struct TimeTableDropFramesKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
 struct TimeTableEditView: View {
     let timeTableStore: StoreOf<TimeTableFeature>
     let store: StoreOf<TimeTableEditFeature>
@@ -47,6 +55,14 @@ struct TimeTableEditView: View {
             .presentationCornerRadius(28)
             .presentationBackground(DDColor.surfaceDefault)
         }
+        .alert("일정을 저장할 수 없어요", isPresented: Binding(
+            get: { store.isSaveUnavailableAlertPresented },
+            set: { if !$0 { store.send(.saveUnavailableAlertDismissed) } }
+        )) {
+            Button("확인") { store.send(.saveUnavailableAlertDismissed) }
+        } message: {
+            Text("서버 일정 저장 기능이 아직 연결되지 않았어요. 편집 내용은 이 화면에 남아 있어요.")
+        }
     }
 }
 
@@ -57,22 +73,40 @@ private struct TimeTableEditContent: View {
     @State private var dragging: DraggedItem?
     @State private var targetedRowID: String?
     @State private var isAppendTargeted = false
+    @State private var dragLocation: CGPoint?
+    @State private var dropFrames: [String: CGRect] = [:]
 
     private enum DraggedItem: Equatable {
         case recommendation(TimeTableRecommendation.ID)
         case row(TimeTableEditRow.ID)
     }
 
+    private enum DropTarget: Equatable {
+        case row(String)
+        case merge(String)
+        case append
+    }
+
+    @State private var activeDropTarget: DropTarget?
+
     private var rows: [TimeTableEditRow] {
         store.rowsByDay[timeTableStore.selectedDay] ?? []
     }
 
     private var availableRecommendations: [TimeTableRecommendation] {
-        let placedIDs = Set(store.rowsByDay.values.flatMap { $0 }.compactMap { row -> String? in
-            if case let .recommendation(id) = row.source { return id }
-            return nil
-        })
-        return timeTableStore.recommendations.filter { !placedIDs.contains($0.id) }
+        let placedGroupIDs = Set(
+            store.rowsByDay.values
+                .flatMap { $0 }
+                .flatMap(\.sources)
+                .compactMap { source -> String? in
+                    guard case let .recommendationGroup(groupID) = source else { return nil }
+                    return groupID
+                }
+        )
+        var seen: Set<String> = []
+        return timeTableStore.recommendations.filter {
+            !placedGroupIDs.contains($0.groupID) && seen.insert($0.groupID).inserted
+        }
     }
 
     var body: some View {
@@ -98,6 +132,15 @@ private struct TimeTableEditContent: View {
                 .scrollIndicators(.hidden)
                 .id(timeTableStore.selectedDay)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .coordinateSpace(name: "timeTableEditDrag")
+        .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
+        .overlay {
+            if let dragging, let dragLocation {
+                dragPreview(dragging)
+                    .position(dragLocation)
+                    .allowsHitTesting(false)
             }
         }
         .preferredColorScheme(.dark)
@@ -198,12 +241,13 @@ private struct TimeTableEditContent: View {
             ScrollView(.horizontal) {
                 HStack(spacing: DDSpacing.large) {
                     ForEach(availableRecommendations) { recommendation in
+                        let places = timeTableStore.recommendations.filter { $0.groupID == recommendation.groupID }
                         editCard(
-                            title: recommendation.placeName,
+                            title: places.count > 1 ? "\(recommendation.placeName) 외 \(places.count - 1)곳" : recommendation.placeName,
                             subtitle: recommendation.category,
                             memberIDs: recommendation.memberIDs,
                             width: 200,
-                            drag: .recommendation(recommendation.id)
+                            drag: .recommendation(recommendation.groupID)
                         )
                     }
                 }
@@ -229,13 +273,8 @@ private struct TimeTableEditContent: View {
                     }
                     .padding(.leading, DDSpacing.medium)
                     .padding(.trailing, DDSpacing.large)
+                    .background(dropFrame("row:\(row.id)"))
                     .background(targetedRowID == row.id ? DDColor.actionPrimary.opacity(0.12) : .clear)
-                    .onDrop(of: ["public.text"], isTargeted: Binding(
-                        get: { targetedRowID == row.id },
-                        set: { targetedRowID = $0 ? row.id : nil }
-                    )) { _ in
-                        drop(before: row.id)
-                    }
                 }
             }
         }
@@ -261,34 +300,47 @@ private struct TimeTableEditContent: View {
 
     @ViewBuilder
     private func rowCards(_ row: TimeTableEditRow) -> some View {
-        switch row.source {
-        case let .recommendation(id):
-            if let item = timeTableStore.recommendations.first(where: { $0.id == id }) {
-                editCard(title: item.placeName, subtitle: item.category,
-                         memberIDs: item.memberIDs, width: nil, drag: .row(row.id))
-            }
-        case let .schedules(ids):
-            let schedules = ids.compactMap { id in
-                timeTableStore.placements.first(where: { $0.id == id })
-            }
-            if ids.count > 1 {
+        if row.sources.count > 1 {
+            GeometryReader { geometry in
+                let spacing = DDSpacing.large
+                let cardWidth = row.sources.count <= 2
+                    ? 200
+                    : max(
+                        112,
+                        min(200, (geometry.size.width + spacing) * 2 / CGFloat(row.sources.count) - spacing)
+                    )
+
                 ScrollView(.horizontal) {
-                    HStack(spacing: DDSpacing.large) {
-                        ForEach(schedules) { schedule in
-                            if let course = timeTableStore.coursesByID[schedule.courseID] {
-                                editCard(title: course.title, subtitle: course.placesSummary,
-                                         memberIDs: course.members.map(\.rawValue),
-                                         width: 200, drag: .row(row.id))
-                            }
+                    HStack(spacing: spacing) {
+                        ForEach(Array(row.sources.enumerated()), id: \.offset) { item in
+                            sourceCard(item.element, rowID: row.id, width: cardWidth)
                         }
                     }
                 }
+                .frame(width: geometry.size.width, alignment: .leading)
                 .scrollIndicators(.hidden)
-            } else if let schedule = schedules.first,
-                      let course = timeTableStore.coursesByID[schedule.courseID] {
+            }
+            .frame(height: 71)
+        } else if let source = row.sources.first {
+            sourceCard(source, rowID: row.id, width: nil)
+        }
+    }
+
+    @ViewBuilder
+    private func sourceCard(_ source: TimeTableEditRow.Source, rowID: String, width: CGFloat?) -> some View {
+        switch source {
+        case let .schedule(id):
+            if let schedule = store.draftPlacements.first(where: { $0.id == id }),
+               let course = timeTableStore.coursesByID[schedule.courseID] {
                 editCard(title: course.title, subtitle: course.placesSummary,
-                         memberIDs: course.members.map(\.rawValue),
-                         width: nil, drag: .row(row.id))
+                         memberIDs: course.members.map(\.rawValue), width: width, drag: .row(rowID))
+            }
+        case let .recommendationGroup(id):
+            let places = timeTableStore.recommendations.filter { $0.groupID == id }
+            if let first = places.first {
+                editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
+                         subtitle: first.category, memberIDs: first.memberIDs,
+                         width: width, drag: .row(rowID))
             }
         }
     }
@@ -352,10 +404,29 @@ private struct TimeTableEditContent: View {
         .frame(width: 31.4, height: 22)
         .frame(width: 44, height: 44, alignment: .trailing)
         .contentShape(Rectangle())
-        .onDrag {
-            dragging = item
-            return NSItemProvider(object: NSString(string: "time-table-edit"))
-        }
+        .highPriorityGesture(
+            LongPressGesture(minimumDuration: 0.3, maximumDistance: 12)
+                .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("timeTableEditDrag")))
+                .onChanged { phase in
+                    switch phase {
+                    case .second(true, let drag):
+                        dragging = item
+                        if let drag {
+                            dragLocation = drag.location
+                            updateDropTarget(at: drag.location)
+                        }
+                    default:
+                        break
+                    }
+                }
+                .onEnded { phase in
+                    if case let .second(true, drag?) = phase {
+                        updateDropTarget(at: drag.location)
+                        commitDrop()
+                    }
+                    finishDrag()
+                }
+        )
         .accessibilityLabel("드래그하여 일정 이동")
     }
 
@@ -374,8 +445,92 @@ private struct TimeTableEditContent: View {
         }
         .buttonStyle(.plain)
         .background(isAppendTargeted ? DDColor.actionPrimary.opacity(0.12) : .clear)
-        .onDrop(of: ["public.text"], isTargeted: $isAppendTargeted) { _ in
-            drop(before: nil)
+        .background(dropFrame("append"))
+    }
+
+    private func dropFrame(_ id: String) -> some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: TimeTableDropFramesKey.self,
+                value: [id: proxy.frame(in: .named("timeTableEditDrag"))]
+            )
+        }
+    }
+
+    private func updateDropTarget(at location: CGPoint) {
+        let target: DropTarget?
+        if let row = rows.first(where: { dropFrames["row:\($0.id)"]?.contains(location) == true }),
+           let frame = dropFrames["row:\(row.id)"] {
+            switch dragging {
+            case .recommendation:
+                target = .merge(row.id)
+            case .row:
+                target = location.x >= frame.midX ? .merge(row.id) : .row(row.id)
+            case nil:
+                target = .row(row.id)
+            }
+        } else if dropFrames["append"]?.contains(location) == true {
+            target = .append
+        } else {
+            target = nil
+        }
+        activeDropTarget = target
+        switch target {
+        case let .row(id):
+            targetedRowID = id
+        case .merge:
+            targetedRowID = nil
+        case .append, nil:
+            targetedRowID = nil
+        }
+        isAppendTargeted = target == .append
+    }
+
+    private func commitDrop() {
+        switch activeDropTarget {
+        case let .row(id): _ = drop(before: id)
+        case let .merge(id): _ = merge(into: id)
+        case .append: _ = drop(before: nil)
+        case nil: break
+        }
+    }
+
+    private func finishDrag() {
+        dragging = nil
+        dragLocation = nil
+        activeDropTarget = nil
+        targetedRowID = nil
+        isAppendTargeted = false
+    }
+
+    @ViewBuilder
+    private func dragPreview(_ item: DraggedItem) -> some View {
+        switch item {
+        case let .recommendation(id):
+            let places = timeTableStore.recommendations.filter { $0.groupID == id }
+            if let first = places.first {
+                editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
+                         subtitle: first.category, memberIDs: first.memberIDs,
+                         width: 200, drag: item)
+            }
+        case let .row(id):
+            if let source = rows.first(where: { $0.id == id })?.sources.first {
+                switch source {
+                case let .schedule(scheduleID):
+                    if let schedule = store.draftPlacements.first(where: { $0.id == scheduleID }),
+                       let course = timeTableStore.coursesByID[schedule.courseID] {
+                        editCard(title: course.title, subtitle: course.placesSummary,
+                                 memberIDs: course.members.map(\.rawValue), width: 200, drag: item)
+                    }
+                case let .recommendationGroup(groupID):
+                    let places = timeTableStore.recommendations.filter { $0.groupID == groupID }
+                    if let first = places.first {
+                        editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
+                                 subtitle: first.category, memberIDs: first.memberIDs,
+                                 width: 200, drag: item)
+                    }
+                }
+            }
         }
     }
 
@@ -390,16 +545,22 @@ private struct TimeTableEditContent: View {
         self.dragging = nil
         return true
     }
+
+    private func merge(into rowID: String) -> Bool {
+        guard let dragging else { return false }
+        switch dragging {
+        case let .recommendation(id): store.send(.recommendationMerged(id, into: rowID))
+        case let .row(id): store.send(.rowMerged(id, into: rowID))
+        }
+        self.dragging = nil
+        return true
+    }
 }
 
 #if DEBUG
 #Preview("편집 · 추천 그룹 목업") {
-    let timeTableStore = Store(initialState: TimeTableFeature.debugEditPreviewState) {
+    TimeTableView(store: Store(initialState: TimeTableFeature.debugEditPreviewState) {
         TimeTableFeature()
-    }
-    TimeTableEditView(
-        timeTableStore: timeTableStore,
-        store: timeTableStore.scope(state: \.edit, action: \.edit)
-    )
+    })
 }
 #endif

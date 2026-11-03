@@ -9,6 +9,7 @@ import Foundation
 struct UpcomingTripsFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
+        case proceedToAnalysis(PlaceSelectionFeature.State)
     }
 
     struct Trip: Equatable, Identifiable {
@@ -202,6 +203,10 @@ struct UpcomingTripsFeature: Reducer {
             case .waitingForParticipants(.delegate(.returnToUpcomingTrips)):
                 state.isWaitingForParticipantsPresented = false
                 return fetchUpcomingTripsEffect()
+
+            case let .waitingForParticipants(.delegate(.proceedToAnalysis(placeSelection))):
+                state.isWaitingForParticipantsPresented = false
+                return .send(.delegate(.proceedToAnalysis(placeSelection)))
 
             case .waitingForParticipants:
                 return .none

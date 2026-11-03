@@ -162,6 +162,16 @@ struct HomeFeature: Reducer {
             case .upcomingTrips(.delegate(.returnHome)):
                 state.isUpcomingTripsPresented = false
                 return .none
+            case let .upcomingTrips(.delegate(.proceedToAnalysis(placeSelection))):
+                state.placeSelection = placeSelection
+                state.placeGrouping = PlaceGroupingFeature.State(
+                    placeSelection: placeSelection
+                )
+                state.isUpcomingTripsPresented = false
+                state.isPlaceSelectionPresented = false
+                state.isPlaceGroupingPresented = false
+                state.isPlaceAnalysisLoading = true
+                return .none
             case .upcomingTrips:
                 return .none
             case .tripItinerary(.timeTable(.backButtonTapped)),

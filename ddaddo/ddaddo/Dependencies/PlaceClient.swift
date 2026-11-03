@@ -11,6 +11,7 @@ struct PlaceClient: DependencyKey, Sendable {
     var autocomplete: @Sendable (String) async throws -> [PlaceSearchResult]
     var fetchDetails: @Sendable (PlaceSearchResult) async throws -> PlaceDetails
     var fetchMemberPlaces: @Sendable (String) async throws -> [MemberPlacePins]
+    var observeMemberPlaces: @Sendable (String) -> AsyncThrowingStream<[MemberPlacePins], Error>
     var savePlace: @Sendable (String, PinnedPlace) async throws -> Void
     var deletePlace: @Sendable (String, String) async throws -> Void
     var confirmPlaces: @Sendable (String) async throws -> Void
@@ -28,6 +29,9 @@ struct PlaceClient: DependencyKey, Sendable {
             },
             fetchMemberPlaces: { tripID in
                 try await FirebasePlaceSelectionService.fetchMemberPlaces(tripID: tripID)
+            },
+            observeMemberPlaces: { tripID in
+                FirebasePlaceSelectionService.observeMemberPlaces(tripID: tripID)
             },
             savePlace: { tripID, place in
                 try await FirebasePlaceSelectionService.savePlace(place, tripID: tripID)
@@ -69,6 +73,7 @@ struct PlaceClient: DependencyKey, Sendable {
             )
         },
         fetchMemberPlaces: { _ in [] },
+        observeMemberPlaces: { _ in AsyncThrowingStream { $0.finish() } },
         savePlace: { _, _ in },
         deletePlace: { _, _ in },
         confirmPlaces: { _ in },

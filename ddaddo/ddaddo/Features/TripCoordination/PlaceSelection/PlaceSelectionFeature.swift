@@ -77,6 +77,7 @@ struct PlaceSelectionFeature: Reducer {
         var hasSelectionEnded = false
         var isEditingConfirmedPlaces = false
         var completionAlert: CompletionAlert?
+        var placeSyncErrorMessage: String?
         var placeSearch = PlaceSearchFeature.State()
 
         init(
@@ -343,9 +344,12 @@ struct PlaceSelectionFeature: Reducer {
     @CasePathable
     enum Action: Equatable {
         case onAppear
+        case onDisappear
+        case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
-        case placeMutationFailed
+        case placeMutationFailed(String)
+        case placeSyncErrorDismissed
         case backButtonTapped
         case searchFieldTapped
         case searchTextChanged(String)
@@ -384,23 +388,41 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    return .send(.delegate(.proceedToAnalysis))
+                    return .merge(
+                        loadMemberPlacesEffect(tripID: state.tripID),
+                        .send(.delegate(.proceedToAnalysis))
+                    )
                 }
 
-                guard !state.isTimerRunning, !state.hasSelectionEnded else {
-                    return .none
-                }
-                state.isTimerRunning = true
-                return .merge(
-                    loadMemberPlacesEffect(tripID: state.tripID),
-                    .run { send in
-                        while !Task.isCancelled {
-                            try await clock.sleep(for: .seconds(1))
-                            await send(.timerTicked)
+                let tripID = state.tripID
+                var effects: [Effect<Action>] = [
+                    loadMemberPlacesEffect(tripID: tripID),
+                    observeMemberPlacesEffect(tripID: tripID)
+                    .cancellable(id: "place-selection-sync", cancelInFlight: true)
+                ]
+                if !state.isTimerRunning && !state.hasSelectionEnded {
+                    state.isTimerRunning = true
+                    effects.append(
+                        .run { send in
+                            while !Task.isCancelled {
+                                try await clock.sleep(for: .seconds(1))
+                                await send(.timerTicked)
+                            }
                         }
-                    }
-                    .cancellable(id: "place-selection-timer", cancelInFlight: true)
+                        .cancellable(id: "place-selection-timer", cancelInFlight: true)
+                    )
+                }
+                return .merge(effects)
+
+            case .onDisappear:
+                state.isTimerRunning = false
+                return .merge(
+                    .cancel(id: "place-selection-timer"),
+                    .cancel(id: "place-selection-sync")
                 )
+
+            case .refreshMemberPlaces:
+                return loadMemberPlacesEffect(tripID: state.tripID)
 
             case let .memberPlacesResponse(memberPins):
                 for pins in memberPins {
@@ -411,9 +433,29 @@ struct PlaceSelectionFeature: Reducer {
                         state.participants[index].isConfirmed = pins.isConfirmed
                     }
                 }
+                if state.isCurrentUserConfirmed,
+                   state.haveAllJoinedParticipantsConfirmed,
+                   !state.hasSelectionEnded,
+                   state.completionAlert == nil {
+                    state.isTimerRunning = false
+                    state.hasSelectionEnded = true
+                    state.completionAlert = .allMembersConfirmed
+                    return .merge(
+                        .cancel(id: "place-selection-timer"),
+                        .cancel(id: "place-selection-sync")
+                    )
+                }
                 return .none
 
-            case .memberPlacesFailed, .placeMutationFailed:
+            case .memberPlacesFailed:
+                return .none
+
+            case let .placeMutationFailed(message):
+                state.placeSyncErrorMessage = message
+                return loadMemberPlacesEffect(tripID: state.tripID)
+
+            case .placeSyncErrorDismissed:
+                state.placeSyncErrorMessage = nil
                 return .none
 
             case .backButtonTapped:
@@ -484,7 +526,7 @@ struct PlaceSelectionFeature: Reducer {
                     do {
                         try await placeClient.savePlace(tripID, pinnedPlace)
                     } catch {
-                        await send(.placeMutationFailed)
+                        await send(.placeMutationFailed(error.localizedDescription))
                     }
                 }
 
@@ -546,7 +588,7 @@ struct PlaceSelectionFeature: Reducer {
                     do {
                         try await placeClient.deletePlace(tripID, placeID)
                     } catch {
-                        await send(.placeMutationFailed)
+                        await send(.placeMutationFailed(error.localizedDescription))
                     }
                 }
 
@@ -685,12 +727,25 @@ struct PlaceSelectionFeature: Reducer {
         }
     }
 
+    private func observeMemberPlacesEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observeMemberPlaces(tripID)
+        return .run { send in
+            do {
+                for try await memberPlaces in stream {
+                    await send(.memberPlacesResponse(memberPlaces))
+                }
+            } catch {
+                await send(.memberPlacesFailed)
+            }
+        }
+    }
+
     private func confirmPlacesEffect(tripID: String) -> Effect<Action> {
         .run { send in
             do {
                 try await placeClient.confirmPlaces(tripID)
             } catch {
-                await send(.placeMutationFailed)
+                await send(.placeMutationFailed(error.localizedDescription))
             }
         }
     }

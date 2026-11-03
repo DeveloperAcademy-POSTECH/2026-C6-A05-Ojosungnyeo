@@ -15,30 +15,43 @@ enum FirebasePlaceSelectionService {
             .order(by: "slotIndex")
             .getDocuments()
 
+        let currentUserID = Auth.auth().currentUser?.uid
         var result: [MemberPlacePins] = []
-        for participant in participants.documents {
+        var seenMembers = Set<TripMember>()
+        for participant in orderedParticipantDocuments(participants.documents) {
             guard
                 participant.get("status") as? String == "joined",
                 let avatarName = participant.get("avatarName") as? String,
                 let avatar = ParticipantAvatar(rawValue: avatarName)
             else { continue }
+            let member = TripMember(avatar: avatar)
+            guard seenMembers.insert(member).inserted else { continue }
 
             let placeDocuments: QuerySnapshot
-            do {
-                placeDocuments = try await participant.reference
-                    .collection("places")
-                    .order(by: "createdAt")
-                    .getDocuments()
-            } catch {
-                // 다른 참여자의 장소 읽기 권한이 아직 배포되지 않은 환경에서도
-                // 내 장소와 로컬 fallback으로 화면 흐름은 계속 진행한다.
-                continue
+            let places: [PinnedPlace]
+            if let storedPlaces = participant.get("selectedPlaces") as? [[String: Any]] {
+                places = storedPlaces.compactMap(makePinnedPlace)
+            } else {
+                do {
+                    placeDocuments = try await participant.reference
+                        .collection("places")
+                        .order(by: "createdAt")
+                        .getDocuments()
+                    places = placeDocuments.documents.compactMap(makePinnedPlace)
+                    if participant.documentID == currentUserID {
+                        try? await participant.reference.setData(
+                            ["selectedPlaces": places.map(placeData)],
+                            merge: true
+                        )
+                    }
+                } catch {
+                    places = []
+                }
             }
-            let places = placeDocuments.documents.compactMap(makePinnedPlace)
 
             result.append(
                 MemberPlacePins(
-                    member: TripMember(avatar: avatar),
+                    member: member,
                     places: places,
                     isConfirmed: participant.get("placeSelectionConfirmed") as? Bool ?? false
                 )
@@ -47,40 +60,67 @@ enum FirebasePlaceSelectionService {
         return result
     }
 
+    nonisolated static func observeMemberPlaces(
+        tripID: String
+    ) -> AsyncThrowingStream<[MemberPlacePins], Error> {
+        AsyncThrowingStream { continuation in
+            let registration = Firestore.firestore()
+                .collection("trips")
+                .document(tripID)
+                .collection("participants")
+                .order(by: "slotIndex")
+                .addSnapshotListener { snapshot, error in
+                    if let error {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                    guard let documents = snapshot?.documents else { return }
+                    var seenMembers = Set<TripMember>()
+                    let values = orderedParticipantDocuments(documents).compactMap { document -> MemberPlacePins? in
+                        guard
+                            document.get("status") as? String == "joined",
+                            let avatarName = document.get("avatarName") as? String,
+                            let avatar = ParticipantAvatar(rawValue: avatarName)
+                        else { return nil }
+                        let member = TripMember(avatar: avatar)
+                        guard seenMembers.insert(member).inserted else { return nil }
+                        let places = (document.get("selectedPlaces") as? [[String: Any]] ?? [])
+                            .compactMap(makePinnedPlace)
+                        return MemberPlacePins(
+                            member: member,
+                            places: places,
+                            isConfirmed: document.get("placeSelectionConfirmed") as? Bool ?? false
+                        )
+                    }
+                    continuation.yield(values)
+                }
+            continuation.onTermination = { _ in registration.remove() }
+        }
+    }
+
     static func savePlace(_ place: PinnedPlace, tripID: String) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
-        try await participant.collection("places").document(place.id).setData(
-            [
-                "id": place.id,
-                "name": place.name,
-                "description": place.description,
-                "category": place.category,
-                "latitude": place.latitude,
-                "longitude": place.longitude,
-                "createdAt": FieldValue.serverTimestamp(),
-                "updatedAt": FieldValue.serverTimestamp()
-            ],
-            merge: true
-        )
-        try await participant.setData(
-            [
-                "placeSelectionConfirmed": false,
-                "updatedAt": FieldValue.serverTimestamp()
-            ],
-            merge: true
-        )
+        let document = try await participant.getDocument()
+        var places = try await storedPlaceData(document: document, participant: participant)
+        places.removeAll { $0["id"] as? String == place.id }
+        places.append(placeData(place))
+        try await participant.setData([
+            "selectedPlaces": places,
+            "placeSelectionConfirmed": false,
+            "updatedAt": FieldValue.serverTimestamp()
+        ], merge: true)
     }
 
     static func deletePlace(placeID: String, tripID: String) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
-        try await participant.collection("places").document(placeID).delete()
-        try await participant.setData(
-            [
-                "placeSelectionConfirmed": false,
-                "updatedAt": FieldValue.serverTimestamp()
-            ],
-            merge: true
-        )
+        let document = try await participant.getDocument()
+        var places = try await storedPlaceData(document: document, participant: participant)
+        places.removeAll { $0["id"] as? String == placeID }
+        try await participant.setData([
+            "selectedPlaces": places,
+            "placeSelectionConfirmed": false,
+            "updatedAt": FieldValue.serverTimestamp()
+        ], merge: true)
     }
 
     static func confirmPlaces(tripID: String) async throws {
@@ -142,25 +182,28 @@ enum FirebasePlaceSelectionService {
             throw TripServiceError.unauthenticated
         }
 
-        let participants = try await Firestore.firestore()
+        let participants = Firestore.firestore()
             .collection("trips")
             .document(tripID)
             .collection("participants")
+        let uidReference = participants.document(userID)
+        let uidDocument = try await uidReference.getDocument()
+        if uidDocument.exists,
+           uidDocument.get("status") as? String == "joined" {
+            return uidReference
+        }
+
+        let legacyParticipants = try await participants
             .whereField("uid", isEqualTo: userID)
             .limit(to: 1)
             .getDocuments()
-        guard let participant = participants.documents.first else {
+        guard let participant = legacyParticipants.documents.first else {
             throw TripServiceError.tripNotFound
-        }
-
-        guard participant.documentID != userID else {
-            return participant.reference
         }
 
         // 예전 데이터는 slot_2 같은 슬롯 문서에 uid만 기록되어 있다.
         // 장소 하위 컬렉션 규칙이 인증 uid 문서만 허용하므로 최초 접근 시
         // 참가자 메타데이터를 participants/{uid}로 옮긴다.
-        let uidReference = participant.reference.parent.document(userID)
         var participantData = participant.data()
         participantData["uid"] = userID
         participantData["status"] = "joined"
@@ -195,5 +238,63 @@ enum FirebasePlaceSelectionService {
             latitude: latitude,
             longitude: longitude
         )
+    }
+
+    nonisolated private static func makePinnedPlace(_ data: [String: Any]) -> PinnedPlace? {
+        guard
+            let id = data["id"] as? String,
+            let name = data["name"] as? String,
+            let latitude = data["latitude"] as? Double,
+            let longitude = data["longitude"] as? Double
+        else { return nil }
+        return PinnedPlace(
+            id: id,
+            name: name,
+            description: data["description"] as? String ?? "",
+            thumbnailName: "DDMockPlaceVillage",
+            category: data["category"] as? String ?? "장소",
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
+    private static func placeData(_ place: PinnedPlace) -> [String: Any] {
+        [
+            "id": place.id,
+            "name": place.name,
+            "description": place.description,
+            "category": place.category,
+            "latitude": place.latitude,
+            "longitude": place.longitude
+        ]
+    }
+
+    private static func storedPlaceData(
+        document: DocumentSnapshot,
+        participant: DocumentReference
+    ) async throws -> [[String: Any]] {
+        if let places = document.get("selectedPlaces") as? [[String: Any]] {
+            return places
+        }
+        let legacyPlaces = try await participant.collection("places")
+            .order(by: "createdAt")
+            .getDocuments()
+        return legacyPlaces.documents
+            .compactMap(makePinnedPlace)
+            .map(placeData)
+    }
+
+    nonisolated private static func orderedParticipantDocuments(
+        _ documents: [QueryDocumentSnapshot]
+    ) -> [QueryDocumentSnapshot] {
+        documents.sorted { lhs, rhs in
+            let lhsUID = lhs.get("uid") as? String
+            let rhsUID = rhs.get("uid") as? String
+            let lhsIsCanonical = lhsUID != nil && lhs.documentID == lhsUID
+            let rhsIsCanonical = rhsUID != nil && rhs.documentID == rhsUID
+            if lhsIsCanonical != rhsIsCanonical { return lhsIsCanonical }
+            return (lhs.get("slotIndex") as? Int ?? 0)
+                < (rhs.get("slotIndex") as? Int ?? 0)
+        }
     }
 }

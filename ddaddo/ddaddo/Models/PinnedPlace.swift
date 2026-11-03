@@ -17,7 +17,7 @@ struct PinnedPlace: Equatable, Identifiable, Sendable {
     let latitude: Double
     let longitude: Double
 
-    init(
+    nonisolated init(
         id: String,
         name: String,
         description: String,

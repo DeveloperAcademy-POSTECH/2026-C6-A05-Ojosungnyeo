@@ -123,7 +123,6 @@ struct PlaceGroupingFeature: Reducer {
     }
 
     @Dependency(\.placeClient) var placeClient
-    @Dependency(\.continuousClock) var clock
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -159,12 +158,7 @@ struct PlaceGroupingFeature: Reducer {
                 if let tripID = state.sourcePlaceSelection?.tripID {
                     effects.append(fetchMemberPlacesEffect(tripID: tripID))
                     effects.append(
-                        .run { send in
-                            while !Task.isCancelled {
-                                try await clock.sleep(for: .seconds(2))
-                                await send(.refreshMemberPlaces)
-                            }
-                        }
+                        observeMemberPlacesEffect(tripID: tripID)
                         .cancellable(id: "place-grouping-member-places", cancelInFlight: true)
                     )
                 }
@@ -392,6 +386,19 @@ struct PlaceGroupingFeature: Reducer {
             do {
                 let memberPlaces = try await placeClient.fetchMemberPlaces(tripID)
                 await send(.memberPlacesResponse(memberPlaces))
+            } catch {
+                await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func observeMemberPlacesEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observeMemberPlaces(tripID)
+        return .run { send in
+            do {
+                for try await memberPlaces in stream {
+                    await send(.memberPlacesResponse(memberPlaces))
+                }
             } catch {
                 await send(.memberPlacesFailed)
             }

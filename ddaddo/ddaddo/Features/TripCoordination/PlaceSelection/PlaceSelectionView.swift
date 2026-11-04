@@ -12,6 +12,7 @@ struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
     @Environment(\.dismiss) private var dismiss
     @GestureState private var sheetDragTranslation: CGFloat = 0
+    @State private var bottomSafeAreaInset: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -103,6 +104,7 @@ struct PlaceSelectionView: View {
                     participants: store.participants,
                     destinationName: store.destinationName,
                     maximumPlaceCount: store.maximumPlaceCount,
+                    bottomSafeAreaInset: bottomSafeAreaInset,
                     memberTapped: { member in
                         store.send(.memberProfileTapped(member))
                     },
@@ -116,6 +118,17 @@ struct PlaceSelectionView: View {
                 .gesture(sheetDragGesture)
             }
 
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: BottomSafeAreaInsetPreferenceKey.self,
+                    value: geometry.safeAreaInsets.bottom
+                )
+            }
+        }
+        .onPreferenceChange(BottomSafeAreaInsetPreferenceKey.self) {
+            bottomSafeAreaInset = $0
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
@@ -287,8 +300,13 @@ struct PlaceSelectionView: View {
     }
 
     private var currentSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 110
-        return min(322, max(110, restingHeight - sheetDragTranslation))
+        let expandedHeight = 288 + bottomSafeAreaInset
+        let collapsedHeight = 76 + bottomSafeAreaInset
+        let restingHeight = store.isBottomSheetExpanded ? expandedHeight : collapsedHeight
+        return min(
+            expandedHeight,
+            max(collapsedHeight, restingHeight - sheetDragTranslation)
+        )
     }
 
     private var currentMemberSheetHeight: CGFloat {
@@ -304,6 +322,14 @@ struct PlaceSelectionView: View {
             .onEnded { value in
                 store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
             }
+    }
+}
+
+private struct BottomSafeAreaInsetPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

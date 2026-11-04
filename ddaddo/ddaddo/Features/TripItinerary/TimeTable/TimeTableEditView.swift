@@ -534,7 +534,6 @@ private struct TimeTableEditContent: View {
             )
         )
         .background(dropFrame("trash"))
-        .ignoresSafeArea(edges: .bottom)
         .allowsHitTesting(false)
     }
 

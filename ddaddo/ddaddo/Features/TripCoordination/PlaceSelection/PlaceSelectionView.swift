@@ -219,7 +219,7 @@ struct PlaceSelectionView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("예정된 여행으로 돌아가기")
+            .accessibilityLabel("친구 초대 화면으로 돌아가기")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)

@@ -142,15 +142,18 @@ struct HomeFeature: Reducer {
                 }
                 state.pendingPlaceSelectionTripID = nil
                 let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
+                state.upcomingTrips.waitingForParticipants = waitingState
+                state.upcomingTrips.isWaitingForParticipantsPresented = true
                 state.placeSelection = waitingState.placeSelection
                 state.isPlaceSelectionPresented = true
                 return .none
             case .tripInvitationResponse(.failure):
                 state.pendingPlaceSelectionTripID = nil
                 return .none
-            case .placeSelection(.delegate(.returnToUpcomingTrips)):
+            case .placeSelection(.delegate(.returnToInvitation)):
                 state.isPlaceSelectionPresented = false
                 state.isUpcomingTripsPresented = true
+                state.upcomingTrips.isWaitingForParticipantsPresented = true
                 state.pendingPlaceSelectionTripID = nil
                 return .cancel(id: "place-selection-trip-request")
             case .placeSelection(.delegate(.proceedToAnalysis)):
@@ -158,6 +161,8 @@ struct HomeFeature: Reducer {
                     placeSelection: state.placeSelection
                 )
                 state.isPlaceSelectionPresented = false
+                state.isUpcomingTripsPresented = false
+                state.upcomingTrips.isWaitingForParticipantsPresented = false
                 state.isPlaceGroupingPresented = false
                 state.isPlaceAnalysisLoading = true
                 return .none

@@ -512,9 +512,8 @@ struct PlaceSelectionFeature: Reducer {
 
             case .searchFieldTapped:
                 state.selectedMember = state.currentMember
-                state.placeSearch = PlaceSearchFeature.State()
                 state.isSearchPresented = true
-                return .cancel(id: "place-search")
+                return .none
 
             case let .searchTextChanged(text):
                 state.searchText = text
@@ -543,11 +542,12 @@ struct PlaceSelectionFeature: Reducer {
 
             case .clearSelectedPlaceButtonTapped:
                 state.searchText = ""
+                state.placeSearch = PlaceSearchFeature.State()
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.isPlaceDetailsLoading = false
                 state.isBottomSheetExpanded = true
-                return .none
+                return .cancel(id: "place-search")
 
             case .addSelectedPlaceButtonTapped:
                 guard

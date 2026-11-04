@@ -25,10 +25,9 @@ struct TimeTableFeature: Reducer {
         var dayOfMonthByDay: [TripDay: Int] = [
             .day1: 22, .day2: 23, .day3: 24, .day4: 25
         ]
-        var coursesByID = TimeTableCourse.mockCoursesByID
-        var groups = TimeTableGroup.mockGroups
-        var placements = TimeTableSchedule.mockPlacements
-        var hasLoadedItinerary = false
+        var coursesByID: [TimeTableCourse.ID: TimeTableCourse] = [:]
+        var groups: [TimeTableGroup] = []
+        var placements: [TimeTableSchedule] = []
         var isEditing = false
         var edit = TimeTableEditFeature.State()
         #if DEBUG
@@ -677,11 +676,6 @@ struct TimeTableGroup: Equatable, Identifiable {
             .map { "\($0)명" }
             .joined(separator: " · ")
     }
-
-    static let mockGroups = [
-        TimeTableGroup(id: 0, name: "신주쿠", courseIDs: [400, 401]),
-        TimeTableGroup(id: 1, name: "주오", courseIDs: [402])
-    ]
 }
 
 struct TimeTableCourse: Equatable, Identifiable {
@@ -737,14 +731,6 @@ struct TimeTableCourse: Equatable, Identifiable {
         let remainingCount = max(placeCount - displayedNames.count, 0)
         let names = displayedNames.joined(separator: ", ")
         return remainingCount > 0 ? "\(names) 외 \(remainingCount)곳" : names
-    }
-
-    var categorySummary: String {
-        let values = categories.reduce(into: [String]()) { result, category in
-            guard !category.isEmpty, !result.contains(category) else { return }
-            result.append(category)
-        }
-        return values.isEmpty ? "장소" : values.joined(separator: " · ")
     }
 
     static let mockCoursesByID: [ID: Self] = {
@@ -816,21 +802,6 @@ struct TimeTableSchedule: Equatable, Identifiable {
         return false
     }
 
-    static let mockPlacements: [Self] = [
-        .init(id: 0, courseID: 0, day: .day1, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
-        .init(id: 1, courseID: 1, day: .day1, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
-        .init(id: 2, courseID: 2, day: .day1, timing: .init(startHour: 14, startMinute: 30), branchGroupID: nil),
-        .init(id: 100, courseID: 100, day: .day2, timing: .init(startHour: 9, startMinute: 30), branchGroupID: 0),
-        .init(id: 101, courseID: 101, day: .day2, timing: .init(startHour: 13, startMinute: 0), branchGroupID: 0),
-        .init(id: 102, courseID: 102, day: .day2, timing: .init(startHour: 18, startMinute: 0), branchGroupID: nil),
-        .init(id: 200, courseID: 200, day: .day3, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
-        .init(id: 201, courseID: 201, day: .day3, timing: .init(startHour: 14, startMinute: 30), branchGroupID: 0),
-        .init(id: 202, courseID: 202, day: .day3, timing: .init(startHour: 19, startMinute: 0), branchGroupID: nil),
-        .init(id: 302, courseID: 302, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: 0),
-        .init(id: 303, courseID: 303, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: 0),
-        .init(id: 300, courseID: 300, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: nil),
-        .init(id: 301, courseID: 301, day: .day4, timing: .init(startHour: 11, startMinute: 30), branchGroupID: nil)
-    ]
 }
 
 private struct TimeTableOccupiedInterval {

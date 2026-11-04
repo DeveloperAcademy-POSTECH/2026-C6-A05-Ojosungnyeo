@@ -484,7 +484,7 @@ private enum PlaceGroupingEngine {
             let uniquePlaces = unique(region.map(\.place))
             return MapPlaceGroup(
                 id: "region-\(index)",
-                name: regionName(for: uniquePlaces, destination: state.destinationName, index: index),
+                name: regionName(destination: state.destinationName, index: index),
                 places: uniquePlaces,
                 radius: max(800, regionRadius(uniquePlaces) + 500)
             )
@@ -494,7 +494,6 @@ private enum PlaceGroupingEngine {
         for (regionIndex, region) in regions.enumerated() {
             let regionPlaces = unique(region.map(\.place))
             let title = regionName(
-                for: regionPlaces,
                 destination: state.destinationName,
                 index: regionIndex
             )
@@ -615,16 +614,7 @@ private enum PlaceGroupingEngine {
         return places.filter { ids.insert($0.id).inserted }
     }
 
-    private static func regionName(
-        for places: [PinnedPlace],
-        destination: String,
-        index: Int
-    ) -> String {
-        let text = places.map { "\($0.name) \($0.description)" }.joined(separator: " ").lowercased()
-        if text.contains("shinjuku") || text.contains("신주쿠") { return "신주쿠" }
-        if text.contains("shibuya") || text.contains("시부야") { return "시부야" }
-        if text.contains("ginza") || text.contains("chuo") || text.contains("긴자") || text.contains("주오") { return "주오" }
-        if text.contains("minato") || text.contains("미나토") { return "미나토" }
-        return "\(destination) 지역 \(index + 1)"
+    private static func regionName(destination: String, index: Int) -> String {
+        "\(destination) 지역 \(index + 1)"
     }
 }

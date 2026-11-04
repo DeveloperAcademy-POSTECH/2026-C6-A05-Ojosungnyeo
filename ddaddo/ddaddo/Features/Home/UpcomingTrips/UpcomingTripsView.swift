@@ -385,22 +385,16 @@ private struct UpcomingTripTicketCard: View {
 
                 VStack(spacing: 0) {
                     HStack(alignment: .top, spacing: DDSpacing.small) {
-                        Label("Flight Ticket", systemImage: "airplane.ticket.fill")
-                            .ddTypography(.heading20)
+                        Text(trip.dateText)
+                            .ddTypography(.label14)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
 
                         Spacer(minLength: 0)
 
-                        Text(trip.dateText)
-                            .ddTypography(.label14)
-                            .foregroundStyle(
-                                Color(
-                                    red: 96 / 255,
-                                    green: 96 / 255,
-                                    blue: 96 / 255
-                                )
-                            )
+                        Text(trip.progressTitle)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.surfaceControl)
                             .lineLimit(1)
                     }
 

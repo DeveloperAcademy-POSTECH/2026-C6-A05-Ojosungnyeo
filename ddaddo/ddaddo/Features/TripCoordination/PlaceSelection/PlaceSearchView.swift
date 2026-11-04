@@ -37,7 +37,7 @@ struct PlaceSearchView: View {
             } label: {
                 PlaceSearchBackIcon()
                     .frame(width: 24, height: 24)
-                    .frame(width: 40, height: 41)
+                    .frame(width: 24, height: 41)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

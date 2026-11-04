@@ -512,8 +512,9 @@ struct PlaceSelectionFeature: Reducer {
 
             case .searchFieldTapped:
                 state.selectedMember = state.currentMember
+                state.placeSearch = PlaceSearchFeature.State()
                 state.isSearchPresented = true
-                return .none
+                return .cancel(id: "place-search")
 
             case let .searchTextChanged(text):
                 state.searchText = text
@@ -522,9 +523,10 @@ struct PlaceSelectionFeature: Reducer {
             case .searchButtonTapped:
                 state.selectedMember = state.currentMember
                 state.selectedPinnedPlace = nil
+                state.placeSearch = PlaceSearchFeature.State()
                 state.isBottomSheetExpanded = false
                 state.isSearchPresented = true
-                return .none
+                return .cancel(id: "place-search")
 
             case .dimmedBackgroundTapped:
                 state.isBottomSheetExpanded = false

@@ -120,25 +120,7 @@ struct HomeFeature: Reducer {
                     state.isTripItineraryPresented = true
                     return .none
                 }
-                state.isTripItineraryPresented = false
-                state.isUpcomingTripsPresented = true
-                let trip = state.upcomingTrips.trips.first { $0.id == tripID }
-                state.tripItinerary.timeTable.tripStartDate = trip?.startDate
-                state.tripItinerary.timeTable.tripEndDate = trip?.endDate
-                if state.tripItinerary.timeTable.recommendationTripID != tripID {
-                    state.tripItinerary.timeTable.recommendationTripID = nil
-                    state.tripItinerary.timeTable.recommendations = []
-                    state.tripItinerary.timeTable.edit.rowsByDay = [:]
-                }
-                state.pendingPlaceSelectionTripID = tripID
-                return .run { send in
-                    await send(
-                        .tripInvitationResponse(
-                            Result { try await tripClient.fetchInvitation(tripID) }
-                        )
-                    )
-                }
-                .cancellable(id: "place-selection-trip-request", cancelInFlight: true)
+                return .none
             case let .tripInvitationResponse(.success(snapshot)):
                 guard state.pendingPlaceSelectionTripID == snapshot.tripID else {
                     return .none
@@ -233,6 +215,14 @@ struct HomeFeature: Reducer {
                 state.isPlaceSelectionPresented = false
                 state.isPlaceGroupingPresented = false
                 state.isPlaceAnalysisLoading = true
+                return .none
+            case let .upcomingTrips(.delegate(.proceedToGrouping(placeSelection))):
+                state.placeSelection = placeSelection
+                state.placeGrouping = PlaceGroupingFeature.State(placeSelection: placeSelection)
+                state.isUpcomingTripsPresented = false
+                state.isPlaceSelectionPresented = false
+                state.isPlaceAnalysisLoading = false
+                state.isPlaceGroupingPresented = true
                 return .none
             case .upcomingTrips:
                 return .none

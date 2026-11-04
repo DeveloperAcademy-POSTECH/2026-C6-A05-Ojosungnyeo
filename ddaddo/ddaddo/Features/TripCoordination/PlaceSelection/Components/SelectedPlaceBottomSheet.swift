@@ -65,7 +65,7 @@ struct SelectedPlaceBottomSheet: View {
                 Spacer(minLength: DDSpacing.small)
 
                 Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
-                    .ddTypography(.label14)
+                    .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
                     .foregroundStyle(canAdd ? DDColor.textOnPrimary : DDColor.textTertiary)
                     .padding(.horizontal, 12)
                     .frame(height: 28)

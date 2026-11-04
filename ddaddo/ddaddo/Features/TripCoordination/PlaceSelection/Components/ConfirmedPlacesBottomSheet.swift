@@ -35,7 +35,7 @@ struct ConfirmedPlacesBottomSheet: View {
                 Spacer(minLength: DDSpacing.small)
 
                 Text("확정완료")
-                    .ddTypography(.label14)
+                    .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
                     .foregroundStyle(DDColor.textOnPrimary)
                     .padding(.horizontal, DDSpacing.medium)
                     .frame(height: 28)

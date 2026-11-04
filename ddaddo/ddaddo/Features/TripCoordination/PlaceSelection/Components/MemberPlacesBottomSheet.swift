@@ -124,11 +124,11 @@ struct MemberPlacesBottomSheet: View {
             Spacer(minLength: DDSpacing.small)
 
             Button("확정하기", action: confirmButtonTapped)
-                .ddTypography(.label14)
-                .foregroundStyle(canConfirm ? DDColor.textPrimary : DDColor.textTertiary)
+                .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
+                .foregroundStyle(canConfirm ? DDColor.textOnPrimary : DDColor.textTertiary)
                 .padding(.horizontal, DDSpacing.medium)
                 .frame(height: 28)
-                .background(DDColor.surfaceControl)
+                .background(canConfirm ? DDColor.actionPrimary : DDColor.surfaceControl)
                 .clipShape(.capsule)
                 .disabled(!canConfirm)
         }

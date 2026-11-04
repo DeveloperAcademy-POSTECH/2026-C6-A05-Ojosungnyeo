@@ -12,17 +12,23 @@ struct TimeTableView: View {
     let store: StoreOf<TimeTableFeature>
 
     var body: some View {
-        if store.isEditing {
-            TimeTableEditView(
-                timeTableStore: store,
-                store: store.scope(state: \.edit, action: \.edit)
-            )
-        } else {
-            TimeTableReadOnlyContent(
-                store: store,
-                onBack: { store.send(.backButtonTapped) },
-                onEdit: { store.send(.editButtonTapped) }
-            )
+        Group {
+            if store.isEditing {
+                TimeTableEditView(
+                    timeTableStore: store,
+                    store: store.scope(state: \.edit, action: \.edit)
+                )
+            } else {
+                TimeTableReadOnlyContent(
+                    store: store,
+                    onBack: { store.send(.backButtonTapped) },
+                    onEdit: { store.send(.editButtonTapped) }
+                )
+            }
+        }
+        .onAppear { store.send(.validateSelectedDay) }
+        .onChange(of: store.availableDays) { _, _ in
+            store.send(.validateSelectedDay)
         }
     }
 }
@@ -132,7 +138,7 @@ private struct TimeTableReadOnlyContent: View {
     private var dayPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: DDSpacing.small) {
-                ForEach(TripDay.allCases) { day in
+                ForEach(store.availableDays) { day in
                     Button {
                         store.send(.daySelected(day))
                     } label: {

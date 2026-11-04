@@ -36,6 +36,21 @@ struct TimeTableFeature: Reducer {
         var savedPreviewPlacements: [TimeTableSchedule]?
         #endif
 
+        var availableDays: [TripDay] {
+            guard let tripStartDate, let tripEndDate else {
+                let fallback = TripDay.allCases.filter { dayOfMonthByDay[$0] != nil }
+                return fallback.isEmpty ? [.day1] : fallback
+            }
+
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .current
+            let startDay = calendar.startOfDay(for: tripStartDate)
+            let endDay = calendar.startOfDay(for: tripEndDate)
+            guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
+                  nights >= 0 else { return [.day1] }
+            return Array(TripDay.allCases.prefix(min(nights + 1, TripDay.allCases.count)))
+        }
+
         var tripDateText: String? {
             if let startDate = tripStartDate, let endDate = tripEndDate {
                 var calendar = Calendar(identifier: .gregorian)
@@ -140,6 +155,7 @@ struct TimeTableFeature: Reducer {
         case daySelected(TripDay)
         case groupAddButtonTapped(TimeTableGroup.ID)
         case scheduleTapped(TimeTableSchedule.ID)
+        case validateSelectedDay
         case edit(TimeTableEditFeature.Action)
         case delegate(Delegate)
     }
@@ -148,6 +164,12 @@ struct TimeTableFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .backButtonTapped, .groupAddButtonTapped, .scheduleTapped, .delegate:
+                return .none
+
+            case .validateSelectedDay:
+                if !state.availableDays.contains(state.selectedDay) {
+                    state.selectedDay = .day1
+                }
                 return .none
 
             case .edit(.delegate(.addPlaceRequested)):
@@ -317,7 +339,7 @@ struct TimeTableFeature: Reducer {
                 return .none
 
             case let .daySelected(day):
-                state.selectedDay = day
+                state.selectedDay = state.availableDays.contains(day) ? day : .day1
                 return .none
             }
         }

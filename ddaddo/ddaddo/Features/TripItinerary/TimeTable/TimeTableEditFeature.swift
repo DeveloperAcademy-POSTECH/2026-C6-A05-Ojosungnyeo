@@ -19,6 +19,12 @@ struct TimeTableEditFeature: Reducer {
 
     @ObservableState
     struct State: Equatable {
+        struct PendingDeletion: Equatable {
+            let day: TripDay
+            let rowID: TimeTableEditRow.ID
+            let source: TimeTableEditRow.Source
+        }
+
         var isAddSchedulePresented = false
         var placeSearchText = ""
         var placeSearchResults: [PlaceSearchResult] = []
@@ -31,6 +37,7 @@ struct TimeTableEditFeature: Reducer {
         var rowsByDay: [TripDay: [TimeTableEditRow]] = [:]
         var draftPlacements: [TimeTableSchedule] = []
         var isSaveUnavailableAlertPresented = false
+        var pendingDeletion: PendingDeletion?
 
         var isTimeSelectionPresented: Bool {
             editingScheduleID != nil || placingGroupID != nil
@@ -62,6 +69,9 @@ struct TimeTableEditFeature: Reducer {
         case scheduleRowMoved(TimeTableEditRow.ID, before: TimeTableEditRow.ID?)
         case rowMerged(TimeTableEditRow.ID, into: TimeTableEditRow.ID)
         case recommendationMerged(String, into: TimeTableEditRow.ID)
+        case deletionRequested(TripDay, rowID: TimeTableEditRow.ID, source: TimeTableEditRow.Source)
+        case deletionCancelled
+        case deletionConfirmed
         case saveUnavailableAlertDismissed
         case delegate(Delegate)
     }
@@ -81,6 +91,37 @@ struct TimeTableEditFeature: Reducer {
                  .groupAddButtonTapped, .timeSelectionDoneTapped,
                  .recommendationDropped, .scheduleRowMoved, .rowMerged, .recommendationMerged,
                  .delegate:
+                return .none
+
+            case let .deletionRequested(day, rowID, source):
+                state.pendingDeletion = State.PendingDeletion(day: day, rowID: rowID, source: source)
+                return .none
+
+            case .deletionCancelled:
+                state.pendingDeletion = nil
+                return .none
+
+            case .deletionConfirmed:
+                guard let target = state.pendingDeletion,
+                      var rows = state.rowsByDay[target.day],
+                      let rowIndex = rows.firstIndex(where: { $0.id == target.rowID }),
+                      let sourceIndex = rows[rowIndex].sources.firstIndex(of: target.source)
+                else {
+                    state.pendingDeletion = nil
+                    return .none
+                }
+
+                rows[rowIndex].sources.remove(at: sourceIndex)
+                if case let .schedule(scheduleID) = target.source {
+                    state.draftPlacements.removeAll { $0.id == scheduleID }
+                }
+                if rows[rowIndex].sources.isEmpty {
+                    rows.remove(at: rowIndex)
+                } else if rows[rowIndex].sources.count == 1 {
+                    rows[rowIndex].branchGroupID = nil
+                }
+                state.rowsByDay[target.day] = rows
+                state.pendingDeletion = nil
                 return .none
 
             case .saveUnavailableAlertDismissed:

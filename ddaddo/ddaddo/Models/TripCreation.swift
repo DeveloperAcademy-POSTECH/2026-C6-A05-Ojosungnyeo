@@ -38,10 +38,16 @@ struct TripInvitationSnapshot: Equatable, Sendable {
 }
 
 struct UpcomingTripSnapshot: Equatable, Sendable {
+    enum Progress: Equatable, Sendable {
+        case placeSelection
+        case placeGrouping
+        case itinerary
+    }
+
     let tripID: String
     let destinationName: String
     let countryName: String
     let startDate: Date
     let endDate: Date
-    let isItineraryReady: Bool
+    let progress: Progress
 }

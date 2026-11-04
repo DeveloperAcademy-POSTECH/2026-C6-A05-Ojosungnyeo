@@ -373,13 +373,28 @@ enum FirebaseTripService {
                     else { return nil }
 
                     let destination = (document.get("destinations") as? [[String: Any]])?.first
+                    let progress: UpcomingTripSnapshot.Progress
+                    if document.get("status") as? String == "itinerary" {
+                        progress = .itinerary
+                    } else {
+                        let participants = try await document.reference
+                            .collection("participants")
+                            .getDocuments()
+                            .documents
+                            .filter { $0.get("status") as? String == "joined" }
+                        let hasFinishedPlaceSelection = !participants.isEmpty
+                            && participants.allSatisfy {
+                                $0.get("placeSelectionConfirmed") as? Bool == true
+                            }
+                        progress = hasFinishedPlaceSelection ? .placeGrouping : .placeSelection
+                    }
                     return UpcomingTripSnapshot(
                         tripID: document.documentID,
                         destinationName: destination?["name"] as? String ?? "여행",
                         countryName: destination?["country"] as? String ?? "",
                         startDate: startDate,
                         endDate: endDate,
-                        isItineraryReady: document.get("status") as? String == "itinerary"
+                        progress: progress
                     )
                 }
             }

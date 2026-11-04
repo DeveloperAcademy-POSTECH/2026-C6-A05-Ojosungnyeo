@@ -28,6 +28,7 @@ struct TimeTableFeature: Reducer {
         var coursesByID: [TimeTableCourse.ID: TimeTableCourse] = [:]
         var groups: [TimeTableGroup] = []
         var placements: [TimeTableSchedule] = []
+        var hasLoadedItinerary = false
         var isEditing = false
         var edit = TimeTableEditFeature.State()
         #if DEBUG
@@ -138,6 +139,7 @@ struct TimeTableFeature: Reducer {
             coursesByID = [:]
             groups = []
             placements = []
+            hasLoadedItinerary = false
             isEditing = false
             edit = TimeTableEditFeature.State()
             #if DEBUG
@@ -731,6 +733,14 @@ struct TimeTableCourse: Equatable, Identifiable {
         let remainingCount = max(placeCount - displayedNames.count, 0)
         let names = displayedNames.joined(separator: ", ")
         return remainingCount > 0 ? "\(names) 외 \(remainingCount)곳" : names
+    }
+
+    var categorySummary: String {
+        categories.reduce(into: [String]()) { result, category in
+            guard !category.isEmpty, !result.contains(category) else { return }
+            result.append(category)
+        }
+        .joined(separator: " · ")
     }
 
     static let mockCoursesByID: [ID: Self] = {

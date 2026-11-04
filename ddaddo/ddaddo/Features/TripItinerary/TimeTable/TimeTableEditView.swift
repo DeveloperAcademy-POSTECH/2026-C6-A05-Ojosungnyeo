@@ -241,7 +241,7 @@ private struct TimeTableEditContent: View {
     private var tripHeader: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DDSpacing.small) {
-                Text(timeTableStore.tripTitle ?? "여행 일정을 살펴보게따")
+                Text(timeTableStore.headerTitle)
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
                     .lineLimit(1)
@@ -437,7 +437,9 @@ private struct TimeTableEditContent: View {
                         .ddTypography(.bodyEmphasis16)
                         .foregroundStyle(DDColor.textPrimary)
                         .lineLimit(1)
-                    memberDots(memberIDs)
+                    if shouldDisplayMemberDots(for: memberIDs) {
+                        memberDots(memberIDs)
+                    }
                 }
                 Text(subtitle)
                     .ddTypography(.labelEmphasis14)
@@ -465,6 +467,16 @@ private struct TimeTableEditContent: View {
                     .frame(width: 14, height: 14)
             }
         }
+    }
+
+    private func shouldDisplayMemberDots(for memberIDs: [String]) -> Bool {
+        let tripMemberIDs = Set(timeTableStore.tripMembers.map(\.rawValue))
+        let scheduleMemberIDs = Set(memberIDs)
+
+        return !tripMemberIDs.isEmpty
+            && !scheduleMemberIDs.isEmpty
+            && scheduleMemberIDs.isSubset(of: tripMemberIDs)
+            && scheduleMemberIDs != tripMemberIDs
     }
 
     private func dragHandle(_ item: DraggedItem) -> some View {

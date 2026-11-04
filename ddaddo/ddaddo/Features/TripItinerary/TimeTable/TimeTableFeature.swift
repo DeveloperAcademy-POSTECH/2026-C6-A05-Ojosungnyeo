@@ -20,6 +20,7 @@ struct TimeTableFeature: Reducer {
         var tripStartDate: Date? = nil
         var tripEndDate: Date? = nil
         var tripTitle: String?
+        var destinationName: String?
         var recommendationTripID: String?
         var recommendations: [TimeTableRecommendation] = []
         var dayOfMonthByDay: [TripDay: Int] = [
@@ -50,6 +51,13 @@ struct TimeTableFeature: Reducer {
             guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
                   nights >= 0 else { return [.day1] }
             return Array(TripDay.allCases.prefix(min(nights + 1, TripDay.allCases.count)))
+        }
+
+        var headerTitle: String {
+            guard let destinationName = destinationName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !destinationName.isEmpty
+            else { return "여행 일정을 살펴보게따" }
+            return "\(destinationName) 여행을 살펴보게따"
         }
 
         var tripDateText: String? {
@@ -631,6 +639,7 @@ struct TimeTableFeature: Reducer {
         var state = State()
         state.isLocalPreview = true
         state.tripTitle = "도쿄 여행을 살펴보게따"
+        state.destinationName = "도쿄"
         let calendar = Calendar(identifier: .gregorian)
         state.tripStartDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 22))
         state.tripEndDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 25))

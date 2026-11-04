@@ -109,7 +109,7 @@ private struct TimeTableReadOnlyContent: View {
     private var tripHeader: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DDSpacing.small) {
-                Text("여행 일정을 살펴보게따")
+                Text(store.headerTitle)
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
                     .lineLimit(1)

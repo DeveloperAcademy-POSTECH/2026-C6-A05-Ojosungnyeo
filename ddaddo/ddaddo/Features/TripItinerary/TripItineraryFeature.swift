@@ -49,7 +49,9 @@ struct TripItineraryFeature: Reducer {
                 return .send(.delegate(.returnToUpcomingTrips))
 
             case .timeTable(.delegate(.addPlaceRequested)):
-                state.routeEditor = RouteEditorFeature.State()
+                state.routeEditor = RouteEditorFeature.State(
+                    availableDays: state.timeTable.availableDays
+                )
                 state.isRouteEditorPresented = true
                 return .none
 

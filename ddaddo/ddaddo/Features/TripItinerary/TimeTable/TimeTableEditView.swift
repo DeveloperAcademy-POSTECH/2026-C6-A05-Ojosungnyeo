@@ -176,6 +176,11 @@ private struct TimeTableEditContent: View {
                     VStack(alignment: .leading, spacing: 0) {
                         recommendationSection
                         scheduleSection
+                        if dragging != nil {
+                            appendDropArea
+                                .padding(.leading, 48)
+                                .padding(.trailing, DDSpacing.large)
+                        }
                         addPlaceButton
                             .padding(.leading, 48)
                             .padding(.trailing, DDSpacing.large)
@@ -236,7 +241,7 @@ private struct TimeTableEditContent: View {
     private var tripHeader: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DDSpacing.small) {
-                Text(timeTableStore.tripTitle ?? "여행 일정을 살펴보게따")
+                Text(timeTableStore.headerTitle)
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
                     .lineLimit(1)
@@ -310,6 +315,7 @@ private struct TimeTableEditContent: View {
                             width: 200,
                             drag: .recommendation(group.id)
                         )
+                        .opacity(dragging == .recommendation(group.id) ? 0 : 1)
                     }
                 }
                 .padding(.horizontal, DDSpacing.large)
@@ -335,7 +341,14 @@ private struct TimeTableEditContent: View {
                     .padding(.leading, DDSpacing.medium)
                     .padding(.trailing, DDSpacing.large)
                     .background(dropFrame("row:\(row.id)"))
-                    .background(targetedRowID == row.id ? DDColor.actionPrimary.opacity(0.12) : .clear)
+                    .overlay(alignment: .top) {
+                        if dragging != nil {
+                            insertionDropArea(before: row.id)
+                                .padding(.leading, 48)
+                                .padding(.trailing, DDSpacing.large)
+                                .offset(y: -(DDSpacing.xLarge / 2 + DDSpacing.small))
+                        }
+                    }
                 }
             }
         }
@@ -373,8 +386,8 @@ private struct TimeTableEditContent: View {
 
                 ScrollView(.horizontal) {
                     HStack(spacing: spacing) {
-                        ForEach(Array(row.sources.enumerated()), id: \.offset) { item in
-                            sourceCard(item.element, rowID: row.id, width: cardWidth)
+                        ForEach(row.sources, id: \.self) { source in
+                            sourceCard(source, rowID: row.id, width: cardWidth)
                         }
                     }
                 }
@@ -393,15 +406,19 @@ private struct TimeTableEditContent: View {
         case let .schedule(id):
             if let schedule = store.draftPlacements.first(where: { $0.id == id }),
                let course = timeTableStore.coursesByID[schedule.courseID] {
+                let dragItem = DraggedItem.row(rowID, source)
                 editCard(title: course.title, subtitle: course.categorySummary,
-                         memberIDs: course.members.map(\.rawValue), width: width, drag: .row(rowID, source))
+                         memberIDs: course.members.map(\.rawValue), width: width, drag: dragItem)
+                    .opacity(dragging == dragItem ? 0 : 1)
             }
         case let .recommendationGroup(id):
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
             if let first = places.first {
+                let dragItem = DraggedItem.row(rowID, source)
                 editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
                          subtitle: places.categorySummary, memberIDs: first.memberIDs,
-                         width: width, drag: .row(rowID, source))
+                         width: width, drag: dragItem)
+                    .opacity(dragging == dragItem ? 0 : 1)
             }
         }
     }
@@ -420,7 +437,9 @@ private struct TimeTableEditContent: View {
                         .ddTypography(.bodyEmphasis16)
                         .foregroundStyle(DDColor.textPrimary)
                         .lineLimit(1)
-                    memberDots(memberIDs)
+                    if shouldDisplayMemberDots(for: memberIDs) {
+                        memberDots(memberIDs)
+                    }
                 }
                 Text(subtitle)
                     .ddTypography(.labelEmphasis14)
@@ -448,6 +467,16 @@ private struct TimeTableEditContent: View {
                     .frame(width: 14, height: 14)
             }
         }
+    }
+
+    private func shouldDisplayMemberDots(for memberIDs: [String]) -> Bool {
+        let tripMemberIDs = Set(timeTableStore.tripMembers.map(\.rawValue))
+        let scheduleMemberIDs = Set(memberIDs)
+
+        return !tripMemberIDs.isEmpty
+            && !scheduleMemberIDs.isEmpty
+            && scheduleMemberIDs.isSubset(of: tripMemberIDs)
+            && scheduleMemberIDs != tripMemberIDs
     }
 
     private func dragHandle(_ item: DraggedItem) -> some View {
@@ -508,8 +537,36 @@ private struct TimeTableEditContent: View {
                 }
         }
         .buttonStyle(.plain)
-        .background(isAppendTargeted ? DDColor.actionPrimary.opacity(0.12) : .clear)
+    }
+
+    private var appendDropArea: some View {
+        ZStack {
+            if isAppendTargeted {
+                insertionIndicator
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: DDSpacing.large)
+        .contentShape(Rectangle())
         .background(dropFrame("append"))
+    }
+
+    private func insertionDropArea(before rowID: TimeTableEditRow.ID) -> some View {
+        ZStack {
+            if targetedRowID == rowID {
+                insertionIndicator
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: DDSpacing.xLarge)
+        .contentShape(Rectangle())
+        .background(dropFrame("insert:\(rowID)"))
+    }
+
+    private var insertionIndicator: some View {
+        Capsule()
+            .fill(DDColor.actionPrimary)
+            .frame(height: 2)
     }
 
     private var deletionDropArea: some View {
@@ -550,6 +607,10 @@ private struct TimeTableEditContent: View {
         let target: DropTarget?
         if case .row = dragging, dropFrames["trash"]?.contains(location) == true {
             target = .trash
+        } else if let row = rows.first(where: {
+            dropFrames["insert:\($0.id)"]?.contains(location) == true
+        }) {
+            target = .row(row.id)
         } else if let row = rows.first(where: { dropFrames["row:\($0.id)"]?.contains(location) == true }),
            let frame = dropFrames["row:\(row.id)"] {
             switch dragging {
@@ -633,8 +694,8 @@ private struct TimeTableEditContent: View {
         switch dragging {
         case let .recommendation(id):
             store.send(.recommendationDropped(id, before: targetID))
-        case let .row(id, _):
-            store.send(.scheduleRowMoved(id, before: targetID))
+        case let .row(id, source):
+            store.send(.scheduleRowMoved(id, source: source, before: targetID))
         }
         self.dragging = nil
         return true
@@ -644,7 +705,7 @@ private struct TimeTableEditContent: View {
         guard let dragging else { return false }
         switch dragging {
         case let .recommendation(id): store.send(.recommendationMerged(id, into: rowID))
-        case let .row(id, _): store.send(.rowMerged(id, into: rowID))
+        case let .row(id, source): store.send(.rowMerged(id, source: source, into: rowID))
         }
         self.dragging = nil
         return true

@@ -16,6 +16,7 @@ struct UpcomingTripsFeature: Reducer {
     struct Trip: Equatable, Identifiable {
         let id: String
         let destination: String
+        var destinationName: String? = nil
         let country: String
         let dateText: String
         var startDate: Date? = nil
@@ -285,6 +286,7 @@ struct UpcomingTripsFeature: Reducer {
         return Trip(
             id: snapshot.tripID,
             destination: destination,
+            destinationName: snapshot.destinationName,
             country: country,
             dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
             startDate: snapshot.startDate,

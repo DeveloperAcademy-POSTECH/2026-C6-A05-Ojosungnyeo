@@ -20,6 +20,7 @@ struct TimeTableFeature: Reducer {
         var tripStartDate: Date? = nil
         var tripEndDate: Date? = nil
         var tripTitle: String?
+        var destinationName: String?
         var recommendationTripID: String?
         var recommendations: [TimeTableRecommendation] = []
         var dayOfMonthByDay: [TripDay: Int] = [
@@ -50,6 +51,13 @@ struct TimeTableFeature: Reducer {
             guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
                   nights >= 0 else { return [.day1] }
             return Array(TripDay.allCases.prefix(min(nights + 1, TripDay.allCases.count)))
+        }
+
+        var headerTitle: String {
+            guard let destinationName = destinationName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !destinationName.isEmpty
+            else { return "여행 일정을 살펴보게따" }
+            return "\(destinationName) 여행을 살펴보게따"
         }
 
         var tripDateText: String? {
@@ -339,18 +347,27 @@ struct TimeTableFeature: Reducer {
                 state.edit.rowsByDay[state.selectedDay] = rows
                 return .none
 
-            case let .edit(.rowMerged(sourceID, into: targetID)):
+            case let .edit(.rowMerged(sourceID, source: source, into: targetID)):
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 guard sourceID != targetID,
                       let sourceIndex = rows.firstIndex(where: { $0.id == sourceID }),
+                      let sourcePosition = rows[sourceIndex].sources.firstIndex(of: source),
                       let targetIndex = rows.firstIndex(where: { $0.id == targetID }),
-                      let sourceMembers = Self.memberIDs(for: rows[sourceIndex], state: state),
+                      let sourceMembers = Self.memberIDs(for: source, state: state),
                       let targetMembers = Self.memberIDs(for: rows[targetIndex], state: state),
+                      !sourceMembers.isEmpty,
                       sourceMembers.isDisjoint(with: targetMembers)
                 else { return .none }
-                let source = rows.remove(at: sourceIndex)
-                let destination = targetIndex - (sourceIndex < targetIndex ? 1 : 0)
-                rows[destination].sources.append(contentsOf: source.sources)
+
+                rows[sourceIndex].sources.remove(at: sourcePosition)
+                if rows[sourceIndex].sources.isEmpty {
+                    rows.remove(at: sourceIndex)
+                } else if rows[sourceIndex].sources.count == 1 {
+                    rows[sourceIndex].branchGroupID = nil
+                }
+
+                guard let destination = rows.firstIndex(where: { $0.id == targetID }) else { return .none }
+                rows[destination].sources.append(source)
                 rows[destination].branchGroupID = rows[destination].branchGroupID ?? "local-\(UUID().uuidString)"
                 state.edit.rowsByDay[state.selectedDay] = rows
                 return .none
@@ -371,11 +388,27 @@ struct TimeTableFeature: Reducer {
                 state.edit.rowsByDay[state.selectedDay] = rows
                 return .none
 
-            case let .edit(.scheduleRowMoved(id, before: targetID)):
+            case let .edit(.scheduleRowMoved(id, source: source, before: targetID)):
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 guard let sourceIndex = rows.firstIndex(where: { $0.id == id }),
-                      targetID != id else { return .none }
-                let row = rows.remove(at: sourceIndex)
+                      let sourcePosition = rows[sourceIndex].sources.firstIndex(of: source)
+                else { return .none }
+
+                let row: TimeTableEditRow
+                if rows[sourceIndex].sources.count == 1 {
+                    guard targetID != id else { return .none }
+                    row = rows.remove(at: sourceIndex)
+                } else {
+                    rows[sourceIndex].sources.remove(at: sourcePosition)
+                    if rows[sourceIndex].sources.count == 1 {
+                        rows[sourceIndex].branchGroupID = nil
+                    }
+                    row = TimeTableEditRow(
+                        id: Self.rowID(for: source, on: state.selectedDay),
+                        sources: [source]
+                    )
+                }
+
                 let targetIndex = targetID.flatMap { targetID in
                     rows.firstIndex(where: { $0.id == targetID })
                 } ?? rows.endIndex
@@ -573,11 +606,40 @@ struct TimeTableFeature: Reducer {
         return members
     }
 
+    private static func memberIDs(
+        for source: TimeTableEditRow.Source,
+        state: State
+    ) -> Set<String>? {
+        switch source {
+        case let .schedule(id):
+            guard let schedule = state.edit.draftPlacements.first(where: { $0.id == id }),
+                  let course = state.coursesByID[schedule.courseID]
+            else { return nil }
+            return Set(course.members.map(\.rawValue))
+
+        case let .recommendationGroup(id):
+            guard let recommendation = state.recommendations.first(where: { $0.groupID == id })
+            else { return nil }
+            return Set(recommendation.memberIDs)
+        }
+    }
+
+    private static func rowID(
+        for source: TimeTableEditRow.Source,
+        on day: TripDay
+    ) -> TimeTableEditRow.ID {
+        switch source {
+        case let .schedule(id): "\(day.rawValue)-schedule-\(id)"
+        case let .recommendationGroup(id): "recommendation-\(id)"
+        }
+    }
+
     #if DEBUG
     static var debugMockState: State {
         var state = State()
         state.isLocalPreview = true
         state.tripTitle = "도쿄 여행을 살펴보게따"
+        state.destinationName = "도쿄"
         let calendar = Calendar(identifier: .gregorian)
         state.tripStartDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 22))
         state.tripEndDate = calendar.date(from: DateComponents(year: 2026, month: 11, day: 25))

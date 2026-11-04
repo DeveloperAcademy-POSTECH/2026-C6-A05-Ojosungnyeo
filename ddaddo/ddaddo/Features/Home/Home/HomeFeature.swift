@@ -116,6 +116,7 @@ struct HomeFeature: Reducer {
                     state.tripItinerary = TripItineraryFeature.State(selectedTab: .dailyItinerary)
                     state.tripItinerary.timeTable.recommendationTripID = trip?.id
                     state.tripItinerary.timeTable.tripTitle = trip?.destination
+                    state.tripItinerary.timeTable.destinationName = trip?.destinationName
                     state.tripItinerary.timeTable.tripStartDate = trip?.startDate
                     state.tripItinerary.timeTable.tripEndDate = trip?.endDate
                     state.isUpcomingTripsPresented = false
@@ -160,6 +161,7 @@ struct HomeFeature: Reducer {
                 else { return .none }
 
                 state.tripItinerary.timeTable.tripTitle = state.placeGrouping.tripTitle
+                state.tripItinerary.timeTable.destinationName = source.destinationName
                 state.tripItinerary.timeTable.tripStartDate = source.tripStartDate
                 state.tripItinerary.timeTable.tripEndDate = source.tripEndDate
                 state.tripItinerary.timeTable.recommendationTripID = source.tripID

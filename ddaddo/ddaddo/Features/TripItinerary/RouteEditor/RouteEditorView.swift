@@ -116,30 +116,31 @@ struct RouteEditorView: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: DDSpacing.small) {
-                ForEach(store.availableDays) { day in
-                    Button {
-                        store.send(.daySelected(day))
-                    } label: {
-                        Text(day.rawValue)
-                            .ddTypography(.labelEmphasis14)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .frame(width: 64, height: 40)
-                            .background(
-                                day == store.availableDays.first
-                                    ? DDColor.borderDefault
-                                    : Color.clear
-                            )
-                            .clipShape(.capsule)
-                            .overlay {
-                                Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
-                            }
+            ScrollView(.horizontal) {
+                HStack(spacing: DDSpacing.small) {
+                    ForEach(store.availableDays) { day in
+                        Button {
+                            store.send(.daySelected(day))
+                        } label: {
+                            Text(day.rawValue)
+                                .ddTypography(.labelEmphasis14)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(width: 64, height: 40)
+                                .background(
+                                    day == store.availableDays.first
+                                        ? DDColor.borderDefault
+                                        : Color.clear
+                                )
+                                .clipShape(.capsule)
+                                .overlay {
+                                    Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
-
-                Spacer(minLength: 0)
             }
+            .scrollIndicators(.hidden)
 
             Spacer(minLength: 0)
         }

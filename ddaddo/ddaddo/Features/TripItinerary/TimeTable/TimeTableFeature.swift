@@ -36,6 +36,21 @@ struct TimeTableFeature: Reducer {
         var savedPreviewPlacements: [TimeTableSchedule]?
         #endif
 
+        var availableDays: [TripDay] {
+            guard let tripStartDate, let tripEndDate else {
+                let fallback = TripDay.allCases.filter { dayOfMonthByDay[$0] != nil }
+                return fallback.isEmpty ? [.day1] : fallback
+            }
+
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .current
+            let startDay = calendar.startOfDay(for: tripStartDate)
+            let endDay = calendar.startOfDay(for: tripEndDate)
+            guard let nights = calendar.dateComponents([.day], from: startDay, to: endDay).day,
+                  nights >= 0 else { return [.day1] }
+            return Array(TripDay.allCases.prefix(min(nights + 1, TripDay.allCases.count)))
+        }
+
         var tripDateText: String? {
             if let startDate = tripStartDate, let endDate = tripEndDate {
                 var calendar = Calendar(identifier: .gregorian)
@@ -131,6 +146,70 @@ struct TimeTableFeature: Reducer {
             #endif
         }
 
+        mutating func materializeRecommendationRows() {
+            var nextCourseID = (coursesByID.keys.max() ?? -1) + 1
+            var nextScheduleID = (edit.draftPlacements.map(\.id).max() ?? -1) + 1
+            var nextBranchID = (edit.draftPlacements.compactMap(\.branchGroupID).max() ?? -1) + 1
+
+            for day in TripDay.allCases {
+                let rows = edit.rowsByDay[day, default: []]
+                for (rowIndex, row) in rows.enumerated() {
+                    let recommendationSources = row.sources.compactMap { source -> String? in
+                        guard case let .recommendationGroup(groupID) = source else { return nil }
+                        return groupID
+                    }
+                    guard !recommendationSources.isEmpty else { continue }
+                    let branchID = row.sources.count > 1 ? nextBranchID : nil
+                    if branchID != nil { nextBranchID += 1 }
+                    var materializedScheduleIDs: [TimeTableSchedule.ID] = []
+
+                    for groupID in recommendationSources {
+                        let places = recommendations.filter { $0.groupID == groupID }
+                        guard let first = places.first else { continue }
+                        let categories = places.reduce(into: [String]()) { result, place in
+                            guard !result.contains(place.category) else { return }
+                            result.append(place.category)
+                        }
+                        let memberIDs = places.flatMap(\.memberIDs).reduce(into: [String]()) {
+                            guard !$0.contains($1) else { return }
+                            $0.append($1)
+                        }
+                        let course = TimeTableCourse(
+                            id: nextCourseID,
+                            title: places.count > 1
+                                ? "\(first.placeName) 외 \(places.count - 1)곳"
+                                : first.placeName,
+                            placeCount: places.count,
+                            placeNames: places.map(\.placeName),
+                            categories: categories,
+                            members: memberIDs.compactMap(TripMember.init(rawValue:)),
+                            durationMinutes: max(60, places.count * 60)
+                        )
+                        coursesByID[nextCourseID] = course
+                        edit.draftPlacements.append(
+                            TimeTableSchedule(
+                                id: nextScheduleID,
+                                courseID: nextCourseID,
+                                day: day,
+                                timing: .init(startMinuteOfDay: 9 * 60 + rowIndex * 90),
+                                branchGroupID: branchID
+                            )
+                        )
+                        materializedScheduleIDs.append(nextScheduleID)
+                        nextCourseID += 1
+                        nextScheduleID += 1
+                    }
+                    var scheduleIDs = materializedScheduleIDs
+                    edit.rowsByDay[day]?[rowIndex].sources = row.sources.map { source in
+                        guard case .recommendationGroup = source, !scheduleIDs.isEmpty else {
+                            return source
+                        }
+                        return .schedule(scheduleIDs.removeFirst())
+                    }
+                }
+            }
+        }
+
     }
 
     @CasePathable
@@ -140,14 +219,84 @@ struct TimeTableFeature: Reducer {
         case daySelected(TripDay)
         case groupAddButtonTapped(TimeTableGroup.ID)
         case scheduleTapped(TimeTableSchedule.ID)
+        case validateSelectedDay
+        case onAppear
+        case itineraryLoaded(TripItinerarySnapshot?)
+        case itineraryLoadFailed
+        case itinerarySaveSucceeded
+        case itinerarySaveFailed(String)
         case edit(TimeTableEditFeature.Action)
         case delegate(Delegate)
     }
+
+    @Dependency(\.tripClient) var tripClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .backButtonTapped, .groupAddButtonTapped, .scheduleTapped, .delegate:
+                return .none
+
+            case .onAppear:
+                guard !state.hasLoadedItinerary,
+                      let tripID = state.recommendationTripID,
+                      !tripID.isEmpty else { return .none }
+                state.hasLoadedItinerary = true
+                return .run { send in
+                    do {
+                        await send(.itineraryLoaded(try await tripClient.fetchItinerary(tripID)))
+                    } catch {
+                        await send(.itineraryLoadFailed)
+                    }
+                }
+
+            case let .itineraryLoaded(snapshot):
+                guard let snapshot else { return .none }
+                state.coursesByID = Dictionary(uniqueKeysWithValues: snapshot.courses.map { course in
+                    let value = TimeTableCourse(
+                        id: course.id,
+                        title: course.title,
+                        placeCount: course.placeNames.count,
+                        placeNames: course.placeNames,
+                        categories: course.categories,
+                        members: course.memberIDs.compactMap(TripMember.init(rawValue:)),
+                        durationMinutes: course.durationMinutes
+                    )
+                    return (value.id, value)
+                })
+                state.placements = snapshot.schedules.compactMap { schedule in
+                    guard let day = TripDay(rawValue: schedule.day) else { return nil }
+                    return TimeTableSchedule(
+                        id: schedule.id,
+                        courseID: schedule.courseID,
+                        day: day,
+                        timing: .init(startMinuteOfDay: schedule.startMinuteOfDay),
+                        branchGroupID: schedule.branchGroupID
+                    )
+                }
+                return .none
+
+            case .itineraryLoadFailed:
+                state.hasLoadedItinerary = false
+                return .none
+
+            case .itinerarySaveSucceeded:
+                state.placements = state.edit.draftPlacements
+                state.edit.isSaving = false
+                state.isEditing = false
+                state.edit = TimeTableEditFeature.State()
+                return .none
+
+            case let .itinerarySaveFailed(message):
+                state.edit.isSaving = false
+                state.edit.saveErrorMessage = message
+                state.edit.isSaveUnavailableAlertPresented = true
+                return .none
+
+            case .validateSelectedDay:
+                if !state.availableDays.contains(state.selectedDay) {
+                    state.selectedDay = .day1
+                }
                 return .none
 
             case .edit(.delegate(.addPlaceRequested)):
@@ -247,9 +396,51 @@ struct TimeTableFeature: Reducer {
                     return .none
                 }
                 #endif
-                // TODO: 일정 저장 API가 연결되면 여행 ID와 초안을 전송하고 성공 응답 후에만 확정한다.
-                state.edit.isSaveUnavailableAlertPresented = true
-                return .none
+                guard !state.edit.isSaving,
+                      let tripID = state.recommendationTripID,
+                      !tripID.isEmpty else {
+                    state.edit.saveErrorMessage = "저장할 여행 정보를 찾을 수 없어요."
+                    state.edit.isSaveUnavailableAlertPresented = true
+                    return .none
+                }
+                state.materializeRecommendationRows()
+                state.edit.isSaving = true
+                let usedCourseIDs = Set(state.edit.draftPlacements.map(\.courseID))
+                let courses = state.coursesByID.values
+                    .filter { usedCourseIDs.contains($0.id) }
+                    .sorted { $0.id < $1.id }
+                    .map { course in
+                        TripItinerarySaveRequest.Course(
+                            id: course.id,
+                            title: course.title,
+                            placeNames: course.placeNames,
+                            categories: course.categories,
+                            memberIDs: course.members.map(\.rawValue),
+                            durationMinutes: course.durationMinutes
+                        )
+                    }
+                let schedules = state.edit.draftPlacements.map { schedule in
+                    TripItinerarySaveRequest.Schedule(
+                        id: schedule.id,
+                        courseID: schedule.courseID,
+                        day: schedule.day.rawValue,
+                        startMinuteOfDay: schedule.timing.startMinuteOfDay,
+                        branchGroupID: schedule.branchGroupID
+                    )
+                }
+                let request = TripItinerarySaveRequest(
+                    tripID: tripID,
+                    courses: courses,
+                    schedules: schedules
+                )
+                return .run { send in
+                    do {
+                        try await tripClient.saveItinerary(request)
+                        await send(.itinerarySaveSucceeded)
+                    } catch {
+                        await send(.itinerarySaveFailed(error.localizedDescription))
+                    }
+                }
 
             case let .edit(.scheduleTapped(id)):
                 guard let schedule = state.edit.draftPlacements.first(where: {
@@ -317,7 +508,7 @@ struct TimeTableFeature: Reducer {
                 return .none
 
             case let .daySelected(day):
-                state.selectedDay = day
+                state.selectedDay = state.availableDays.contains(day) ? day : .day1
                 return .none
             }
         }
@@ -455,6 +646,17 @@ struct TimeTableRecommendation: Equatable, Identifiable {
     #endif
 }
 
+extension Collection where Element == TimeTableRecommendation {
+    var categorySummary: String {
+        reduce(into: [String]()) { result, recommendation in
+            guard !recommendation.category.isEmpty,
+                  !result.contains(recommendation.category) else { return }
+            result.append(recommendation.category)
+        }
+        .joined(separator: " · ")
+    }
+}
+
 enum TripDay: String, CaseIterable, Equatable, Identifiable {
     case day1 = "DAY 1"
     case day2 = "DAY 2"
@@ -486,8 +688,27 @@ struct TimeTableCourse: Equatable, Identifiable {
     let title: String
     let placeCount: Int
     let placeNames: [String]
+    let categories: [String]
     let members: [TripMember]
     let durationMinutes: Int
+
+    init(
+        id: Int,
+        title: String,
+        placeCount: Int,
+        placeNames: [String],
+        categories: [String] = [],
+        members: [TripMember],
+        durationMinutes: Int
+    ) {
+        self.id = id
+        self.title = title
+        self.placeCount = placeCount
+        self.placeNames = placeNames
+        self.categories = categories
+        self.members = members
+        self.durationMinutes = durationMinutes
+    }
 
     func kind(among tripMembers: [TripMember]) -> Kind? {
         let tripMemberIDs = tripMembers.map(\.id)
@@ -512,6 +733,27 @@ struct TimeTableCourse: Equatable, Identifiable {
         return remainingCount > 0 ? "\(names) 외 \(remainingCount)곳" : names
     }
 
+    static let mockCoursesByID: [ID: Self] = {
+        let courses: [Self] = [
+            .init(id: 0, title: "도쿄역 쇼핑 코스", placeCount: 4, placeNames: ["TK 빈티지샵", "HABARI"], members: [.tae, .header], durationMinutes: 240),
+            .init(id: 1, title: "치이카와 뮤지엄 코스", placeCount: 4, placeNames: ["치이카와랜드"], members: [.grae, .juni], durationMinutes: 240),
+            .init(id: 2, title: "파르페 먹방 코스", placeCount: 4, placeNames: ["말차 파르페 센터"], members: [.grae, .header, .juni, .tae], durationMinutes: 210),
+            .init(id: 100, title: "아사쿠사 산책 코스", placeCount: 3, placeNames: ["센소지", "나카미세도리"], members: [.tae, .juni], durationMinutes: 180),
+            .init(id: 101, title: "우에노 문화 코스", placeCount: 4, placeNames: ["우에노 공원", "도쿄 국립박물관"], members: [.header, .grae], durationMinutes: 240),
+            .init(id: 102, title: "아키하바라 야경 코스", placeCount: 3, placeNames: ["아키하바라 전자상가"], members: TripMember.allCases, durationMinutes: 180),
+            .init(id: 200, title: "하라주쿠 쇼핑 코스", placeCount: 4, placeNames: ["타케시타도리", "캐트스트리트"], members: [.tae, .grae], durationMinutes: 240),
+            .init(id: 201, title: "시부야 디저트 코스", placeCount: 3, placeNames: ["하치 카페"], members: [.header, .juni], durationMinutes: 180),
+            .init(id: 202, title: "시부야 야경 코스", placeCount: 3, placeNames: ["시부야 스카이"], members: TripMember.allCases, durationMinutes: 180),
+            .init(id: 302, title: "긴자 브런치 코스", placeCount: 2, placeNames: ["긴자 카페"], members: [.tae], durationMinutes: 120),
+            .init(id: 303, title: "도쿄역 마지막 쇼핑", placeCount: 3, placeNames: ["도쿄 캐릭터스트리트"], members: [.header, .grae, .juni], durationMinutes: 120),
+            .init(id: 300, title: "긴자 브런치 코스", placeCount: 2, placeNames: ["긴자 카페"], members: TripMember.allCases, durationMinutes: 120),
+            .init(id: 301, title: "도쿄역 마지막 쇼핑", placeCount: 3, placeNames: ["도쿄 캐릭터스트리트"], members: TripMember.allCases, durationMinutes: 180),
+            .init(id: 400, title: "신주쿠 쇼핑 코스", placeCount: 2, placeNames: ["루미네 신주쿠", "이세탄 신주쿠"], members: [.grae, .juni], durationMinutes: 240),
+            .init(id: 401, title: "신주쿠 카페 코스", placeCount: 2, placeNames: ["카페 알리야", "신주쿠 교엔"], members: [.tae], durationMinutes: 120),
+            .init(id: 402, title: "주오 맛집 투어", placeCount: 2, placeNames: ["오이시 돈코츠 라멘", "말차 카페"], members: TripMember.allCases, durationMinutes: 240)
+        ]
+        return Dictionary(uniqueKeysWithValues: courses.map { ($0.id, $0) })
+    }()
 }
 
 struct TimeTableSchedule: Equatable, Identifiable {

@@ -96,6 +96,7 @@ private extension TripItineraryFeature.State {
             title: place.name,
             placeCount: 1,
             placeNames: [place.name],
+            categories: [place.category],
             members: timeTable.tripMembers,
             durationMinutes: 60
         )

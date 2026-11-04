@@ -114,6 +114,8 @@ struct HomeFeature: Reducer {
                 if state.upcomingTrips.trips.first(where: { $0.id == tripID })?.progress == .itinerary {
                     let trip = state.upcomingTrips.trips.first { $0.id == tripID }
                     state.tripItinerary = TripItineraryFeature.State(selectedTab: .dailyItinerary)
+                    state.tripItinerary.timeTable.recommendationTripID = trip?.id
+                    state.tripItinerary.timeTable.tripTitle = trip?.destination
                     state.tripItinerary.timeTable.tripStartDate = trip?.startDate
                     state.tripItinerary.timeTable.tripEndDate = trip?.endDate
                     state.isUpcomingTripsPresented = false

@@ -36,7 +36,9 @@ struct TimeTableEditFeature: Reducer {
         var selectedMinuteOfDay: Int?
         var rowsByDay: [TripDay: [TimeTableEditRow]] = [:]
         var draftPlacements: [TimeTableSchedule] = []
+        var isSaving = false
         var isSaveUnavailableAlertPresented = false
+        var saveErrorMessage = "일정을 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
         var pendingDeletion: PendingDeletion?
 
         var isTimeSelectionPresented: Bool {

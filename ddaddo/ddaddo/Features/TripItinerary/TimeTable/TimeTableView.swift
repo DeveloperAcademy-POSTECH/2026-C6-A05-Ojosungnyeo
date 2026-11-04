@@ -26,7 +26,10 @@ struct TimeTableView: View {
                 )
             }
         }
-        .onAppear { store.send(.validateSelectedDay) }
+        .onAppear {
+            store.send(.validateSelectedDay)
+            store.send(.onAppear)
+        }
         .onChange(of: store.availableDays) { _, _ in
             store.send(.validateSelectedDay)
         }
@@ -250,7 +253,7 @@ private struct TimeTableReadOnlyContent: View {
                             }
                         }
                     }
-                    Text(first.category)
+                    Text(places.categorySummary)
                         .ddTypography(.labelEmphasis14)
                         .foregroundStyle(DDColor.actionPrimary)
                 }
@@ -301,10 +304,10 @@ private struct TimeTableReadOnlyContent: View {
                 }
             }
 
-            Text(course.placesSummary)
+            Text(course.categorySummary)
                 .ddTypography(.labelEmphasis14)
                 .foregroundStyle(DDColor.actionPrimary)
-                .lineLimit(1)
+                .lineLimit(2)
         }
         .padding(.horizontal, DDSpacing.xLarge)
         .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)

@@ -61,7 +61,7 @@ struct TimeTableEditView: View {
         )) {
             Button("확인") { store.send(.saveUnavailableAlertDismissed) }
         } message: {
-            Text("서버 일정 저장 기능이 아직 연결되지 않았어요. 편집 내용은 이 화면에 남아 있어요.")
+            Text(store.saveErrorMessage)
         }
         .allowsHitTesting(store.pendingDeletion == nil)
         .overlay {
@@ -225,6 +225,8 @@ private struct TimeTableEditContent: View {
                 .frame(width: 64, height: 40)
                 .background(DDColor.actionPrimary, in: Capsule())
                 .buttonStyle(.plain)
+                .disabled(store.isSaving)
+                .opacity(store.isSaving ? 0.5 : 1)
         }
         .frame(height: 40)
         .padding(.horizontal, DDSpacing.large)
@@ -391,14 +393,14 @@ private struct TimeTableEditContent: View {
         case let .schedule(id):
             if let schedule = store.draftPlacements.first(where: { $0.id == id }),
                let course = timeTableStore.coursesByID[schedule.courseID] {
-                editCard(title: course.title, subtitle: course.placesSummary,
+                editCard(title: course.title, subtitle: course.categorySummary,
                          memberIDs: course.members.map(\.rawValue), width: width, drag: .row(rowID, source))
             }
         case let .recommendationGroup(id):
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
             if let first = places.first {
                 editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                         subtitle: first.category, memberIDs: first.memberIDs,
+                         subtitle: places.categorySummary, memberIDs: first.memberIDs,
                          width: width, drag: .row(rowID, source))
             }
         }
@@ -605,7 +607,7 @@ private struct TimeTableEditContent: View {
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
             if let first = places.first {
                 editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                         subtitle: first.category, memberIDs: first.memberIDs,
+                         subtitle: places.categorySummary, memberIDs: first.memberIDs,
                          width: 200, drag: item)
             }
         case let .row(_, source):
@@ -613,14 +615,14 @@ private struct TimeTableEditContent: View {
                 case let .schedule(scheduleID):
                     if let schedule = store.draftPlacements.first(where: { $0.id == scheduleID }),
                        let course = timeTableStore.coursesByID[schedule.courseID] {
-                        editCard(title: course.title, subtitle: course.placesSummary,
+                        editCard(title: course.title, subtitle: course.categorySummary,
                                  memberIDs: course.members.map(\.rawValue), width: 200, drag: item)
                     }
                 case let .recommendationGroup(groupID):
                     let places = timeTableStore.recommendations.filter { $0.groupID == groupID }
                     if let first = places.first {
                         editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                                 subtitle: first.category, memberIDs: first.memberIDs,
+                                 subtitle: places.categorySummary, memberIDs: first.memberIDs,
                                  width: 200, drag: item)
                     }
                 }

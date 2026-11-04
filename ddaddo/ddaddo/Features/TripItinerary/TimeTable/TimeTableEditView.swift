@@ -61,7 +61,26 @@ struct TimeTableEditView: View {
         )) {
             Button("확인") { store.send(.saveUnavailableAlertDismissed) }
         } message: {
-            Text("서버 일정 저장 기능이 아직 연결되지 않았어요. 편집 내용은 이 화면에 남아 있어요.")
+            Text(store.saveErrorMessage)
+        }
+        .allowsHitTesting(store.pendingDeletion == nil)
+        .overlay {
+            if store.pendingDeletion != nil {
+                ZStack {
+                    Color.black.opacity(0.55).ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: "일정 삭제하기",
+                        message: "이 일정을 진짜 삭제할까요?",
+                        cancelTitle: "아니요",
+                        confirmTitle: "네",
+                        cancelColor: DDColor.actionPrimary,
+                        confirmColor: DDColor.actionPrimary,
+                        onCancel: { store.send(.deletionCancelled) },
+                        onConfirm: { store.send(.deletionConfirmed) }
+                    )
+                }
+            }
         }
     }
 }
@@ -73,18 +92,20 @@ private struct TimeTableEditContent: View {
     @State private var dragging: DraggedItem?
     @State private var targetedRowID: String?
     @State private var isAppendTargeted = false
+    @State private var isDeletionOverlayPresented = false
     @State private var dragLocation: CGPoint?
     @State private var dropFrames: [String: CGRect] = [:]
 
     private enum DraggedItem: Equatable {
         case recommendation(TimeTableRecommendation.ID)
-        case row(TimeTableEditRow.ID)
+        case row(TimeTableEditRow.ID, TimeTableEditRow.Source)
     }
 
     private enum DropTarget: Equatable {
         case row(String)
         case merge(String)
         case append
+        case trash
     }
 
     @State private var activeDropTarget: DropTarget?
@@ -168,6 +189,12 @@ private struct TimeTableEditContent: View {
             }
         }
         .coordinateSpace(name: "timeTableEditDrag")
+        .overlay(alignment: .bottom) {
+            if isDeletionOverlayPresented {
+                deletionDropArea
+                    .zIndex(1)
+            }
+        }
         .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
         .overlay {
             if let dragging, let dragLocation {
@@ -198,6 +225,8 @@ private struct TimeTableEditContent: View {
                 .frame(width: 64, height: 40)
                 .background(DDColor.actionPrimary, in: Capsule())
                 .buttonStyle(.plain)
+                .disabled(store.isSaving)
+                .opacity(store.isSaving ? 0.5 : 1)
         }
         .frame(height: 40)
         .padding(.horizontal, DDSpacing.large)
@@ -235,7 +264,7 @@ private struct TimeTableEditContent: View {
     private var dayPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: DDSpacing.small) {
-                ForEach(TripDay.allCases) { day in
+                ForEach(timeTableStore.availableDays) { day in
                     Button { timeTableStore.send(.daySelected(day)) } label: {
                         Text(day.rawValue)
                             .ddTypography(.labelEmphasis14)
@@ -364,15 +393,15 @@ private struct TimeTableEditContent: View {
         case let .schedule(id):
             if let schedule = store.draftPlacements.first(where: { $0.id == id }),
                let course = timeTableStore.coursesByID[schedule.courseID] {
-                editCard(title: course.title, subtitle: course.placesSummary,
-                         memberIDs: course.members.map(\.rawValue), width: width, drag: .row(rowID))
+                editCard(title: course.title, subtitle: course.categorySummary,
+                         memberIDs: course.members.map(\.rawValue), width: width, drag: .row(rowID, source))
             }
         case let .recommendationGroup(id):
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
             if let first = places.first {
                 editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                         subtitle: first.category, memberIDs: first.memberIDs,
-                         width: width, drag: .row(rowID))
+                         subtitle: places.categorySummary, memberIDs: first.memberIDs,
+                         width: width, drag: .row(rowID, source))
             }
         }
     }
@@ -443,6 +472,9 @@ private struct TimeTableEditContent: View {
                     switch phase {
                     case .second(true, let drag):
                         dragging = item
+                        if case .row = item {
+                            isDeletionOverlayPresented = true
+                        }
                         if let drag {
                             dragLocation = drag.location
                             updateDropTarget(at: drag.location)
@@ -480,6 +512,31 @@ private struct TimeTableEditContent: View {
         .background(dropFrame("append"))
     }
 
+    private var deletionDropArea: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Image(systemName: "trash")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(DDColor.actionPrimary)
+                .padding(.bottom, 25)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 246)
+        .background(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: Color.black.opacity(0.8), location: 0.673),
+                    .init(color: Color.black.opacity(0.8), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .background(dropFrame("trash"))
+        .allowsHitTesting(false)
+    }
+
     private func dropFrame(_ id: String) -> some View {
         GeometryReader { proxy in
             Color.clear.preference(
@@ -491,7 +548,9 @@ private struct TimeTableEditContent: View {
 
     private func updateDropTarget(at location: CGPoint) {
         let target: DropTarget?
-        if let row = rows.first(where: { dropFrames["row:\($0.id)"]?.contains(location) == true }),
+        if case .row = dragging, dropFrames["trash"]?.contains(location) == true {
+            target = .trash
+        } else if let row = rows.first(where: { dropFrames["row:\($0.id)"]?.contains(location) == true }),
            let frame = dropFrames["row:\(row.id)"] {
             switch dragging {
             case .recommendation:
@@ -512,7 +571,7 @@ private struct TimeTableEditContent: View {
             targetedRowID = id
         case .merge:
             targetedRowID = nil
-        case .append, nil:
+        case .append, .trash, nil:
             targetedRowID = nil
         }
         isAppendTargeted = target == .append
@@ -523,12 +582,17 @@ private struct TimeTableEditContent: View {
         case let .row(id): _ = drop(before: id)
         case let .merge(id): _ = merge(into: id)
         case .append: _ = drop(before: nil)
+        case .trash:
+            if case let .row(rowID, source) = dragging {
+                store.send(.deletionRequested(timeTableStore.selectedDay, rowID: rowID, source: source))
+            }
         case nil: break
         }
     }
 
     private func finishDrag() {
         dragging = nil
+        isDeletionOverlayPresented = false
         dragLocation = nil
         activeDropTarget = nil
         targetedRowID = nil
@@ -542,27 +606,25 @@ private struct TimeTableEditContent: View {
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
             if let first = places.first {
                 editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                         subtitle: first.category, memberIDs: first.memberIDs,
+                         subtitle: places.categorySummary, memberIDs: first.memberIDs,
                          width: 200, drag: item)
             }
-        case let .row(id):
-            if let source = rows.first(where: { $0.id == id })?.sources.first {
-                switch source {
+        case let .row(_, source):
+            switch source {
                 case let .schedule(scheduleID):
                     if let schedule = store.draftPlacements.first(where: { $0.id == scheduleID }),
                        let course = timeTableStore.coursesByID[schedule.courseID] {
-                        editCard(title: course.title, subtitle: course.placesSummary,
+                        editCard(title: course.title, subtitle: course.categorySummary,
                                  memberIDs: course.members.map(\.rawValue), width: 200, drag: item)
                     }
                 case let .recommendationGroup(groupID):
                     let places = timeTableStore.recommendations.filter { $0.groupID == groupID }
                     if let first = places.first {
                         editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                                 subtitle: first.category, memberIDs: first.memberIDs,
+                                 subtitle: places.categorySummary, memberIDs: first.memberIDs,
                                  width: 200, drag: item)
                     }
                 }
-            }
         }
     }
 
@@ -571,7 +633,7 @@ private struct TimeTableEditContent: View {
         switch dragging {
         case let .recommendation(id):
             store.send(.recommendationDropped(id, before: targetID))
-        case let .row(id):
+        case let .row(id, _):
             store.send(.scheduleRowMoved(id, before: targetID))
         }
         self.dragging = nil
@@ -582,7 +644,7 @@ private struct TimeTableEditContent: View {
         guard let dragging else { return false }
         switch dragging {
         case let .recommendation(id): store.send(.recommendationMerged(id, into: rowID))
-        case let .row(id): store.send(.rowMerged(id, into: rowID))
+        case let .row(id, _): store.send(.rowMerged(id, into: rowID))
         }
         self.dragging = nil
         return true

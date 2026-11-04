@@ -6,7 +6,7 @@
 //
 
 enum PlaceGroupingPreviewData {
-    static let tripTitle = "도쿄 여행"
+    static let tripTitle = "오사카 여행"
     static let tripDates = "11월 22일 ~ 25일"
     static let travelCriteria = "대중교통 · 장소 간 최대 30분"
 
@@ -18,29 +18,29 @@ enum PlaceGroupingPreviewData {
     ]
 
     static let recommendedGroups: [PlaceGroupingFeature.RecommendedGroup] = [
-        .init(id: "shinjuku", title: "신주쿠", participantSummary: "2명 · 1명", memberIDs: ["tae", "header"], categories: ["쇼핑", "디저트"], places: []),
-        .init(id: "chuo", title: "주오", participantSummary: "4명", memberIDs: ["tae", "header", "juni", "grae"], categories: ["맛집"], places: []),
+        .init(id: "osaka-region-1", title: "오사카 지역 1", participantSummary: "2명 · 1명", memberIDs: ["tae", "header"], categories: ["쇼핑", "디저트"], places: []),
+        .init(id: "osaka-region-2", title: "오사카 지역 2", participantSummary: "4명", memberIDs: ["tae", "header", "juni", "grae"], categories: ["맛집"], places: []),
     ]
 
     static let placeGroups: [MapPlaceGroup] = [
         .init(
-            id: "shinjuku",
-            name: "신주쿠",
+            id: "osaka-region-1",
+            name: "오사카 지역 1",
             places: [
-                .init(id: "shinjuku-gyoen", name: "신주쿠 교엔", description: "", thumbnailName: "", latitude: 35.6852, longitude: 139.7100),
-                .init(id: "omoide-yokocho", name: "오모이데 요코초", description: "", thumbnailName: "", latitude: 35.6939, longitude: 139.6995),
-                .init(id: "tokyo-metropolitan", name: "도쿄 도청 전망대", description: "", thumbnailName: "", latitude: 35.6896, longitude: 139.6917),
+                .init(id: "osaka-castle", name: "오사카성", description: "", thumbnailName: "", latitude: 34.6873, longitude: 135.5262),
+                .init(id: "osaka-museum", name: "오사카 역사박물관", description: "", thumbnailName: "", latitude: 34.6826, longitude: 135.5200),
+                .init(id: "nakanoshima-park", name: "나카노시마 공원", description: "", thumbnailName: "", latitude: 34.6923, longitude: 135.5075),
             ],
             radius: 1_550
         ),
         .init(
-            id: "chuo",
-            name: "주오",
+            id: "osaka-region-2",
+            name: "오사카 지역 2",
             places: [
-                .init(id: "ginza-six", name: "긴자 식스", description: "", thumbnailName: "", latitude: 35.6697, longitude: 139.7649),
-                .init(id: "tsukiji-market", name: "쓰키지 장외시장", description: "", thumbnailName: "", latitude: 35.6655, longitude: 139.7707),
-                .init(id: "tokyo-station", name: "도쿄역", description: "", thumbnailName: "", latitude: 35.6812, longitude: 139.7671),
-                .init(id: "hamarikyu-gardens", name: "하마리큐 은사정원", description: "", thumbnailName: "", latitude: 35.6597, longitude: 139.7635),
+                .init(id: "dotonbori", name: "도톤보리", description: "", thumbnailName: "", latitude: 34.6687, longitude: 135.5013),
+                .init(id: "kuromon-market", name: "구로몬 시장", description: "", thumbnailName: "", latitude: 34.6654, longitude: 135.5067),
+                .init(id: "shinsaibashi", name: "신사이바시", description: "", thumbnailName: "", latitude: 34.6747, longitude: 135.5010),
+                .init(id: "namba-yasaka", name: "난바 야사카 신사", description: "", thumbnailName: "", latitude: 34.6616, longitude: 135.4966),
             ],
             radius: 2_050
         ),

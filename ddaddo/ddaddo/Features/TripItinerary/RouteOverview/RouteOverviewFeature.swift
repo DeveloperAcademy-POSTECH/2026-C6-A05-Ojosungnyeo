@@ -15,16 +15,13 @@ struct RouteOverviewFeature: Reducer {
         var selectedMembers: Set<TripMember> = []
         var selectedMemberOrder: [TripMember] = []
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
-        var isEditing = false
         var stopsByDay = RouteStop.stopsByDay
-        var draftStopsByDay: [TripDay: [RouteStop]]?
         let places = RoutePlace.mockPlaces
         var memberOrder = TripMember.allCases
         var currentMember = TripMember.tae
 
         private var currentStops: [RouteStop] {
-            let source = draftStopsByDay ?? stopsByDay
-            return source[selectedDay, default: []]
+            stopsByDay[selectedDay, default: []]
         }
 
         var visibleStopGroups: [RouteStopGroup] {
@@ -77,8 +74,6 @@ struct RouteOverviewFeature: Reducer {
                     }
             }
             selectedPlaceID = nil
-            draftStopsByDay = nil
-            isEditing = false
         }
     }
 
@@ -87,10 +82,6 @@ struct RouteOverviewFeature: Reducer {
         case backButtonTapped
         case daySelected(TripDay)
         case memberTapped(TripMember)
-        case editButtonTapped
-        case editingDoneButtonTapped
-        case editingStopMoved(RouteStop.ID, before: RouteStop.ID)
-        case editingStopDeleted(RouteStop.ID)
         case placeChanged(RoutePlace.ID?)
         case addressCopyButtonTapped(String)
     }
@@ -102,8 +93,6 @@ struct RouteOverviewFeature: Reducer {
                 state.selectedDay = .day1
                 state.selectedMembers.removeAll()
                 state.selectedMemberOrder.removeAll()
-                state.isEditing = false
-                state.draftStopsByDay = nil
                 return .none
 
             case .backButtonTapped:
@@ -123,27 +112,6 @@ struct RouteOverviewFeature: Reducer {
                 }
                 return .none
 
-            case .editButtonTapped:
-                state.draftStopsByDay = state.stopsByDay
-                state.isEditing = true
-                return .none
-
-            case .editingDoneButtonTapped:
-                if let draftStopsByDay = state.draftStopsByDay {
-                    state.stopsByDay = draftStopsByDay
-                }
-                state.draftStopsByDay = nil
-                state.isEditing = false
-                return .none
-
-            case let .editingStopMoved(sourceID, targetID):
-                state.moveDraftGroup(containing: sourceID, before: targetID)
-                return .none
-
-            case let .editingStopDeleted(stopID):
-                state.deleteDraftStop(stopID)
-                return .none
-
             case let .placeChanged(placeID):
                 guard let placeID else { return .none }
                 state.selectedPlaceID = placeID
@@ -152,54 +120,6 @@ struct RouteOverviewFeature: Reducer {
             case .addressCopyButtonTapped:
                 return .none
             }
-        }
-    }
-}
-
-private extension RouteOverviewFeature.State {
-    mutating func moveDraftGroup(
-        containing sourceID: RouteStop.ID,
-        before targetID: RouteStop.ID
-    ) {
-        guard var draftStopsByDay,
-              let dayStops = draftStopsByDay[selectedDay],
-              let sourceStop = dayStops.first(where: { $0.id == sourceID }),
-              let targetStop = dayStops.first(where: { $0.id == targetID }),
-              sourceStop.order != targetStop.order else { return }
-
-        var groups = Dictionary(grouping: dayStops, by: \.order)
-            .sorted { $0.key < $1.key }
-            .map(\.value)
-
-        guard let sourceIndex = groups.firstIndex(where: { group in
-            group.contains(where: { $0.id == sourceID })
-        }),
-        let targetIndex = groups.firstIndex(where: { group in
-            group.contains(where: { $0.id == targetID })
-        }) else { return }
-
-        let movingGroup = groups.remove(at: sourceIndex)
-        let insertionIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex
-        groups.insert(movingGroup, at: insertionIndex)
-        draftStopsByDay[selectedDay] = normalized(groups: groups)
-        self.draftStopsByDay = draftStopsByDay
-    }
-
-    mutating func deleteDraftStop(_ stopID: RouteStop.ID) {
-        guard var draftStopsByDay,
-              let dayStops = draftStopsByDay[selectedDay] else { return }
-
-        let remainingStops = dayStops.filter { $0.id != stopID }
-        let groups = Dictionary(grouping: remainingStops, by: \.order)
-            .sorted { $0.key < $1.key }
-            .map(\.value)
-        draftStopsByDay[selectedDay] = normalized(groups: groups)
-        self.draftStopsByDay = draftStopsByDay
-    }
-
-    func normalized(groups: [[RouteStop]]) -> [RouteStop] {
-        groups.enumerated().flatMap { order, group in
-            group.map { $0.with(order: order) }
         }
     }
 }

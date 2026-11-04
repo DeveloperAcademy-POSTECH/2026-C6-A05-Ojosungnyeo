@@ -63,7 +63,7 @@ struct PlaceSelectionView: View {
                     isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
                     fallbackImageName: store.selectedPinnedPlace?.thumbnailName,
                     closeButtonTapped: {
-                        store.send(.clearSelectedPlaceButtonTapped)
+                        store.send(.selectedPlaceCloseButtonTapped)
                     },
                     addButtonTapped: {
                         store.send(.addSelectedPlaceButtonTapped)
@@ -264,7 +264,7 @@ struct PlaceSelectionView: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        store.send(.clearSelectedPlaceButtonTapped)
+                        store.send(.searchFieldClearButtonTapped)
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .regular))

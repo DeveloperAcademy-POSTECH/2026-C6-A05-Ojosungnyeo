@@ -358,7 +358,8 @@ struct PlaceSelectionFeature: Reducer {
         case searchButtonTapped
         case dimmedBackgroundTapped
         case bottomSheetDragEnded(CGFloat)
-        case clearSelectedPlaceButtonTapped
+        case searchFieldClearButtonTapped
+        case selectedPlaceCloseButtonTapped
         case addSelectedPlaceButtonTapped
         case pinnedPlaceTapped(PinnedPlace)
         case pinnedPlaceDetailsResponse(String, PlaceDetails)
@@ -540,14 +541,23 @@ struct PlaceSelectionFeature: Reducer {
                 }
                 return .none
 
-            case .clearSelectedPlaceButtonTapped:
+            case .searchFieldClearButtonTapped:
                 state.searchText = ""
                 state.placeSearch = PlaceSearchFeature.State()
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.isPlaceDetailsLoading = false
+                state.isMemberPlacesSheetPresented = false
                 state.isBottomSheetExpanded = true
                 return .cancel(id: "place-search")
+
+            case .selectedPlaceCloseButtonTapped:
+                state.selectedPlace = nil
+                state.selectedPinnedPlace = nil
+                state.isPlaceDetailsLoading = false
+                state.isMemberPlacesSheetPresented = true
+                state.isBottomSheetExpanded = true
+                return .none
 
             case .addSelectedPlaceButtonTapped:
                 guard

@@ -343,7 +343,7 @@ struct TimeTableFeature: Reducer {
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 guard sourceID != targetID,
                       let sourceIndex = rows.firstIndex(where: { $0.id == sourceID }),
-                      rows[sourceIndex].sources.contains(source),
+                      let sourcePosition = rows[sourceIndex].sources.firstIndex(of: source),
                       let targetIndex = rows.firstIndex(where: { $0.id == targetID }),
                       let sourceMembers = Self.memberIDs(for: source, state: state),
                       let targetMembers = Self.memberIDs(for: rows[targetIndex], state: state),
@@ -351,7 +351,7 @@ struct TimeTableFeature: Reducer {
                       sourceMembers.isDisjoint(with: targetMembers)
                 else { return .none }
 
-                rows[sourceIndex].sources.removeAll { $0 == source }
+                rows[sourceIndex].sources.remove(at: sourcePosition)
                 if rows[sourceIndex].sources.isEmpty {
                     rows.remove(at: sourceIndex)
                 } else if rows[sourceIndex].sources.count == 1 {
@@ -383,7 +383,7 @@ struct TimeTableFeature: Reducer {
             case let .edit(.scheduleRowMoved(id, source: source, before: targetID)):
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 guard let sourceIndex = rows.firstIndex(where: { $0.id == id }),
-                      rows[sourceIndex].sources.contains(source)
+                      let sourcePosition = rows[sourceIndex].sources.firstIndex(of: source)
                 else { return .none }
 
                 let row: TimeTableEditRow
@@ -391,7 +391,7 @@ struct TimeTableFeature: Reducer {
                     guard targetID != id else { return .none }
                     row = rows.remove(at: sourceIndex)
                 } else {
-                    rows[sourceIndex].sources.removeAll { $0 == source }
+                    rows[sourceIndex].sources.remove(at: sourcePosition)
                     if rows[sourceIndex].sources.count == 1 {
                         rows[sourceIndex].branchGroupID = nil
                     }

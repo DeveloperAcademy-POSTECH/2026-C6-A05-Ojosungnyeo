@@ -208,7 +208,8 @@ struct HomeView: View {
 
     private var speechBubble: some View {
         mascotMessageText
-            .ddTypography(.bodyEmphasis16)
+            //.ddTypography(.bodyEmphasis16)
+            .ddTypography(.labelEmphasis14)
             .lineSpacing(4)
             .frame(width: 250, height: 48, alignment: .leading)
             .frame(width: 324, height: 92)

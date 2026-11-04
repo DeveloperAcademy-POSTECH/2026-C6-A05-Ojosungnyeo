@@ -347,6 +347,7 @@ struct UpcomingTripsFeature: Reducer {
         "다낭": "Da Nang",
         "하노이": "Hanoi",
         "호찌민": "Ho Chi Minh City",
+        "푸꾸옥": "Phu Quoc",
         "세부": "Cebu",
         "마닐라": "Manila",
         "보라카이": "Boracay",

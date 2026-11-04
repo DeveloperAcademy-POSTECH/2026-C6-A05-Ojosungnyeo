@@ -17,7 +17,7 @@ struct ConfirmedPlacesBottomSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 19)
 
-            HStack(spacing: DDSpacing.xSmall) {
+            HStack(spacing: DDSpacing.small) {
                 ForEach(participants.filter(\.hasJoined)) { participant in
                     PlaceSelectionParticipantAvatar(
                         participant: participant,
@@ -35,7 +35,7 @@ struct ConfirmedPlacesBottomSheet: View {
                     .background(DDColor.surfaceSelected)
                     .clipShape(.capsule)
             }
-            .padding(.top, 17)
+            .padding(.top, DDSpacing.xLarge)
 
             Text("전체 여행 일정")
                 .ddTypography(.bodyEmphasis16)

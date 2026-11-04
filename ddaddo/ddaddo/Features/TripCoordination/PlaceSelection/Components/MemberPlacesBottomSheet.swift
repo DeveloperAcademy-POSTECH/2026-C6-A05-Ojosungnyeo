@@ -55,7 +55,7 @@ struct MemberPlacesBottomSheet: View {
     }
 
     private var memberSelector: some View {
-        HStack(spacing: DDSpacing.xSmall) {
+        HStack(spacing: DDSpacing.small) {
             ForEach(participants) { participant in
                 Button {
                     memberTapped(participant.member)

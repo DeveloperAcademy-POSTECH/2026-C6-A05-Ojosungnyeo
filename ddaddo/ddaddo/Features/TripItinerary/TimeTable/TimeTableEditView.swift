@@ -373,8 +373,8 @@ private struct TimeTableEditContent: View {
 
                 ScrollView(.horizontal) {
                     HStack(spacing: spacing) {
-                        ForEach(Array(row.sources.enumerated()), id: \.offset) { item in
-                            sourceCard(item.element, rowID: row.id, width: cardWidth)
+                        ForEach(row.sources, id: \.self) { source in
+                            sourceCard(source, rowID: row.id, width: cardWidth)
                         }
                     }
                 }
@@ -633,8 +633,8 @@ private struct TimeTableEditContent: View {
         switch dragging {
         case let .recommendation(id):
             store.send(.recommendationDropped(id, before: targetID))
-        case let .row(id, _):
-            store.send(.scheduleRowMoved(id, before: targetID))
+        case let .row(id, source):
+            store.send(.scheduleRowMoved(id, source: source, before: targetID))
         }
         self.dragging = nil
         return true
@@ -644,7 +644,7 @@ private struct TimeTableEditContent: View {
         guard let dragging else { return false }
         switch dragging {
         case let .recommendation(id): store.send(.recommendationMerged(id, into: rowID))
-        case let .row(id, _): store.send(.rowMerged(id, into: rowID))
+        case let .row(id, source): store.send(.rowMerged(id, source: source, into: rowID))
         }
         self.dragging = nil
         return true

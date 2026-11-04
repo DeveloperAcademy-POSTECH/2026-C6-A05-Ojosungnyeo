@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 struct TimeTableEditRow: Equatable, Identifiable {
-    enum Source: Equatable {
+    enum Source: Hashable {
         case schedule(TimeTableSchedule.ID)
         case recommendationGroup(String)
     }
@@ -68,8 +68,8 @@ struct TimeTableEditFeature: Reducer {
         case placeSearchFailed(String)
         case placeSearchResultTapped(PlaceSearchResult)
         case recommendationDropped(String, before: TimeTableEditRow.ID?)
-        case scheduleRowMoved(TimeTableEditRow.ID, before: TimeTableEditRow.ID?)
-        case rowMerged(TimeTableEditRow.ID, into: TimeTableEditRow.ID)
+        case scheduleRowMoved(TimeTableEditRow.ID, source: TimeTableEditRow.Source, before: TimeTableEditRow.ID?)
+        case rowMerged(TimeTableEditRow.ID, source: TimeTableEditRow.Source, into: TimeTableEditRow.ID)
         case recommendationMerged(String, into: TimeTableEditRow.ID)
         case deletionRequested(TripDay, rowID: TimeTableEditRow.ID, source: TimeTableEditRow.Source)
         case deletionCancelled

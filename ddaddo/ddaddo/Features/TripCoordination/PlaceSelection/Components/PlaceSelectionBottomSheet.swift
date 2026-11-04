@@ -63,18 +63,22 @@ struct PlaceSelectionBottomSheet: View {
     private var avatarGroup: some View {
         HStack(spacing: DDSpacing.small) {
             ForEach(participants) { participant in
-                Button {
-                    if participant.hasJoined {
+                if participant.hasJoined {
+                    Button {
                         memberTapped(participant.member)
+                    } label: {
+                        PlaceSelectionParticipantAvatar(
+                            participant: participant,
+                            isSelected: selectedMember == participant.member
+                        )
                     }
-                } label: {
+                    .buttonStyle(.plain)
+                } else {
                     PlaceSelectionParticipantAvatar(
                         participant: participant,
-                        isSelected: selectedMember == participant.member
+                        isSelected: false
                     )
                 }
-                .buttonStyle(.plain)
-                .allowsHitTesting(participant.hasJoined)
             }
         }
     }

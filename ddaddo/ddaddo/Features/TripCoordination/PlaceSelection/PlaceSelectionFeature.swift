@@ -513,8 +513,14 @@ struct PlaceSelectionFeature: Reducer {
 
             case .searchFieldTapped:
                 state.selectedMember = state.currentMember
+                let shouldResetSearch = state.selectedPlace == nil
+                if shouldResetSearch {
+                    state.placeSearch = PlaceSearchFeature.State()
+                }
                 state.isSearchPresented = true
-                return .none
+                return shouldResetSearch
+                    ? .cancel(id: "place-search")
+                    : .none
 
             case let .searchTextChanged(text):
                 state.searchText = text

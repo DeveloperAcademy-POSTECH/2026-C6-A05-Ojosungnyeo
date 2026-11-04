@@ -271,10 +271,12 @@ struct PlaceSelectionView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .regular))
-                            .foregroundStyle(DDColor.iconDefault)
+                            .foregroundStyle(DDColor.textPrimary)
                             .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("검색 초기화")
                 }
                 .padding(.horizontal, DDSpacing.xLarge)
                 .frame(height: 41)

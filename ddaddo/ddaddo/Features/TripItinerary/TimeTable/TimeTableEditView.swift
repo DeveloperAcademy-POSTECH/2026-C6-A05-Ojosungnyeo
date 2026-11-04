@@ -75,7 +75,7 @@ struct TimeTableEditView: View {
                         cancelTitle: "아니요",
                         confirmTitle: "네",
                         cancelColor: DDColor.actionPrimary,
-                        confirmColor: Color(red: 217 / 255, green: 217 / 255, blue: 217 / 255),
+                        confirmColor: DDColor.actionPrimary,
                         onCancel: { store.send(.deletionCancelled) },
                         onConfirm: { store.send(.deletionConfirmed) }
                     )

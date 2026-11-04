@@ -14,15 +14,39 @@ struct SelectedPlaceBottomSheet: View {
     let canAdd: Bool
     let isAlreadyAdded: Bool
     let fallbackImageName: String?
+    let bottomSafeAreaInset: CGFloat
     let closeButtonTapped: () -> Void
     let addButtonTapped: () -> Void
 
+    @State private var isCopyToastPresented = false
+
+    init(
+        place: PlaceDetails,
+        isLoading: Bool,
+        canAdd: Bool,
+        isAlreadyAdded: Bool,
+        fallbackImageName: String?,
+        bottomSafeAreaInset: CGFloat = 34,
+        closeButtonTapped: @escaping () -> Void,
+        addButtonTapped: @escaping () -> Void
+    ) {
+        self.place = place
+        self.isLoading = isLoading
+        self.canAdd = canAdd
+        self.isAlreadyAdded = isAlreadyAdded
+        self.fallbackImageName = fallbackImageName
+        self.bottomSafeAreaInset = bottomSafeAreaInset
+        self.closeButtonTapped = closeButtonTapped
+        self.addButtonTapped = addButtonTapped
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        ZStack(alignment: .top) {
+            DDColor.surfaceDefault
+
             Capsule()
                 .fill(DDColor.actionSecondary)
                 .frame(width: 142, height: 4)
-                .frame(maxWidth: .infinity)
                 .padding(.top, 19)
 
             HStack {
@@ -49,58 +73,115 @@ struct SelectedPlaceBottomSheet: View {
                     .clipShape(.capsule)
                     .disabled(!canAdd)
             }
-            .padding(.top, 10)
+            .padding(.horizontal, DDSpacing.large)
+            .padding(.top, 20)
 
-            Text(place.name)
-                .ddTypography(.heading18)
-                .foregroundStyle(DDColor.textPrimary)
-                .lineLimit(1)
-                .padding(.top, 8)
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(place.name)
+                        .ddTypography(.heading18)
+                        .foregroundStyle(DDColor.textPrimary)
+                        .lineLimit(1)
 
-            ratingView
-                .padding(.top, 2)
-
-            Text(place.category)
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.top, DDSpacing.small)
-
-            Button {
-                UIPasteboard.general.string = place.address
-            } label: {
-                HStack(alignment: .bottom, spacing: DDSpacing.xSmall) {
-                    Text(place.address)
-                        .ddTypography(.label14)
-                        .foregroundStyle(DDColor.textTertiary)
-                        .underline()
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    Image(systemName: "document.on.document")
-                        .font(.system(size: 14))
-                        .foregroundStyle(DDColor.textTertiary)
+                    ratingView
                 }
-                .contentShape(Rectangle())
+                .frame(height: 52, alignment: .top)
+
+                Text(place.category)
+                    .ddTypography(.label14)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .frame(height: 20, alignment: .topLeading)
+
+                Button {
+                    UIPasteboard.general.string = place.address
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isCopyToastPresented = true
+                    }
+                } label: {
+                    HStack(alignment: .bottom, spacing: DDSpacing.xSmall) {
+                        Text(place.address)
+                            .ddTypography(.label14)
+                            .foregroundStyle(DDColor.textTertiary)
+                            .underline()
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+
+                        Image(systemName: "document.on.document")
+                            .font(.system(size: 14))
+                            .foregroundStyle(DDColor.textTertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("주소 복사")
+                .accessibilityHint("클립보드에 장소 주소를 복사합니다")
+                .frame(height: 50, alignment: .topLeading)
+
+                photoStrip
+                    .padding(.top, DDSpacing.small)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("주소 복사")
-            .accessibilityHint("클립보드에 장소 주소를 복사합니다")
-            .padding(.top, 2)
+            .padding(.horizontal, DDSpacing.large)
+            .padding(.top, 60)
 
-            photoStrip
-                .padding(.top, 18)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, DDSpacing.large)
-        .frame(maxWidth: .infinity)
-        .frame(height: 389)
-        .background(DDColor.surfaceDefault)
-        .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay {
             if isLoading {
                 ProgressView()
                     .tint(DDColor.actionPrimary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 355 + bottomSafeAreaInset)
+        .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .overlay {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+                .stroke(DDColor.borderDefault, lineWidth: 1)
+        }
+        .overlay(alignment: .bottom) {
+            if isCopyToastPresented {
+                Text("주소가 복사되었어요")
+                    .font(.custom("Pretendard-Regular", size: 15))
+                    .foregroundStyle(
+                        Color(
+                            red: 123 / 255,
+                            green: 123 / 255,
+                            blue: 123 / 255
+                        )
+                    )
+                    .frame(width: 240, height: 34)
+                    .background(
+                        Color(
+                            red: 37 / 255,
+                            green: 37 / 255,
+                            blue: 37 / 255
+                        )
+                    )
+                    .clipShape(.capsule)
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color(
+                                    red: 72 / 255,
+                                    green: 72 / 255,
+                                    blue: 72 / 255
+                                ),
+                                lineWidth: 1.25
+                            )
+                    }
+                    .padding(.bottom, max(12, bottomSafeAreaInset - 5))
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .task(id: isCopyToastPresented) {
+            guard isCopyToastPresented else { return }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.2)) {
+                isCopyToastPresented = false
             }
         }
     }

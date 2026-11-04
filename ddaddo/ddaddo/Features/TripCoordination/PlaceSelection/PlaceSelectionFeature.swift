@@ -139,6 +139,10 @@ struct PlaceSelectionFeature: Reducer {
             selectedMember == currentMember
         }
 
+        var canEditDisplayedPlaces: Bool {
+            isViewingCurrentUser && !isCurrentUserConfirmed && !hasSelectionEnded
+        }
+
         var canConfirmPlaceSelection: Bool {
             !memberPlaces[currentMember, default: []].isEmpty
                 && !isCurrentUserConfirmed
@@ -365,6 +369,7 @@ struct PlaceSelectionFeature: Reducer {
         case pinnedPlaceDetailsResponse(String, PlaceDetails)
         case pinnedPlaceDetailsFailed(String)
         case deletePinnedPlaceButtonTapped(String)
+        case movePinnedPlace(sourceID: String, beforeID: String)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
         case confirmedPlacesEditButtonTapped
@@ -654,6 +659,32 @@ struct PlaceSelectionFeature: Reducer {
                 return .run { send in
                     do {
                         try await placeClient.deletePlace(tripID, placeID)
+                    } catch {
+                        await send(.placeMutationFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .movePinnedPlace(sourceID, beforeID):
+                guard state.isViewingCurrentUser else { return .none }
+                var places = state.memberPlaces[state.currentMember, default: []]
+                guard
+                    sourceID != beforeID,
+                    let sourceIndex = places.firstIndex(where: { $0.id == sourceID }),
+                    let destinationIndex = places.firstIndex(where: { $0.id == beforeID })
+                else { return .none }
+
+                let place = places.remove(at: sourceIndex)
+                let adjustedDestination = sourceIndex < destinationIndex
+                    ? destinationIndex - 1
+                    : destinationIndex
+                places.insert(place, at: adjustedDestination)
+                state.memberPlaces[state.currentMember] = places
+
+                let tripID = state.tripID
+                let reorderedPlaces = places
+                return .run { send in
+                    do {
+                        try await placeClient.replacePlaces(tripID, reorderedPlaces)
                     } catch {
                         await send(.placeMutationFailed(error.localizedDescription))
                     }

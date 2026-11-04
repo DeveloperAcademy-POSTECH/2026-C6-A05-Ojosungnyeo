@@ -14,6 +14,7 @@ struct PlaceClient: DependencyKey, Sendable {
     var observeMemberPlaces: @Sendable (String) -> AsyncThrowingStream<[MemberPlacePins], Error>
     var savePlace: @Sendable (String, PinnedPlace) async throws -> Void
     var deletePlace: @Sendable (String, String) async throws -> Void
+    var replacePlaces: @Sendable (String, [PinnedPlace]) async throws -> Void
     var confirmPlaces: @Sendable (String) async throws -> Void
     var confirmGroups: @Sendable (String, [String]) async throws -> Void
     var fetchGroupConfirmations: @Sendable (String) async throws -> [MemberGroupConfirmation]
@@ -40,6 +41,12 @@ struct PlaceClient: DependencyKey, Sendable {
             deletePlace: { tripID, placeID in
                 try await FirebasePlaceSelectionService.deletePlace(
                     placeID: placeID,
+                    tripID: tripID
+                )
+            },
+            replacePlaces: { tripID, places in
+                try await FirebasePlaceSelectionService.replacePlaces(
+                    places,
                     tripID: tripID
                 )
             },
@@ -80,6 +87,7 @@ struct PlaceClient: DependencyKey, Sendable {
         observeMemberPlaces: { _ in AsyncThrowingStream { $0.finish() } },
         savePlace: { _, _ in },
         deletePlace: { _, _ in },
+        replacePlaces: { _, _ in },
         confirmPlaces: { _ in },
         confirmGroups: { _, _ in },
         fetchGroupConfirmations: { _ in [] },

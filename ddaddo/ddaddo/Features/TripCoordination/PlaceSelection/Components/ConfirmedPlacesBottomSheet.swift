@@ -8,6 +8,8 @@ import SwiftUI
 struct ConfirmedPlacesBottomSheet: View {
     let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
+    var bottomSafeAreaInset: CGFloat = 34
+    let memberTapped: (TripMember) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DDSpacing.zero) {
@@ -19,10 +21,15 @@ struct ConfirmedPlacesBottomSheet: View {
 
             HStack(spacing: DDSpacing.small) {
                 ForEach(participants.filter(\.hasJoined)) { participant in
-                    PlaceSelectionParticipantAvatar(
-                        participant: participant,
-                        isSelected: participant.isConfirmed
-                    )
+                    Button {
+                        memberTapped(participant.member)
+                    } label: {
+                        PlaceSelectionParticipantAvatar(
+                            participant: participant,
+                            isSelected: participant.isConfirmed
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 Spacer(minLength: DDSpacing.small)
@@ -37,7 +44,7 @@ struct ConfirmedPlacesBottomSheet: View {
             }
             .padding(.top, DDSpacing.xLarge)
 
-            Text("전체 여행 일정")
+            Text("확정된 장소")
                 .ddTypography(.bodyEmphasis16)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.top, 14)
@@ -64,7 +71,7 @@ struct ConfirmedPlacesBottomSheet: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: 535, alignment: .top)
+        .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
     }

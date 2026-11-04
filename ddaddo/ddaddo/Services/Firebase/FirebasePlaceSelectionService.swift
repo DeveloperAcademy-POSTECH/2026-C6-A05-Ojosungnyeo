@@ -123,6 +123,15 @@ enum FirebasePlaceSelectionService {
         ], merge: true)
     }
 
+    static func replacePlaces(_ places: [PinnedPlace], tripID: String) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        try await participant.setData([
+            "selectedPlaces": places.map(placeData),
+            "placeSelectionConfirmed": false,
+            "updatedAt": FieldValue.serverTimestamp()
+        ], merge: true)
+    }
+
     static func confirmPlaces(tripID: String) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
         try await participant.setData(

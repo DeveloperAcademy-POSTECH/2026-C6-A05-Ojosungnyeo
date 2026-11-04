@@ -50,12 +50,18 @@ struct PlaceSelectionView: View {
 
             }
 
-            if store.isShowingConfirmedPlaces {
+            if store.isShowingConfirmedPlaces
+                && !store.isMemberPlacesSheetPresented
+                && store.selectedPlace == nil {
                 ConfirmedPlacesBottomSheet(
                     participants: store.participants,
-                    places: store.confirmedPlaces
+                    places: store.confirmedPlaces,
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    memberTapped: { member in
+                        store.send(.memberProfileTapped(member))
+                    }
                 )
-                .frame(height: 413, alignment: .top)
+                .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
             } else if let selectedPlace = store.selectedPlace {
@@ -65,6 +71,7 @@ struct PlaceSelectionView: View {
                     canAdd: store.canAddSelectedPlace,
                     isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
                     fallbackImageName: store.selectedPinnedPlace?.thumbnailName,
+                    bottomSafeAreaInset: bottomSafeAreaInset,
                     closeButtonTapped: {
                         store.send(.selectedPlaceCloseButtonTapped)
                     },
@@ -79,7 +86,7 @@ struct PlaceSelectionView: View {
                     selectedMember: store.selectedMember,
                     participants: store.participants,
                     places: store.displayedPlaces,
-                    canDeletePlaces: store.isViewingCurrentUser,
+                    canDeletePlaces: store.canEditDisplayedPlaces,
                     canConfirm: store.canConfirmPlaceSelection,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
@@ -88,6 +95,8 @@ struct PlaceSelectionView: View {
                     store.send(.pinnedPlaceTapped(place))
                 } deletePlace: { place in
                     store.send(.deletePinnedPlaceButtonTapped(place.id))
+                } movePlace: { sourceID, targetID in
+                    store.send(.movePinnedPlace(sourceID: sourceID, beforeID: targetID))
                 } confirmButtonTapped: {
                     store.send(.confirmButtonTapped)
                 }
@@ -315,8 +324,13 @@ struct PlaceSelectionView: View {
     }
 
     private var currentMemberSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 413 : 110
-        return min(413, max(110, restingHeight - sheetDragTranslation))
+        let expandedHeight = 379 + bottomSafeAreaInset
+        let collapsedHeight = 76 + bottomSafeAreaInset
+        let restingHeight = store.isBottomSheetExpanded ? expandedHeight : collapsedHeight
+        return min(
+            expandedHeight,
+            max(collapsedHeight, restingHeight - sheetDragTranslation)
+        )
     }
 
     private var sheetDragGesture: some Gesture {

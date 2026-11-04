@@ -45,10 +45,6 @@ struct TripItineraryFeature: Reducer {
                 }
                 return .none
 
-            case .routeOverview(.editingDoneButtonTapped):
-                state.applyRouteEditsToTimeTable()
-                return .none
-
             case .routeOverview(.backButtonTapped):
                 return .send(.delegate(.returnToUpcomingTrips))
 
@@ -91,36 +87,6 @@ private extension TripItineraryFeature.State {
             placements: timeTable.placements,
             coursesByID: timeTable.coursesByID
         )
-    }
-
-    mutating func applyRouteEditsToTimeTable() {
-        guard let draftStopsByDay = routeOverview.draftStopsByDay else { return }
-
-        let retainedScheduleIDs = Set(
-            draftStopsByDay.values
-                .flatMap { $0 }
-                .compactMap(\.scheduleID)
-        )
-        timeTable.placements.removeAll { !retainedScheduleIDs.contains($0.id) }
-
-        for day in TripDay.allCases {
-            let orderedStops = draftStopsByDay[day, default: []].sorted {
-                $0.order == $1.order ? $0.id < $1.id : $0.order < $1.order
-            }
-            let existingMinutes = timeTable.placements
-                .filter { $0.day == day }
-                .map(\.timing.startMinuteOfDay)
-                .sorted()
-
-            for (index, stop) in orderedStops.enumerated() {
-                guard let scheduleID = stop.scheduleID,
-                      let placementIndex = timeTable.placements.firstIndex(where: { $0.id == scheduleID })
-                else { continue }
-                let fallbackMinute = (existingMinutes.last ?? 9 * 60) + max(0, index - existingMinutes.count + 1) * 60
-                timeTable.placements[placementIndex].timing.startMinuteOfDay =
-                    existingMinutes.indices.contains(index) ? existingMinutes[index] : fallbackMinute
-            }
-        }
     }
 
     mutating func addPlace(_ place: PlaceDetails, to day: TripDay) {

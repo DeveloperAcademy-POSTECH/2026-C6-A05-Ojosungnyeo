@@ -25,9 +25,9 @@ struct TimeTableFeature: Reducer {
         var dayOfMonthByDay: [TripDay: Int] = [
             .day1: 22, .day2: 23, .day3: 24, .day4: 25
         ]
-        var coursesByID = TimeTableCourse.mockCoursesByID
-        var groups = TimeTableGroup.mockGroups
-        var placements = TimeTableSchedule.mockPlacements
+        var coursesByID: [TimeTableCourse.ID: TimeTableCourse] = [:]
+        var groups: [TimeTableGroup] = []
+        var placements: [TimeTableSchedule] = []
         var isEditing = false
         var edit = TimeTableEditFeature.State()
         #if DEBUG
@@ -474,11 +474,6 @@ struct TimeTableGroup: Equatable, Identifiable {
             .map { "\($0)명" }
             .joined(separator: " · ")
     }
-
-    static let mockGroups = [
-        TimeTableGroup(id: 0, name: "신주쿠", courseIDs: [400, 401]),
-        TimeTableGroup(id: 1, name: "주오", courseIDs: [402])
-    ]
 }
 
 struct TimeTableCourse: Equatable, Identifiable {
@@ -517,27 +512,6 @@ struct TimeTableCourse: Equatable, Identifiable {
         return remainingCount > 0 ? "\(names) 외 \(remainingCount)곳" : names
     }
 
-    static let mockCoursesByID: [ID: Self] = {
-        let courses: [Self] = [
-            .init(id: 0, title: "도쿄역 쇼핑 코스", placeCount: 4, placeNames: ["TK 빈티지샵", "HABARI"], members: [.tae, .header], durationMinutes: 240),
-            .init(id: 1, title: "치이카와 뮤지엄 코스", placeCount: 4, placeNames: ["치이카와랜드"], members: [.grae, .juni], durationMinutes: 240),
-            .init(id: 2, title: "파르페 먹방 코스", placeCount: 4, placeNames: ["말차 파르페 센터"], members: [.grae, .header, .juni, .tae], durationMinutes: 210),
-            .init(id: 100, title: "아사쿠사 산책 코스", placeCount: 3, placeNames: ["센소지", "나카미세도리"], members: [.tae, .juni], durationMinutes: 180),
-            .init(id: 101, title: "우에노 문화 코스", placeCount: 4, placeNames: ["우에노 공원", "도쿄 국립박물관"], members: [.header, .grae], durationMinutes: 240),
-            .init(id: 102, title: "아키하바라 야경 코스", placeCount: 3, placeNames: ["아키하바라 전자상가"], members: TripMember.allCases, durationMinutes: 180),
-            .init(id: 200, title: "하라주쿠 쇼핑 코스", placeCount: 4, placeNames: ["타케시타도리", "캐트스트리트"], members: [.tae, .grae], durationMinutes: 240),
-            .init(id: 201, title: "시부야 디저트 코스", placeCount: 3, placeNames: ["하치 카페"], members: [.header, .juni], durationMinutes: 180),
-            .init(id: 202, title: "시부야 야경 코스", placeCount: 3, placeNames: ["시부야 스카이"], members: TripMember.allCases, durationMinutes: 180),
-            .init(id: 302, title: "긴자 브런치 코스", placeCount: 2, placeNames: ["긴자 카페"], members: [.tae], durationMinutes: 120),
-            .init(id: 303, title: "도쿄역 마지막 쇼핑", placeCount: 3, placeNames: ["도쿄 캐릭터스트리트"], members: [.header, .grae, .juni], durationMinutes: 120),
-            .init(id: 300, title: "긴자 브런치 코스", placeCount: 2, placeNames: ["긴자 카페"], members: TripMember.allCases, durationMinutes: 120),
-            .init(id: 301, title: "도쿄역 마지막 쇼핑", placeCount: 3, placeNames: ["도쿄 캐릭터스트리트"], members: TripMember.allCases, durationMinutes: 180),
-            .init(id: 400, title: "신주쿠 쇼핑 코스", placeCount: 2, placeNames: ["루미네 신주쿠", "이세탄 신주쿠"], members: [.grae, .juni], durationMinutes: 240),
-            .init(id: 401, title: "신주쿠 카페 코스", placeCount: 2, placeNames: ["카페 알리야", "신주쿠 교엔"], members: [.tae], durationMinutes: 120),
-            .init(id: 402, title: "주오 맛집 투어", placeCount: 2, placeNames: ["오이시 돈코츠 라멘", "말차 카페"], members: TripMember.allCases, durationMinutes: 240)
-        ]
-        return Dictionary(uniqueKeysWithValues: courses.map { ($0.id, $0) })
-    }()
 }
 
 struct TimeTableSchedule: Equatable, Identifiable {
@@ -586,21 +560,6 @@ struct TimeTableSchedule: Equatable, Identifiable {
         return false
     }
 
-    static let mockPlacements: [Self] = [
-        .init(id: 0, courseID: 0, day: .day1, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
-        .init(id: 1, courseID: 1, day: .day1, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
-        .init(id: 2, courseID: 2, day: .day1, timing: .init(startHour: 14, startMinute: 30), branchGroupID: nil),
-        .init(id: 100, courseID: 100, day: .day2, timing: .init(startHour: 9, startMinute: 30), branchGroupID: 0),
-        .init(id: 101, courseID: 101, day: .day2, timing: .init(startHour: 13, startMinute: 0), branchGroupID: 0),
-        .init(id: 102, courseID: 102, day: .day2, timing: .init(startHour: 18, startMinute: 0), branchGroupID: nil),
-        .init(id: 200, courseID: 200, day: .day3, timing: .init(startHour: 10, startMinute: 0), branchGroupID: 0),
-        .init(id: 201, courseID: 201, day: .day3, timing: .init(startHour: 14, startMinute: 30), branchGroupID: 0),
-        .init(id: 202, courseID: 202, day: .day3, timing: .init(startHour: 19, startMinute: 0), branchGroupID: nil),
-        .init(id: 302, courseID: 302, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: 0),
-        .init(id: 303, courseID: 303, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: 0),
-        .init(id: 300, courseID: 300, day: .day4, timing: .init(startHour: 9, startMinute: 0), branchGroupID: nil),
-        .init(id: 301, courseID: 301, day: .day4, timing: .init(startHour: 11, startMinute: 30), branchGroupID: nil)
-    ]
 }
 
 private struct TimeTableOccupiedInterval {

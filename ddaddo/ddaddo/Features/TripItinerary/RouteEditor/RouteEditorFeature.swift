@@ -20,7 +20,7 @@ struct RouteEditorFeature: Reducer {
         var selectedPlace: PlaceDetails?
         var isPlaceDetailsLoading = false
         var isDaySelectionPresented = false
-        var availableDays = TripDay.allCases
+        var availableDays: [TripDay] = [.day1]
     }
 
     @CasePathable

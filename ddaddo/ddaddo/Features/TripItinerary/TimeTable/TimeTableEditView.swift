@@ -346,7 +346,7 @@ private struct TimeTableEditContent: View {
                             insertionDropArea(before: row.id)
                                 .padding(.leading, 48)
                                 .padding(.trailing, DDSpacing.large)
-                                .offset(y: -DDSpacing.xLarge / 2)
+                                .offset(y: -(DDSpacing.xLarge / 2 + DDSpacing.small))
                         }
                     }
                 }
@@ -534,7 +534,7 @@ private struct TimeTableEditContent: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: DDSpacing.xLarge)
+        .frame(height: DDSpacing.large)
         .contentShape(Rectangle())
         .background(dropFrame("append"))
     }

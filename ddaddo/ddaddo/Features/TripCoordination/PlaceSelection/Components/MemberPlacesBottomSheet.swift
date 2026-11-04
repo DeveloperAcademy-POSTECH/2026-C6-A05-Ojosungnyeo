@@ -22,6 +22,8 @@ struct MemberPlacesBottomSheet: View {
     let places: [PinnedPlace]
     let canDeletePlaces: Bool
     let canConfirm: Bool
+    let showsConfirmationButton: Bool
+    let isConfirmationComplete: Bool
     var bottomContentInset: CGFloat = DDSpacing.xLarge
     let memberTapped: (TripMember) -> Void
     let placeTapped: (PinnedPlace) -> Void
@@ -98,6 +100,16 @@ struct MemberPlacesBottomSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .overlay {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+            .stroke(DDColor.borderDefault, lineWidth: 1)
+            .allowsHitTesting(false)
+        }
     }
 
     private var memberSelector: some View {
@@ -123,14 +135,27 @@ struct MemberPlacesBottomSheet: View {
 
             Spacer(minLength: DDSpacing.small)
 
-            Button("확정하기", action: confirmButtonTapped)
+            if showsConfirmationButton {
+                Button(
+                    isConfirmationComplete ? "확정완료" : "확정하기",
+                    action: confirmButtonTapped
+                )
                 .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
-                .foregroundStyle(canConfirm ? DDColor.textOnPrimary : DDColor.textTertiary)
+                .foregroundStyle(
+                    isConfirmationComplete || canConfirm
+                        ? DDColor.textOnPrimary
+                        : DDColor.textTertiary
+                )
                 .padding(.horizontal, DDSpacing.medium)
                 .frame(height: 28)
-                .background(canConfirm ? DDColor.actionPrimary : DDColor.surfaceControl)
+                .background(
+                    isConfirmationComplete || canConfirm
+                        ? DDColor.actionPrimary
+                        : DDColor.surfaceControl
+                )
                 .clipShape(.capsule)
-                .disabled(!canConfirm)
+                .disabled(isConfirmationComplete || !canConfirm)
+            }
         }
     }
 

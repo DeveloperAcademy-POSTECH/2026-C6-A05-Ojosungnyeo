@@ -20,16 +20,23 @@ struct ConfirmedPlacesBottomSheet: View {
                 .padding(.top, 19)
 
             HStack(spacing: DDSpacing.small) {
-                ForEach(participants.filter(\.hasJoined)) { participant in
-                    Button {
-                        memberTapped(participant.member)
-                    } label: {
+                ForEach(participants) { participant in
+                    if participant.hasJoined {
+                        Button {
+                            memberTapped(participant.member)
+                        } label: {
+                            PlaceSelectionParticipantAvatar(
+                                participant: participant,
+                                isSelected: participant.isConfirmed
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
                         PlaceSelectionParticipantAvatar(
                             participant: participant,
-                            isSelected: participant.isConfirmed
+                            isSelected: false
                         )
                     }
-                    .buttonStyle(.plain)
                 }
 
                 Spacer(minLength: DDSpacing.small)
@@ -74,5 +81,15 @@ struct ConfirmedPlacesBottomSheet: View {
         .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .overlay {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+            .stroke(DDColor.borderDefault, lineWidth: 1)
+            .allowsHitTesting(false)
+        }
     }
 }

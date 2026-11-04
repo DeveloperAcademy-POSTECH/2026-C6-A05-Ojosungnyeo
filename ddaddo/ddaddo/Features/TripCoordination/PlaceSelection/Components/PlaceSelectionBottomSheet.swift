@@ -58,6 +58,16 @@ struct PlaceSelectionBottomSheet: View {
                 topTrailingRadius: 40
             )
         )
+        .overlay {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+            .stroke(DDColor.borderDefault, lineWidth: 1)
+            .allowsHitTesting(false)
+        }
     }
 
     private var avatarGroup: some View {

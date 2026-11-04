@@ -457,7 +457,8 @@ struct PlaceSelectionFeature: Reducer {
                     if let index = state.participants.firstIndex(where: {
                         $0.member == pins.member
                     }) {
-                        state.participants[index].isConfirmed = pins.isConfirmed
+                        state.participants[index].isConfirmed =
+                            state.participants[index].isConfirmed || pins.isConfirmed
                     }
                 }
 
@@ -535,6 +536,7 @@ struct PlaceSelectionFeature: Reducer {
                 let shouldResetSearch = state.selectedPlace == nil
                 if shouldResetSearch {
                     state.placeSearch = PlaceSearchFeature.State()
+                    state.isMemberPlacesSheetPresented = true
                 }
                 state.isSearchPresented = true
                 return shouldResetSearch
@@ -549,6 +551,7 @@ struct PlaceSelectionFeature: Reducer {
                 state.selectedMember = state.currentMember
                 state.selectedPinnedPlace = nil
                 state.placeSearch = PlaceSearchFeature.State()
+                state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = false
                 state.isSearchPresented = true
                 return .cancel(id: "place-search")
@@ -572,17 +575,19 @@ struct PlaceSelectionFeature: Reducer {
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.isPlaceDetailsLoading = false
-                state.isMemberPlacesSheetPresented = false
+                state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = true
                 return .cancel(id: "place-search")
 
             case .selectedPlaceCloseButtonTapped:
+                state.searchText = ""
+                state.placeSearch = PlaceSearchFeature.State()
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.isPlaceDetailsLoading = false
                 state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = true
-                return .none
+                return .cancel(id: "place-search")
 
             case .addSelectedPlaceButtonTapped:
                 guard

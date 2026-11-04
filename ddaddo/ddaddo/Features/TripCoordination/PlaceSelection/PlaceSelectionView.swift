@@ -10,7 +10,6 @@ import SwiftUI
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
-    @Environment(\.dismiss) private var dismiss
     @GestureState private var sheetDragTranslation: CGFloat = 0
     @State private var bottomSafeAreaInset: CGFloat = 0
 
@@ -88,6 +87,8 @@ struct PlaceSelectionView: View {
                     places: store.displayedPlaces,
                     canDeletePlaces: store.canEditDisplayedPlaces,
                     canConfirm: store.canConfirmPlaceSelection,
+                    showsConfirmationButton: store.isViewingCurrentUser,
+                    isConfirmationComplete: store.isCurrentUserConfirmed,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
                     store.send(.memberProfileTapped(member))
@@ -212,10 +213,10 @@ struct PlaceSelectionView: View {
         HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
-                dismiss()
             } label: {
                 PlaceSelectionBackIcon()
-                    .frame(width: 44, height: 44)
+                    .frame(width: 24, height: 24)
+                    .frame(width: 24, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

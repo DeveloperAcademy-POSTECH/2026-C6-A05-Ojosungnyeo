@@ -17,8 +17,11 @@ struct PlaceSelectionView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             GoogleMapView(
-                selectedPlace: store.selectedPlace,
-                showsSelectedPlaceMarker: false,
+                selectedPlace: store.isPlaceDetailsLoading
+                    && store.selectedPinnedPlace == nil
+                    ? nil
+                    : store.selectedPlace,
+                showsSelectedPlaceMarker: store.selectedPinnedPlace == nil,
                 pinnedPlaces: store.mapPlaces,
                 showsPinnedPlaceNumbers: false,
                 onPinnedPlaceTapped: { place in

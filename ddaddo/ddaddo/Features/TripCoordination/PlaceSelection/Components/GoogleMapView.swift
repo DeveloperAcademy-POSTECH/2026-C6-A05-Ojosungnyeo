@@ -113,7 +113,9 @@ struct GoogleMapView: UIViewRepresentable {
     private func updateSelection(on mapView: GMSMapView, coordinator: Coordinator) {
         let signature: String
         if let selectedPlace {
-            signature = "selected:\(selectedPlace.id):marker:\(showsSelectedPlaceMarker)"
+            signature = "selected:\(selectedPlace.id)"
+                + ":\(selectedPlace.latitude),\(selectedPlace.longitude)"
+                + ":marker:\(showsSelectedPlaceMarker)"
         } else if let selectedCoordinate {
             signature = "\(selectedCoordinate.latitude),\(selectedCoordinate.longitude)"
         } else if !placeGroups.isEmpty {

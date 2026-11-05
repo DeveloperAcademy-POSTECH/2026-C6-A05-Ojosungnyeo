@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A4082CA63085064D0024DF57"
                BuildableName = "ddaddo.app"
+               BlueprintName = "ddaddo"
                ReferencedContainer = "container:ddaddo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -46,6 +47,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A4082CA63085064D0024DF57"
             BuildableName = "ddaddo.app"
+            BlueprintName = "ddaddo"
             ReferencedContainer = "container:ddaddo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -68,6 +70,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A4082CA63085064D0024DF57"
             BuildableName = "ddaddo.app"
+            BlueprintName = "ddaddo"
             ReferencedContainer = "container:ddaddo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

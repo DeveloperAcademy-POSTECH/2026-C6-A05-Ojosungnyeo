@@ -13,6 +13,7 @@ struct PlaceSelectionBottomSheet: View {
     let participants: [PlaceSelectionFeature.Participant]
     let destinationName: String
     let maximumPlaceCount: Int
+    let bottomSafeAreaInset: CGFloat
     let memberTapped: (TripMember) -> Void
     let searchButtonTapped: () -> Void
 
@@ -20,12 +21,12 @@ struct PlaceSelectionBottomSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             Capsule()
                 .fill(DDColor.actionSecondary)
-                .frame(width: 80, height: 4)
+                .frame(width: 142, height: 4)
                 .frame(maxWidth: .infinity)
-                .padding(.top, DDSpacing.large)
+                .padding(.top, 19)
 
             avatarGroup
-                .padding(.top, DDSpacing.large)
+                .padding(.top, DDSpacing.xLarge)
 
             if isExpanded {
                 Text("아직 추가한 장소가 없따...")
@@ -37,19 +38,19 @@ struct PlaceSelectionBottomSheet: View {
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textSecondary)
                     .lineSpacing(0)
-                    .padding(.top, DDSpacing.medium)
+                    .padding(.top, DDSpacing.large)
 
                 Spacer(minLength: DDSpacing.large)
 
                 DDCTAButton(title: "장소 검색하기", action: searchButtonTapped)
-                    .padding(.bottom, 45)
+                    .padding(.bottom, max(DDSpacing.xLarge, bottomSafeAreaInset + 11))
             } else {
                 Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: isExpanded ? 322 : 535)
+        .frame(height: (isExpanded ? 288 : 501) + bottomSafeAreaInset)
         .background(DDColor.surfaceDefault)
         .clipShape(
             .rect(
@@ -57,21 +58,37 @@ struct PlaceSelectionBottomSheet: View {
                 topTrailingRadius: 40
             )
         )
+        .overlay {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+            .stroke(DDColor.borderDefault, lineWidth: 1)
+            .allowsHitTesting(false)
+        }
     }
 
     private var avatarGroup: some View {
-        HStack(spacing: DDSpacing.xSmall) {
+        HStack(spacing: DDSpacing.small) {
             ForEach(participants) { participant in
-                Button {
-                    memberTapped(participant.member)
-                } label: {
+                if participant.hasJoined {
+                    Button {
+                        memberTapped(participant.member)
+                    } label: {
+                        PlaceSelectionParticipantAvatar(
+                            participant: participant,
+                            isSelected: selectedMember == participant.member
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else {
                     PlaceSelectionParticipantAvatar(
                         participant: participant,
-                        isSelected: selectedMember == participant.member
+                        isSelected: false
                     )
                 }
-                .buttonStyle(.plain)
-                .disabled(!participant.hasJoined)
             }
         }
     }
@@ -85,8 +102,19 @@ struct PlaceSelectionParticipantAvatar: View {
         ZStack(alignment: .topTrailing) {
             if participant.hasJoined {
                 DDMiniHeadAvatar(character: participant.member.avatar, size: 40)
-                    .saturation(isSelected ? 1 : 0.25)
-                    .opacity(isSelected ? 1 : 0.5)
+                    .overlay {
+                        if !isSelected {
+                            Circle()
+                                .fill(
+                                    Color(
+                                        red: 74 / 255,
+                                        green: 74 / 255,
+                                        blue: 74 / 255
+                                    )
+                                    .opacity(0.6)
+                                )
+                        }
+                    }
 
                 if participant.isConfirmed {
                     Circle()
@@ -103,13 +131,13 @@ struct PlaceSelectionParticipantAvatar: View {
                 ZStack {
                     Circle()
                         .stroke(
-                            DDColor.borderDefault,
-                            style: StrokeStyle(lineWidth: 1, dash: [4, 4])
+                            DDColor.textSecondary,
+                            style: StrokeStyle(lineWidth: 1, dash: [3, 3])
                         )
 
                     Image(systemName: "person")
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(DDColor.iconDefault)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(DDColor.textPrimary)
                 }
                 .accessibilityLabel("\(participant.name) 참여 대기")
             }

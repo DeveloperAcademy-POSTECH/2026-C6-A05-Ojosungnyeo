@@ -12,7 +12,7 @@ import Foundation
 struct PlaceSelectionFeature: Reducer {
     enum Delegate: Equatable {
         case proceedToAnalysis
-        case returnToUpcomingTrips
+        case returnToInvitation
     }
 
     enum CompletionAlert: Equatable {
@@ -34,7 +34,7 @@ struct PlaceSelectionFeature: Reducer {
         let id: Int
         let member: TripMember
         let name: String
-        let hasJoined: Bool
+        var hasJoined: Bool
         let isCurrentUser: Bool
         var isConfirmed: Bool
 
@@ -79,6 +79,7 @@ struct PlaceSelectionFeature: Reducer {
         var completionAlert: CompletionAlert?
         var placeSyncErrorMessage: String?
         var requestedPhotoPlaceIDs: Set<String> = []
+        var hasRestoredSavedPlacesPresentation = false
         var placeSearch = PlaceSearchFeature.State()
 
         init(
@@ -139,6 +140,10 @@ struct PlaceSelectionFeature: Reducer {
             selectedMember == currentMember
         }
 
+        var canEditDisplayedPlaces: Bool {
+            isViewingCurrentUser && !isCurrentUserConfirmed && !hasSelectionEnded
+        }
+
         var canConfirmPlaceSelection: Bool {
             !memberPlaces[currentMember, default: []].isEmpty
                 && !isCurrentUserConfirmed
@@ -149,19 +154,17 @@ struct PlaceSelectionFeature: Reducer {
             participants.first(where: \.isCurrentUser)?.isConfirmed == true
         }
 
-        var haveAllJoinedParticipantsConfirmed: Bool {
-            let joinedParticipants = participants.filter(\.hasJoined)
-            return !joinedParticipants.isEmpty
-                && joinedParticipants.allSatisfy(\.isConfirmed)
+        var haveAllParticipantsJoinedAndConfirmed: Bool {
+            !participants.isEmpty
+                && participants.allSatisfy { $0.hasJoined && $0.isConfirmed }
         }
 
         var completionAlertMessage: String {
             switch completionAlert {
             case .allMembersConfirmed:
-                let joinedCount = participants.filter(\.hasJoined).count
-                return "\(joinedCount)명 모두 장소핀을 확정했어요.\n이제 함께 갈 장소를 묶어볼까요?\n다음 그룹핑 단계로 넘어가세요."
+                return "\(participants.count)명 모두 장소핀을 확정했어요.\n이제 함께 갈 장소를 묶어볼까요?"
             case .selectionTimeExpired:
-                return "장소 선택 시간이 종료됐어요.\n지금까지 확정된 장소핀으로\n다음 그룹핑 단계를 시작해 볼까요?"
+                return "지금까지 확정된 장소핀으로\n다음 그룹핑 단계를 시작해 볼까요?"
             case nil:
                 return ""
             }
@@ -358,12 +361,14 @@ struct PlaceSelectionFeature: Reducer {
         case searchButtonTapped
         case dimmedBackgroundTapped
         case bottomSheetDragEnded(CGFloat)
-        case clearSelectedPlaceButtonTapped
+        case searchFieldClearButtonTapped
+        case selectedPlaceCloseButtonTapped
         case addSelectedPlaceButtonTapped
         case pinnedPlaceTapped(PinnedPlace)
         case pinnedPlaceDetailsResponse(String, PlaceDetails)
         case pinnedPlaceDetailsFailed(String)
         case deletePinnedPlaceButtonTapped(String)
+        case movePinnedPlace(sourceID: String, beforeID: String)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
         case confirmedPlacesEditButtonTapped
@@ -390,10 +395,8 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    return .merge(
-                        loadMemberPlacesEffect(tripID: state.tripID),
-                        .send(.delegate(.proceedToAnalysis))
-                    )
+                    state.completionAlert = .selectionTimeExpired
+                    return loadMemberPlacesEffect(tripID: state.tripID)
                 }
 
                 let tripID = state.tripID
@@ -436,6 +439,13 @@ struct PlaceSelectionFeature: Reducer {
                         }
                     }
                 var photoEffects: [Effect<Action>] = []
+                let joinedMembers = Set(memberPins.map(\.member))
+
+                for index in state.participants.indices {
+                    state.participants[index].hasJoined = joinedMembers.contains(
+                        state.participants[index].member
+                    )
+                }
 
                 for pins in memberPins {
                     state.memberPlaces[pins.member] = pins.places.map { place in
@@ -447,8 +457,19 @@ struct PlaceSelectionFeature: Reducer {
                     if let index = state.participants.firstIndex(where: {
                         $0.member == pins.member
                     }) {
-                        state.participants[index].isConfirmed = pins.isConfirmed
+                        state.participants[index].isConfirmed =
+                            state.participants[index].isConfirmed || pins.isConfirmed
                     }
+                }
+
+                if !state.hasRestoredSavedPlacesPresentation,
+                   !state.memberPlaces[state.currentMember, default: []].isEmpty,
+                   state.selectedPlace == nil,
+                   !state.isSearchPresented {
+                    state.hasRestoredSavedPlacesPresentation = true
+                    state.selectedMember = state.currentMember
+                    state.isMemberPlacesSheetPresented = true
+                    state.isBottomSheetExpanded = true
                 }
 
                 let placesNeedingPhotos = state.memberPlaces
@@ -464,7 +485,7 @@ struct PlaceSelectionFeature: Reducer {
                 photoEffects = placesNeedingPhotos.values.map(loadPlacePhotoEffect)
 
                 if state.isCurrentUserConfirmed,
-                   state.haveAllJoinedParticipantsConfirmed,
+                   state.haveAllParticipantsJoinedAndConfirmed,
                    !state.hasSelectionEnded,
                    state.completionAlert == nil {
                     state.isTimerRunning = false
@@ -508,12 +529,19 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .backButtonTapped:
-                return .send(.delegate(.returnToUpcomingTrips))
+                return .send(.delegate(.returnToInvitation))
 
             case .searchFieldTapped:
                 state.selectedMember = state.currentMember
+                let shouldResetSearch = state.selectedPlace == nil
+                if shouldResetSearch {
+                    state.placeSearch = PlaceSearchFeature.State()
+                    state.isMemberPlacesSheetPresented = true
+                }
                 state.isSearchPresented = true
-                return .none
+                return shouldResetSearch
+                    ? .cancel(id: "place-search")
+                    : .none
 
             case let .searchTextChanged(text):
                 state.searchText = text
@@ -522,9 +550,11 @@ struct PlaceSelectionFeature: Reducer {
             case .searchButtonTapped:
                 state.selectedMember = state.currentMember
                 state.selectedPinnedPlace = nil
+                state.placeSearch = PlaceSearchFeature.State()
+                state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = false
                 state.isSearchPresented = true
-                return .none
+                return .cancel(id: "place-search")
 
             case .dimmedBackgroundTapped:
                 state.isBottomSheetExpanded = false
@@ -539,13 +569,25 @@ struct PlaceSelectionFeature: Reducer {
                 }
                 return .none
 
-            case .clearSelectedPlaceButtonTapped:
+            case .searchFieldClearButtonTapped:
                 state.searchText = ""
+                state.placeSearch = PlaceSearchFeature.State()
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.isPlaceDetailsLoading = false
+                state.isMemberPlacesSheetPresented = true
                 state.isBottomSheetExpanded = true
-                return .none
+                return .cancel(id: "place-search")
+
+            case .selectedPlaceCloseButtonTapped:
+                state.searchText = ""
+                state.placeSearch = PlaceSearchFeature.State()
+                state.selectedPlace = nil
+                state.selectedPinnedPlace = nil
+                state.isPlaceDetailsLoading = false
+                state.isMemberPlacesSheetPresented = true
+                state.isBottomSheetExpanded = true
+                return .cancel(id: "place-search")
 
             case .addSelectedPlaceButtonTapped:
                 guard
@@ -641,6 +683,32 @@ struct PlaceSelectionFeature: Reducer {
                     }
                 }
 
+            case let .movePinnedPlace(sourceID, beforeID):
+                guard state.isViewingCurrentUser else { return .none }
+                var places = state.memberPlaces[state.currentMember, default: []]
+                guard
+                    sourceID != beforeID,
+                    let sourceIndex = places.firstIndex(where: { $0.id == sourceID }),
+                    let destinationIndex = places.firstIndex(where: { $0.id == beforeID })
+                else { return .none }
+
+                let place = places.remove(at: sourceIndex)
+                let adjustedDestination = sourceIndex < destinationIndex
+                    ? destinationIndex - 1
+                    : destinationIndex
+                places.insert(place, at: adjustedDestination)
+                state.memberPlaces[state.currentMember] = places
+
+                let tripID = state.tripID
+                let reorderedPlaces = places
+                return .run { send in
+                    do {
+                        try await placeClient.replacePlaces(tripID, reorderedPlaces)
+                    } catch {
+                        await send(.placeMutationFailed(error.localizedDescription))
+                    }
+                }
+
             case let .memberProfileTapped(member):
                 guard state.participants.contains(where: {
                     $0.member == member && $0.hasJoined
@@ -667,7 +735,7 @@ struct PlaceSelectionFeature: Reducer {
                 state.isBottomSheetExpanded = true
                 state.isEditingConfirmedPlaces = false
 
-                if state.haveAllJoinedParticipantsConfirmed {
+                if state.haveAllParticipantsJoinedAndConfirmed {
                     state.isTimerRunning = false
                     state.hasSelectionEnded = true
                     state.completionAlert = .allMembersConfirmed
@@ -691,7 +759,12 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .completionAlertConfirmButtonTapped:
-                guard state.completionAlert != nil else { return .none }
+                guard let completionAlert = state.completionAlert else { return .none }
+                if completionAlert == .allMembersConfirmed,
+                   !state.haveAllParticipantsJoinedAndConfirmed {
+                    state.completionAlert = nil
+                    return .none
+                }
                 state.completionAlert = nil
                 return .send(.delegate(.proceedToAnalysis))
 
@@ -703,10 +776,8 @@ struct PlaceSelectionFeature: Reducer {
                     state.hasSelectionEnded = true
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
-                    return .merge(
-                        .cancel(id: "place-selection-timer"),
-                        .send(.delegate(.proceedToAnalysis))
-                    )
+                    state.completionAlert = .selectionTimeExpired
+                    return .cancel(id: "place-selection-timer")
                 }
                 return .none
 

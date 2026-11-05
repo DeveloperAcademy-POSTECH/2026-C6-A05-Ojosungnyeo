@@ -8,6 +8,8 @@ import SwiftUI
 struct ConfirmedPlacesBottomSheet: View {
     let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
+    var bottomSafeAreaInset: CGFloat = 34
+    let memberTapped: (TripMember) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DDSpacing.zero) {
@@ -17,27 +19,39 @@ struct ConfirmedPlacesBottomSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 19)
 
-            HStack(spacing: DDSpacing.xSmall) {
-                ForEach(participants.filter(\.hasJoined)) { participant in
-                    PlaceSelectionParticipantAvatar(
-                        participant: participant,
-                        isSelected: participant.isConfirmed
-                    )
+            HStack(spacing: DDSpacing.small) {
+                ForEach(participants) { participant in
+                    if participant.hasJoined {
+                        Button {
+                            memberTapped(participant.member)
+                        } label: {
+                            PlaceSelectionParticipantAvatar(
+                                participant: participant,
+                                isSelected: participant.isConfirmed
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        PlaceSelectionParticipantAvatar(
+                            participant: participant,
+                            isSelected: false
+                        )
+                    }
                 }
 
                 Spacer(minLength: DDSpacing.small)
 
                 Text("확정완료")
-                    .ddTypography(.label14)
+                    .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
                     .foregroundStyle(DDColor.textOnPrimary)
                     .padding(.horizontal, DDSpacing.medium)
                     .frame(height: 28)
                     .background(DDColor.surfaceSelected)
                     .clipShape(.capsule)
             }
-            .padding(.top, 17)
+            .padding(.top, DDSpacing.xLarge)
 
-            Text("전체 여행 일정")
+            Text("확정된 장소")
                 .ddTypography(.bodyEmphasis16)
                 .foregroundStyle(DDColor.textPrimary)
                 .padding(.top, 14)
@@ -64,8 +78,18 @@ struct ConfirmedPlacesBottomSheet: View {
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: 535, alignment: .top)
+        .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .overlay {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+            .stroke(DDColor.borderDefault, lineWidth: 1)
+            .allowsHitTesting(false)
+        }
     }
 }

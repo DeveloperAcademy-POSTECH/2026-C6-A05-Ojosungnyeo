@@ -10,14 +10,17 @@ import SwiftUI
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
-    @Environment(\.dismiss) private var dismiss
     @GestureState private var sheetDragTranslation: CGFloat = 0
+    @State private var bottomSafeAreaInset: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
             GoogleMapView(
-                selectedPlace: store.selectedPlace,
-                showsSelectedPlaceMarker: false,
+                selectedPlace: store.isPlaceDetailsLoading
+                    && store.selectedPinnedPlace == nil
+                    ? nil
+                    : store.selectedPlace,
+                showsSelectedPlaceMarker: store.selectedPinnedPlace == nil,
                 pinnedPlaces: store.mapPlaces,
                 showsPinnedPlaceNumbers: false,
                 onPinnedPlaceTapped: { place in
@@ -46,12 +49,18 @@ struct PlaceSelectionView: View {
 
             }
 
-            if store.isShowingConfirmedPlaces {
+            if store.isShowingConfirmedPlaces
+                && !store.isMemberPlacesSheetPresented
+                && store.selectedPlace == nil {
                 ConfirmedPlacesBottomSheet(
                     participants: store.participants,
-                    places: store.confirmedPlaces
+                    places: store.confirmedPlaces,
+                    bottomSafeAreaInset: bottomSafeAreaInset,
+                    memberTapped: { member in
+                        store.send(.memberProfileTapped(member))
+                    }
                 )
-                .frame(height: 413, alignment: .top)
+                .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
                 .clipped()
                 .ignoresSafeArea(edges: .bottom)
             } else if let selectedPlace = store.selectedPlace {
@@ -61,8 +70,9 @@ struct PlaceSelectionView: View {
                     canAdd: store.canAddSelectedPlace,
                     isAlreadyAdded: store.isSelectedPlaceAlreadyAdded,
                     fallbackImageName: store.selectedPinnedPlace?.thumbnailName,
+                    bottomSafeAreaInset: bottomSafeAreaInset,
                     closeButtonTapped: {
-                        store.send(.clearSelectedPlaceButtonTapped)
+                        store.send(.selectedPlaceCloseButtonTapped)
                     },
                     addButtonTapped: {
                         store.send(.addSelectedPlaceButtonTapped)
@@ -75,8 +85,10 @@ struct PlaceSelectionView: View {
                     selectedMember: store.selectedMember,
                     participants: store.participants,
                     places: store.displayedPlaces,
-                    canDeletePlaces: store.isViewingCurrentUser,
+                    canDeletePlaces: store.canEditDisplayedPlaces,
                     canConfirm: store.canConfirmPlaceSelection,
+                    showsConfirmationButton: store.isViewingCurrentUser,
+                    isConfirmationComplete: store.isCurrentUserConfirmed,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
                 ) { member in
                     store.send(.memberProfileTapped(member))
@@ -84,6 +96,8 @@ struct PlaceSelectionView: View {
                     store.send(.pinnedPlaceTapped(place))
                 } deletePlace: { place in
                     store.send(.deletePinnedPlaceButtonTapped(place.id))
+                } movePlace: { sourceID, targetID in
+                    store.send(.movePinnedPlace(sourceID: sourceID, beforeID: targetID))
                 } confirmButtonTapped: {
                     store.send(.confirmButtonTapped)
                 }
@@ -103,6 +117,7 @@ struct PlaceSelectionView: View {
                     participants: store.participants,
                     destinationName: store.destinationName,
                     maximumPlaceCount: store.maximumPlaceCount,
+                    bottomSafeAreaInset: bottomSafeAreaInset,
                     memberTapped: { member in
                         store.send(.memberProfileTapped(member))
                     },
@@ -116,6 +131,17 @@ struct PlaceSelectionView: View {
                 .gesture(sheetDragGesture)
             }
 
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: BottomSafeAreaInsetPreferenceKey.self,
+                    value: geometry.safeAreaInsets.bottom
+                )
+            }
+        }
+        .onPreferenceChange(BottomSafeAreaInsetPreferenceKey.self) {
+            bottomSafeAreaInset = $0
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
@@ -187,14 +213,14 @@ struct PlaceSelectionView: View {
         HStack(spacing: 13) {
             Button {
                 store.send(.backButtonTapped)
-                dismiss()
             } label: {
                 PlaceSelectionBackIcon()
-                    .frame(width: 44, height: 44)
+                    .frame(width: 24, height: 24)
+                    .frame(width: 24, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("예정된 여행으로 돌아가기")
+            .accessibilityLabel("친구 초대 화면으로 돌아가기")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
@@ -251,14 +277,16 @@ struct PlaceSelectionView: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        store.send(.clearSelectedPlaceButtonTapped)
+                        store.send(.searchFieldClearButtonTapped)
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .regular))
-                            .foregroundStyle(DDColor.iconDefault)
+                            .foregroundStyle(DDColor.textPrimary)
                             .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("검색 초기화")
                 }
                 .padding(.horizontal, DDSpacing.xLarge)
                 .frame(height: 41)
@@ -287,13 +315,23 @@ struct PlaceSelectionView: View {
     }
 
     private var currentSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 322 : 110
-        return min(322, max(110, restingHeight - sheetDragTranslation))
+        let expandedHeight = 288 + bottomSafeAreaInset
+        let collapsedHeight = 76 + bottomSafeAreaInset
+        let restingHeight = store.isBottomSheetExpanded ? expandedHeight : collapsedHeight
+        return min(
+            expandedHeight,
+            max(collapsedHeight, restingHeight - sheetDragTranslation)
+        )
     }
 
     private var currentMemberSheetHeight: CGFloat {
-        let restingHeight: CGFloat = store.isBottomSheetExpanded ? 413 : 110
-        return min(413, max(110, restingHeight - sheetDragTranslation))
+        let expandedHeight = 379 + bottomSafeAreaInset
+        let collapsedHeight = 76 + bottomSafeAreaInset
+        let restingHeight = store.isBottomSheetExpanded ? expandedHeight : collapsedHeight
+        return min(
+            expandedHeight,
+            max(collapsedHeight, restingHeight - sheetDragTranslation)
+        )
     }
 
     private var sheetDragGesture: some Gesture {
@@ -304,6 +342,14 @@ struct PlaceSelectionView: View {
             .onEnded { value in
                 store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
             }
+    }
+}
+
+private struct BottomSafeAreaInsetPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

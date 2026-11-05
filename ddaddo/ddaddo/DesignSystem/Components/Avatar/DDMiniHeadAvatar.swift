@@ -21,7 +21,10 @@ struct DDMiniHeadAvatar: View {
             Image(character.rawValue)
                 .resizable()
                 .scaledToFit()
-                .frame(width: size * 0.86, height: size * 0.74)
+                .frame(
+                    width: size * character.faceWidthRatio,
+                    height: size * character.faceHeightRatio
+                )
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -29,6 +32,30 @@ struct DDMiniHeadAvatar: View {
 }
 
 extension ParticipantAvatar {
+    fileprivate var faceWidthRatio: CGFloat {
+        switch self {
+        case .tae, .header:
+            51 / 56
+        case .grae:
+            47.778 / 56
+        case .juni:
+            48 / 56
+        }
+    }
+
+    fileprivate var faceHeightRatio: CGFloat {
+        switch self {
+        case .tae:
+            45 / 56
+        case .header:
+            42 / 56
+        case .grae:
+            40.273 / 56
+        case .juni:
+            36 / 56
+        }
+    }
+
     var backgroundColor: Color {
         switch self {
         case .grae:

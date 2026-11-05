@@ -184,11 +184,14 @@ struct PlaceGroupingDetailFeature: Reducer {
                 else { return .none }
 
                 let place = state.places.remove(at: sourceIndex)
-                let adjustedDestination = sourceIndex < destinationIndex
-                    ? destinationIndex - 1
-                    : destinationIndex
-                state.places.insert(place, at: adjustedDestination)
-                return .none
+                if let beforeID,
+                   let destinationIndex = state.places.firstIndex(where: { $0.id == beforeID }) {
+                    state.places.insert(place, at: destinationIndex)
+                } else {
+                    state.places.append(place)
+                }
+                state.isGroupConfirmed = false
+                return .send(.delegate(.placesReordered(state.places.map(\.id))))
 
             case .confirmButtonTapped:
                 guard !state.isGroupConfirmed else { return .none }

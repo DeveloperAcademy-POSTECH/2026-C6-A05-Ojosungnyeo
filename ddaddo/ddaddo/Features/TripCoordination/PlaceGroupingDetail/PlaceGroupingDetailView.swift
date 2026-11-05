@@ -24,7 +24,9 @@ struct PlaceGroupingDetailView: View {
     @State private var dropFrames: [String: CGRect] = [:]
     @State private var insertionBeforePlaceID: String?
     @State private var isAppendTargeted = false
+    @State private var isTrashTargeted = false
     @State private var containerWidth: CGFloat = 0
+    @State private var containerHeight: CGFloat = 0
 
     private enum AutoScrollDirection {
         case up
@@ -34,6 +36,7 @@ struct PlaceGroupingDetailView: View {
     @State private var autoScrollDirection: AutoScrollDirection?
     private let appendTargetID = "placeGroupingAppendTarget"
     private let placeRowSpacing: CGFloat = 12
+    private let trashTargetHeight: CGFloat = 81
     private let autoScrollTimer = Timer.publish(
         every: 0.16,
         on: .main,
@@ -82,14 +85,41 @@ struct PlaceGroupingDetailView: View {
                 .zIndex(4)
             }
 
+            if store.isDeleteConfirmationPresented {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .zIndex(5)
+
+                DDConfirmationAlert(
+                    title: "장소 삭제하기",
+                    message: "이 장소를 진짜 삭제할까요?",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    cancelColor: DDColor.actionPrimary,
+                    onCancel: {
+                        store.send(.deleteConfirmationCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.deleteConfirmationConfirmTapped)
+                    }
+                )
+                .frame(maxHeight: .infinity)
+                .zIndex(6)
+            }
+
         }
         .coordinateSpace(name: "placeGroupingDetailDrag")
         .background {
             GeometryReader { proxy in
                 Color.clear
-                    .onAppear { containerWidth = proxy.size.width }
-                    .onChange(of: proxy.size.width) { _, width in
-                        containerWidth = width
+                    .onAppear {
+                        containerWidth = proxy.size.width
+                        containerHeight = proxy.size.height
+                    }
+                    .onChange(of: proxy.size) { _, size in
+                        containerWidth = size.width
+                        containerHeight = size.height
                     }
             }
         }
@@ -101,6 +131,13 @@ struct PlaceGroupingDetailView: View {
             .padding(.top, DDSpacing.xLarge)
             .padding(.bottom, 11)
             .background(DDColor.surfaceDefault)
+        }
+        .overlay(alignment: .bottom) {
+            if draggingPlaceID != nil {
+                trashDropOverlay
+                    .transition(.opacity)
+                    .zIndex(10)
+            }
         }
         .overlay {
             if let draggingPlaceID,
@@ -123,6 +160,10 @@ struct PlaceGroupingDetailView: View {
         .animation(
             .easeInOut(duration: 0.2),
             value: store.isJoinConfirmationPresented
+        )
+        .animation(
+            .easeInOut(duration: 0.2),
+            value: store.isDeleteConfirmationPresented
         )
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -396,17 +437,26 @@ struct PlaceGroupingDetailView: View {
     }
 
     private func updateDropTarget(at location: CGPoint) {
+        if trashTargetFrame.contains(location) {
+            insertionBeforePlaceID = nil
+            isAppendTargeted = false
+            isTrashTargeted = true
+            return
+        }
+
         if let insertionTarget = store.places.first(where: {
             dropFrames["insert:\($0.id)"]?.contains(location) == true
         })?.id {
             insertionBeforePlaceID = insertionTarget
             isAppendTargeted = false
+            isTrashTargeted = false
             return
         }
 
         if dropFrames["append"]?.contains(location) == true {
             insertionBeforePlaceID = nil
             isAppendTargeted = true
+            isTrashTargeted = false
             return
         }
 
@@ -423,18 +473,22 @@ struct PlaceGroupingDetailView: View {
                 insertionBeforePlaceID = nil
                 isAppendTargeted = true
             }
+            isTrashTargeted = false
             return
         }
 
         insertionBeforePlaceID = nil
         isAppendTargeted = false
+        isTrashTargeted = trashTargetFrame.contains(location)
     }
 
     private func commitDrop() {
         defer { finishDrag() }
         guard let draggingPlaceID else { return }
 
-        if let insertionBeforePlaceID {
+        if isTrashTargeted {
+            store.send(.deletePlaceTapped(draggingPlaceID))
+        } else if let insertionBeforePlaceID {
             store.send(.placeMoved(sourceID: draggingPlaceID, beforeID: insertionBeforePlaceID))
         } else if isAppendTargeted {
             store.send(.placeMoved(sourceID: draggingPlaceID, beforeID: nil))
@@ -447,6 +501,7 @@ struct PlaceGroupingDetailView: View {
             dragLocation = nil
             insertionBeforePlaceID = nil
             isAppendTargeted = false
+            isTrashTargeted = false
             autoScrollDirection = nil
         }
     }
@@ -485,6 +540,35 @@ struct PlaceGroupingDetailView: View {
             .frame(height: 2)
     }
 
+    private var trashDropOverlay: some View {
+        LinearGradient(
+            colors: [.clear, Color.black.opacity(0.8)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: min(trashTargetHeight, containerHeight))
+        .overlay {
+            Image(systemName: "trash")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(DDColor.actionPrimary)
+                .frame(width: 56, height: 56)
+                .scaleEffect(isTrashTargeted ? 1.15 : 1)
+                .animation(.easeInOut(duration: 0.15), value: isTrashTargeted)
+        }
+        .background(dropFrame("trash"))
+        .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(false)
+    }
+
+    private var trashTargetFrame: CGRect {
+        CGRect(
+            x: 0,
+            y: max(0, containerHeight - trashTargetHeight),
+            width: containerWidth,
+            height: trashTargetHeight
+        )
+    }
+
     private func updateAutoScrollDirection(at location: CGPoint) {
         guard let listFrame = dropFrames["list"] else {
             autoScrollDirection = nil
@@ -493,10 +577,12 @@ struct PlaceGroupingDetailView: View {
 
         let topEdgeThreshold: CGFloat = 52
         let bottomEdgeThreshold: CGFloat = 120
+        let trashBoundary = containerHeight - trashTargetHeight
         if location.y <= listFrame.minY + topEdgeThreshold,
            canAutoScroll(.up, in: listFrame) {
             autoScrollDirection = .up
         } else if location.y >= listFrame.maxY - bottomEdgeThreshold,
+                  location.y < trashBoundary,
                   canAutoScroll(.down, in: listFrame) {
             autoScrollDirection = .down
         } else {
@@ -695,6 +781,7 @@ private struct PlaceDragPreview: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58)
         .background(DDColor.surfaceElevated, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)

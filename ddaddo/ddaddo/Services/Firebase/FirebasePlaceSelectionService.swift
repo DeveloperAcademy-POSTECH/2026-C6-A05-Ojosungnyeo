@@ -220,6 +220,29 @@ enum FirebasePlaceSelectionService {
         )
     }
 
+    static func updateGroupingConfiguration(
+        tripID: String,
+        eventID: String,
+        transportation: String,
+        durationMinutes: Int
+    ) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        try await participant.setData(
+            [
+                "groupingConfigurationEvent": [
+                    "id": eventID,
+                    "transportation": transportation,
+                    "durationMinutes": durationMinutes,
+                    "createdAt": FieldValue.serverTimestamp()
+                ],
+                "groupingConfirmed": false,
+                "confirmedGroupIDs": [],
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+    }
+
     nonisolated static func observeGroupMemberships(
         tripID: String
     ) -> AsyncThrowingStream<[MemberGroupMembership], Error> {
@@ -258,6 +281,23 @@ enum FirebasePlaceSelectionService {
                         } else {
                             latestGroupEdit = nil
                         }
+                        let configurationData = document.get("groupingConfigurationEvent")
+                            as? [String: Any]
+                        let latestGroupingConfiguration: GroupingConfigurationEvent?
+                        if let eventID = configurationData?["id"] as? String,
+                           let transportation = configurationData?["transportation"] as? String,
+                           let durationMinutes = configurationData?["durationMinutes"] as? Int {
+                            latestGroupingConfiguration = GroupingConfigurationEvent(
+                                id: eventID,
+                                transportation: transportation,
+                                durationMinutes: durationMinutes,
+                                editor: member,
+                                createdAt: (configurationData?["createdAt"] as? Timestamp)?
+                                    .dateValue() ?? .distantPast
+                            )
+                        } else {
+                            latestGroupingConfiguration = nil
+                        }
                         return MemberGroupMembership(
                             member: member,
                             groupIDs: document.get("joinedGroupIDs") as? [String] ?? [],
@@ -266,7 +306,8 @@ enum FirebasePlaceSelectionService {
                                 as? [String: [String]] ?? [:],
                             orderedPlaceIDsByGroupID: document.get("orderedPlaceIDsByGroupID")
                                 as? [String: [String]] ?? [:],
-                            latestGroupEdit: latestGroupEdit
+                            latestGroupEdit: latestGroupEdit,
+                            latestGroupingConfiguration: latestGroupingConfiguration
                         )
                     }
                     continuation.yield(values)

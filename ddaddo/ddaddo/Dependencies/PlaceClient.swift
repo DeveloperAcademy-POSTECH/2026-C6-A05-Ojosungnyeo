@@ -19,6 +19,7 @@ struct PlaceClient: DependencyKey, Sendable {
     var joinGroup: @Sendable (String, String) async throws -> Void
     var setGroupConfirmation: @Sendable (String, String, Bool, Bool) async throws -> Void
     var updateGroupPlaces: @Sendable (String, String, [String], String?) async throws -> Void
+    var updateGroupingConfiguration: @Sendable (String, String, String, Int) async throws -> Void
     var observeGroupMemberships: @Sendable (String) -> AsyncThrowingStream<[MemberGroupMembership], Error>
     var confirmGroups: @Sendable (String, [String]) async throws -> Void
     var fetchGroupConfirmations: @Sendable (String) async throws -> [MemberGroupConfirmation]
@@ -79,6 +80,14 @@ struct PlaceClient: DependencyKey, Sendable {
                     deletedPlaceID: deletedPlaceID
                 )
             },
+            updateGroupingConfiguration: { tripID, eventID, transportation, durationMinutes in
+                try await FirebasePlaceSelectionService.updateGroupingConfiguration(
+                    tripID: tripID,
+                    eventID: eventID,
+                    transportation: transportation,
+                    durationMinutes: durationMinutes
+                )
+            },
             observeGroupMemberships: { tripID in
                 FirebasePlaceSelectionService.observeGroupMemberships(tripID: tripID)
             },
@@ -121,6 +130,7 @@ struct PlaceClient: DependencyKey, Sendable {
         joinGroup: { _, _ in },
         setGroupConfirmation: { _, _, _, _ in },
         updateGroupPlaces: { _, _, _, _ in },
+        updateGroupingConfiguration: { _, _, _, _ in },
         observeGroupMemberships: { _ in AsyncThrowingStream { $0.finish() } },
         confirmGroups: { _, _ in },
         fetchGroupConfirmations: { _ in [] },

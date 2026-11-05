@@ -18,14 +18,14 @@ enum PlaceGroupingPreviewData {
     ]
 
     static let recommendedGroups: [PlaceGroupingFeature.RecommendedGroup] = [
-        .init(id: "osaka-region-1", title: "오사카 지역 1", participantSummary: "2명 · 1명", memberIDs: ["tae", "header"], categories: ["쇼핑", "디저트"], places: []),
-        .init(id: "osaka-region-2", title: "오사카 지역 2", participantSummary: "4명", memberIDs: ["tae", "header", "juni", "grae"], categories: ["맛집"], places: []),
+        .init(id: "osaka-region-1", title: "오사카성 중심 코스", participantSummary: "2명", memberIDs: ["tae", "header"], categories: ["쇼핑", "디저트"], places: []),
+        .init(id: "osaka-region-2", title: "도톤보리 중심 코스", participantSummary: "4명", memberIDs: ["tae", "header", "juni", "grae"], categories: ["맛집"], places: []),
     ]
 
     static let placeGroups: [MapPlaceGroup] = [
         .init(
             id: "osaka-region-1",
-            name: "오사카 지역 1",
+            name: "오사카성 중심 코스",
             places: [
                 .init(id: "osaka-castle", name: "오사카성", description: "", thumbnailName: "", latitude: 34.6873, longitude: 135.5262),
                 .init(id: "osaka-museum", name: "오사카 역사박물관", description: "", thumbnailName: "", latitude: 34.6826, longitude: 135.5200),
@@ -35,7 +35,7 @@ enum PlaceGroupingPreviewData {
         ),
         .init(
             id: "osaka-region-2",
-            name: "오사카 지역 2",
+            name: "도톤보리 중심 코스",
             places: [
                 .init(id: "dotonbori", name: "도톤보리", description: "", thumbnailName: "", latitude: 34.6687, longitude: 135.5013),
                 .init(id: "kuromon-market", name: "구로몬 시장", description: "", thumbnailName: "", latitude: 34.6654, longitude: 135.5067),

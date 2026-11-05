@@ -58,6 +58,7 @@ struct MemberGroupMembership: Equatable, Sendable {
     let deletedPlaceIDsByGroupID: [String: [String]]
     let orderedPlaceIDsByGroupID: [String: [String]]
     let latestGroupEdit: GroupEditEvent?
+    let latestGroupingConfiguration: GroupingConfigurationEvent?
 }
 
 struct GroupEditEvent: Equatable, Sendable {
@@ -65,4 +66,12 @@ struct GroupEditEvent: Equatable, Sendable {
     let groupID: String
     let editor: TripMember
     let editorName: String
+}
+
+struct GroupingConfigurationEvent: Equatable, Sendable {
+    let id: String
+    let transportation: String
+    let durationMinutes: Int
+    let editor: TripMember
+    let createdAt: Date
 }

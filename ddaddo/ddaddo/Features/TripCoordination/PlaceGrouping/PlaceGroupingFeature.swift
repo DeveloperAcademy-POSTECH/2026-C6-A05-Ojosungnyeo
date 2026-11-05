@@ -59,6 +59,8 @@ struct PlaceGroupingFeature: Reducer {
         var deletedPlaceIDsByGroupID: [String: Set<String>] = [:]
         var orderedPlaceIDsByGroupID: [String: [String]] = [:]
         var processedGroupEditEventIDs: Set<String> = []
+        var processedGroupingConfigurationEventIDs: Set<String> = []
+        var hasLoadedGroupingConfiguration = false
         var confirmedGroupIDsByMemberID: [String: Set<String>] = [:]
         var hasLoadedServerGroupConfirmations = false
         var confirmedGroupIDs: Set<String> = []
@@ -254,6 +256,30 @@ struct PlaceGroupingFeature: Reducer {
                 }
                 state.applyGroupPlaceOrders()
 
+                let configurationEvents = memberships.compactMap(\.latestGroupingConfiguration)
+                if !state.hasLoadedGroupingConfiguration {
+                    state.hasLoadedGroupingConfiguration = true
+                    state.processedGroupingConfigurationEventIDs.formUnion(
+                        configurationEvents.map(\.id)
+                    )
+                    if let latestConfiguration = configurationEvents.max(by: {
+                        $0.createdAt < $1.createdAt
+                    }) {
+                        state.applyGroupingConfiguration(latestConfiguration)
+                    }
+                } else if let latestConfiguration = configurationEvents
+                    .filter({
+                        !state.processedGroupingConfigurationEventIDs.contains($0.id)
+                            && $0.editor.rawValue != state.currentMemberID
+                    })
+                    .max(by: { $0.createdAt < $1.createdAt }) {
+                    state.processedGroupingConfigurationEventIDs.formUnion(
+                        configurationEvents.map(\.id)
+                    )
+                    state.applyGroupingConfiguration(latestConfiguration)
+                    return .send(.delegate(.reanalyzeGrouping))
+                }
+
                 let latestConfirmations = Dictionary(uniqueKeysWithValues: memberships.map {
                     ($0.member.rawValue, Set($0.confirmedGroupIDs))
                 })
@@ -401,7 +427,22 @@ struct PlaceGroupingFeature: Reducer {
                 state.applyJoinedGroupMemberships()
                 state.confirmedGroupIDs = []
                 state.selectedGroupID = nil
-                return .send(.delegate(.reanalyzeGrouping))
+                guard let tripID = state.sourcePlaceSelection?.tripID else {
+                    return .send(.delegate(.reanalyzeGrouping))
+                }
+                let eventID = UUID().uuidString
+                state.processedGroupingConfigurationEventIDs.insert(eventID)
+                return .merge(
+                    .run { _ in
+                        try? await placeClient.updateGroupingConfiguration(
+                            tripID,
+                            eventID,
+                            selection.transportation.rawValue,
+                            selection.duration.rawValue
+                        )
+                    },
+                    .send(.delegate(.reanalyzeGrouping))
+                )
             case .transportationSheet:
                 return .none
             case .memberTapped:
@@ -628,6 +669,35 @@ struct PlaceGroupingFeature: Reducer {
 }
 
 private extension PlaceGroupingFeature.State {
+    mutating func applyGroupingConfiguration(_ event: GroupingConfigurationEvent) {
+        guard let transportation = Transportation(rawValue: event.transportation),
+              let duration = TravelDuration(rawValue: event.durationMinutes),
+              let sourcePlaceSelection
+        else { return }
+
+        let selection = TripSetUpTransportationFeature.Selection(
+            transportation: transportation,
+            duration: duration
+        )
+        transportationSelection = selection
+        transportationSheet = TripSetUpTransportationFeature.State(selection: selection)
+        travelCriteria = "\(transportation.title) · 장소 간 최대 \(duration.rawValue)분"
+
+        let refreshed = PlaceGroupingEngine.makeGroups(
+            from: sourcePlaceSelection,
+            selection: selection
+        )
+        members = refreshed.members
+        placeGroups = refreshed.mapGroups
+        recommendedGroups = refreshed.recommendedGroups
+        applyJoinedGroupMemberships()
+        applyDeletedGroupPlaces()
+        applyGroupPlaceOrders()
+        confirmedGroupIDs = []
+        selectedGroupID = nil
+        isDetailPresented = false
+    }
+
     mutating func applyJoinedGroupMemberships() {
         recommendedGroups = recommendedGroups.map { group in
             let joinedMemberIDs = joinedMemberIDsByGroupID[group.id, default: []]
@@ -764,7 +834,11 @@ private enum PlaceGroupingEngine {
             let uniquePlaces = unique(region.map(\.place))
             return MapPlaceGroup(
                 id: "region-\(index)",
-                name: regionName(destination: state.destinationName, index: index),
+                name: courseName(
+                    places: uniquePlaces,
+                    destination: state.destinationName,
+                    index: index
+                ),
                 places: uniquePlaces,
                 radius: max(800, regionRadius(uniquePlaces) + 500)
             )
@@ -773,12 +847,12 @@ private enum PlaceGroupingEngine {
         var recommendations: [PlaceGroupingFeature.RecommendedGroup] = []
         for (regionIndex, region) in regions.enumerated() {
             let regionPlaces = unique(region.map(\.place))
-            let title = regionName(
+            let title = courseName(
+                places: regionPlaces,
                 destination: state.destinationName,
                 index: regionIndex
             )
             let memberIDs = Array(Set(region.map { $0.member.rawValue })).sorted()
-            let memberComponents = categoryConnectedMembers(memberIDs, region: region)
             let categories = Array(Set(regionPlaces.map {
                 normalizedCategory($0.category)
             })).sorted()
@@ -786,9 +860,7 @@ private enum PlaceGroupingEngine {
                 .init(
                     id: "region-\(regionIndex)",
                     title: title,
-                    participantSummary: memberComponents
-                        .map { "\($0.count)명" }
-                        .joined(separator: " · "),
+                    participantSummary: "\(memberIDs.count)명",
                     memberIDs: memberIDs,
                     categories: categories,
                     places: regionPlaces
@@ -834,36 +906,6 @@ private enum PlaceGroupingEngine {
         return Double(selection.duration.rawValue) * metersPerMinute
     }
 
-    private static func categoryConnectedMembers(
-        _ members: [String],
-        region: [OwnedPlace]
-    ) -> [[String]] {
-        var visited = Set<String>()
-        var result: [[String]] = []
-        let categories = Dictionary(uniqueKeysWithValues: members.map { member in
-            (member, Set(region.filter { $0.member.rawValue == member }.map {
-                normalizedCategory($0.place.category)
-            }))
-        })
-        for start in members where !visited.contains(start) {
-            var queue = [start]
-            visited.insert(start)
-            var component: [String] = []
-            while let member = queue.popLast() {
-                component.append(member)
-                for candidate in members where !visited.contains(candidate) {
-                    if !(categories[member, default: []]
-                        .intersection(categories[candidate, default: []]).isEmpty) {
-                        visited.insert(candidate)
-                        queue.append(candidate)
-                    }
-                }
-            }
-            result.append(component.sorted())
-        }
-        return result
-    }
-
     private static func normalizedCategory(_ raw: String) -> String {
         let value = raw.lowercased()
         if value.contains("카페") || value.contains("디저트") || value.contains("coffee") || value.contains("cafe") { return "카페" }
@@ -894,7 +936,17 @@ private enum PlaceGroupingEngine {
         return places.filter { ids.insert($0.id).inserted }
     }
 
-    private static func regionName(destination: String, index: Int) -> String {
-        "\(destination) 지역 \(index + 1)"
+    private static func courseName(
+        places: [PinnedPlace],
+        destination: String,
+        index: Int
+    ) -> String {
+        guard let representativePlace = places.first else {
+            return "\(destination) 코스 \(index + 1)"
+        }
+        if places.count == 1 {
+            return "\(representativePlace.name) 코스"
+        }
+        return "\(representativePlace.name) 중심 코스"
     }
 }

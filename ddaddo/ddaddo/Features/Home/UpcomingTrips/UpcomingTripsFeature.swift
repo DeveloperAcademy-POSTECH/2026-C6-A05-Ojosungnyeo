@@ -10,16 +10,26 @@ struct UpcomingTripsFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
         case proceedToAnalysis(PlaceSelectionFeature.State)
+        case proceedToGrouping(PlaceSelectionFeature.State)
     }
 
     struct Trip: Equatable, Identifiable {
         let id: String
         let destination: String
+        var destinationName: String? = nil
         let country: String
         let dateText: String
         var startDate: Date? = nil
         var endDate: Date? = nil
-        let isItineraryReady: Bool
+        let progress: UpcomingTripSnapshot.Progress
+
+        var progressTitle: String {
+            switch progress {
+            case .placeSelection: "장소 핀 찍기"
+            case .placeGrouping: "추천 그룹 확정하기"
+            case .itinerary: "여행 계획"
+            }
+        }
     }
 
     @ObservableState
@@ -36,6 +46,7 @@ struct UpcomingTripsFeature: Reducer {
         var deletionErrorMessage: String?
         var waitingForParticipants: WaitingForParticipantsFeature.State?
         var isWaitingForParticipantsPresented = false
+        var pendingTripProgress: UpcomingTripSnapshot.Progress?
 
         var isJoinButtonEnabled: Bool {
             inviteCode.count == 6 && !isJoiningTrip
@@ -64,6 +75,7 @@ struct UpcomingTripsFeature: Reducer {
         case deletionErrorDismissed
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
+        case tripInvitationResponse(Result<TripInvitationSnapshot, Error>)
         case delegate(Delegate)
         case viewScheduleButtonTapped(Trip.ID)
     }
@@ -217,7 +229,37 @@ struct UpcomingTripsFeature: Reducer {
             case .delegate:
                 return .none
 
-            case .viewScheduleButtonTapped:
+            case let .viewScheduleButtonTapped(tripID):
+                guard let trip = state.trips.first(where: { $0.id == tripID }) else {
+                    return .none
+                }
+                guard trip.progress != .itinerary else { return .none }
+                state.pendingTripProgress = trip.progress
+                return .run { send in
+                    await send(
+                        .tripInvitationResponse(
+                            Result { try await tripClient.fetchInvitation(tripID) }
+                        )
+                    )
+                }
+
+            case let .tripInvitationResponse(.success(snapshot)):
+                let progress = state.pendingTripProgress
+                state.pendingTripProgress = nil
+                let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
+                switch progress {
+                case .placeSelection:
+                    state.waitingForParticipants = waitingState
+                    state.isWaitingForParticipantsPresented = true
+                    return .none
+                case .placeGrouping:
+                    return .send(.delegate(.proceedToGrouping(waitingState.placeSelection)))
+                case .itinerary, .none:
+                    return .none
+                }
+
+            case .tripInvitationResponse(.failure):
+                state.pendingTripProgress = nil
                 return .none
             }
         }
@@ -244,11 +286,12 @@ struct UpcomingTripsFeature: Reducer {
         return Trip(
             id: snapshot.tripID,
             destination: destination,
+            destinationName: snapshot.destinationName,
             country: country,
             dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
             startDate: snapshot.startDate,
             endDate: snapshot.endDate,
-            isItineraryReady: snapshot.isItineraryReady
+            progress: snapshot.progress
         )
     }
 
@@ -306,6 +349,7 @@ struct UpcomingTripsFeature: Reducer {
         "다낭": "Da Nang",
         "하노이": "Hanoi",
         "호찌민": "Ho Chi Minh City",
+        "푸꾸옥": "Phu Quoc",
         "세부": "Cebu",
         "마닐라": "Manila",
         "보라카이": "Boracay",

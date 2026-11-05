@@ -107,7 +107,7 @@ struct WaitingForParticipantsView: View {
             .accessibilityLabel("뒤로 가기")
 
             HStack(spacing: DDSpacing.xSmall) {
-                Text("친구를 기다리고 있다")
+                Text("친구를 기다리고 이따")
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
 
@@ -135,7 +135,13 @@ struct WaitingForParticipantsView: View {
 
                 Spacer(minLength: DDSpacing.small)
 
-                ShareLink(item: store.invitation.shareText) {
+                ShareLink(
+                    item: store.invitation.shareText,
+                    preview: SharePreview(
+                        "따또 여행 초대 링크",
+                        image: Image("DDInvitationSharePreview")
+                    )
+                ) {
                     Text("공유하기")
                         .ddTypography(.labelEmphasis14)
                         .foregroundStyle(DDColor.textOnPrimary)

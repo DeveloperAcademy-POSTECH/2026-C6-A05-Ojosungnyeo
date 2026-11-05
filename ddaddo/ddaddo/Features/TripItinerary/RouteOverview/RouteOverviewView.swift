@@ -7,7 +7,6 @@
 
 import ComposableArchitecture
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct RouteOverviewView: View {
     let store: StoreOf<RouteOverviewFeature>
@@ -15,8 +14,6 @@ struct RouteOverviewView: View {
         // Preview and isolated usages can omit navigation handling.
     }
     @State private var isItineraryExpanded = false
-    @State private var draggingStopID: RouteStop.ID?
-    @State private var isTrashTargeted = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -35,11 +32,8 @@ struct RouteOverviewView: View {
                 )
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: store.isEditing)
         .onAppear {
             isItineraryExpanded = false
-            draggingStopID = nil
-            isTrashTargeted = false
             store.send(.onAppear)
         }
         .preferredColorScheme(.dark)
@@ -111,7 +105,7 @@ struct RouteOverviewView: View {
         .padding(.vertical, 8)
     }
 
-    private func itineraryPanel(fullHeight: CGFloat) -> some View {
+    private func itineraryPanel(fullHeight _: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Capsule()
                 .fill(DDColor.textTertiary)
@@ -119,96 +113,41 @@ struct RouteOverviewView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 16)
 
-            if store.isEditing {
-                editingHeader
-                    .padding(.top, 14)
+            memberFilter
+                .padding(.top, 14)
 
-                Text("여행 일정")
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textPrimary)
-                    .padding(.top, 14)
+            Text("여행 일정")
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+                .padding(.top, isItineraryExpanded ? 18 : 10)
 
-                editingItineraryList
+            if isItineraryExpanded {
+                itineraryList
                     .padding(.top, 12)
-            } else {
-                memberFilter
-                    .padding(.top, 14)
-
-                Text("여행 일정")
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textPrimary)
-                    .padding(.top, isItineraryExpanded ? 18 : 10)
-
-                if isItineraryExpanded {
-                    itineraryList
-                        .padding(.top, 12)
-                }
             }
         }
         .padding(.leading, 15)
         .padding(.trailing, DDSpacing.large)
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(
-            height: store.isEditing
-                ? fullHeight
-                : (isItineraryExpanded ? 413 : 139),
-            alignment: .top
-        )
+        .frame(height: isItineraryExpanded ? 413 : 139, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
         .contentShape(.rect)
         .gesture(
-            store.isEditing
-                ? nil
-                : DragGesture(minimumDistance: 12)
-                    .onEnded { value in
-                        if value.translation.height < -30 {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                isItineraryExpanded = true
-                            }
-                        } else if value.translation.height > 30 {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                isItineraryExpanded = false
-                            }
+            DragGesture(minimumDistance: 12)
+                .onEnded { value in
+                    if value.translation.height < -30 {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            isItineraryExpanded = true
+                        }
+                    } else if value.translation.height > 30 {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            isItineraryExpanded = false
                         }
                     }
-        )
-    }
-
-    private var editingHeader: some View {
-        HStack(spacing: DDSpacing.xSmall) {
-            ForEach(store.memberOrder) { member in
-                Button {
-                    store.send(.memberTapped(member))
-                } label: {
-                    DDMiniHeadAvatar(character: member.routeAvatarCharacter, size: 37)
-                        .opacity(
-                            store.selectedMembers.isEmpty || store.selectedMembers.contains(member)
-                                ? 1
-                                : 0.35
-                        )
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(member.accessibilityName) 일정 보기")
-                .accessibilityValue(store.selectedMembers.contains(member) ? "선택됨" : "선택 안 됨")
-            }
-
-            Spacer(minLength: 0)
-
-            Button("완료") {
-                draggingStopID = nil
-                isTrashTargeted = false
-                store.send(.editingDoneButtonTapped)
-            }
-            .ddTypography(.bodyEmphasis16)
-            .foregroundStyle(DDColor.textOnPrimary)
-            .padding(.horizontal, DDSpacing.large)
-            .frame(height: 34)
-            .background(DDColor.actionPrimary)
-            .clipShape(.capsule)
-            .buttonStyle(.plain)
-        }
+        )
     }
 
     private var memberFilter: some View {
@@ -229,17 +168,6 @@ struct RouteOverviewView: View {
                 .accessibilityValue(store.selectedMembers.contains(member) ? "선택됨" : "선택 안 됨")
             }
 
-            Spacer(minLength: 0)
-
-            Button("편집") {
-                store.send(.editButtonTapped)
-            }
-            .ddTypography(.bodyEmphasis16)
-            .foregroundStyle(DDColor.textPrimary)
-            .frame(width: 56, height: 34)
-            .background(DDColor.surfaceControl)
-            .clipShape(.capsule)
-            .buttonStyle(.plain)
         }
     }
 
@@ -309,130 +237,6 @@ struct RouteOverviewView: View {
         }
     }
 
-    private var editingItineraryList: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(Array(store.visibleStopGroups.enumerated()), id: \.element.id) { index, group in
-                        HStack(alignment: .top, spacing: 12) {
-                            timelineMarker(index: index, isLast: false)
-                            editingCards(for: group)
-                        }
-                    }
-
-                    HStack(alignment: .top, spacing: 12) {
-                        timelineMarker(index: store.visibleStopGroups.count, isLast: true)
-
-                        Button {
-                        } label: {
-                            Text("+ 장소 추가하기")
-                                .ddTypography(.bodyEmphasis16)
-                                .foregroundStyle(DDColor.textPrimary)
-                                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                                .padding(.horizontal, DDSpacing.xLarge)
-                                .background(DDColor.surfaceElevated)
-                                .clipShape(.rect(cornerRadius: 20))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(DDColor.actionPrimary, lineWidth: 1)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.bottom, draggingStopID == nil ? 40 : 116)
-            }
-            .scrollIndicators(.hidden)
-
-            if draggingStopID != nil {
-                LinearGradient(
-                    colors: [DDColor.surfaceDefault.opacity(0), DDColor.surfaceDefault],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 118)
-                .allowsHitTesting(false)
-
-                trashDropTarget
-                    .padding(.bottom, 12)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: draggingStopID)
-    }
-
-    @ViewBuilder
-    private func editingCards(for group: RouteStopGroup) -> some View {
-        if group.stops.count == 1 {
-            editingStopCard(group.stops[0])
-        } else {
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 12) {
-                    ForEach(group.stops) { stop in
-                        editingStopCard(stop)
-                            .frame(width: 200)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-        }
-    }
-
-    private func editingStopCard(_ stop: RouteStop) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(stop.name)
-                        .ddTypography(.bodyEmphasis16)
-                        .lineLimit(1)
-
-                    participantDots(for: stop)
-                }
-                .foregroundStyle(DDColor.textPrimary)
-
-                Text(stop.category)
-                    .ddTypography(.labelEmphasis14)
-                    .foregroundStyle(DDColor.actionPrimary)
-            }
-
-            Spacer(minLength: 0)
-
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(DDColor.textSecondary)
-                .frame(width: 28, height: 44)
-                .accessibilityLabel("일정 순서 변경")
-                .onDrag {
-                    draggingStopID = stop.id
-                    return NSItemProvider(object: String(stop.id) as NSString)
-                }
-        }
-        .padding(.horizontal, DDSpacing.xLarge)
-        .frame(maxWidth: .infinity, minHeight: 72)
-        .background(DDColor.surfaceElevated)
-        .clipShape(.rect(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    draggingStopID == stop.id ? DDColor.actionPrimary : DDColor.textTertiary,
-                    lineWidth: 1
-                )
-        }
-        .onDrop(
-            of: [UTType.text],
-            delegate: RouteStopReorderDropDelegate(
-                targetID: stop.id,
-                draggedID: draggingStopID,
-                move: { sourceID, targetID in
-                    store.send(.editingStopMoved(sourceID, before: targetID))
-                },
-                finish: clearDragState
-            )
-        )
-    }
-
     @ViewBuilder
     private func participantDots(for stop: RouteStop) -> some View {
         if store.selectedMembers.count != 1,
@@ -445,35 +249,6 @@ struct RouteOverviewView: View {
                 }
             }
         }
-    }
-
-    private var trashDropTarget: some View {
-        Image(systemName: "trash")
-            .font(.system(size: 24, weight: .semibold))
-            .foregroundStyle(DDColor.actionPrimary)
-            .frame(width: 72, height: 58)
-            .background(
-                isTrashTargeted ? DDColor.surfaceControl : Color.clear,
-                in: .capsule
-            )
-            .scaleEffect(isTrashTargeted ? 1.08 : 1)
-            .accessibilityLabel("일정 삭제")
-            .onDrop(
-                of: [UTType.text],
-                delegate: RouteTrashDropDelegate(
-                    draggedID: draggingStopID,
-                    isTargeted: $isTrashTargeted,
-                    delete: { stopID in
-                        store.send(.editingStopDeleted(stopID))
-                    },
-                    finish: clearDragState
-                )
-            )
-    }
-
-    private func clearDragState() {
-        draggingStopID = nil
-        isTrashTargeted = false
     }
 
     private func timelineMarker(index: Int, isLast: Bool) -> some View {
@@ -503,57 +278,6 @@ struct RouteOverviewView: View {
             stop.members.contains(member)
                 && (store.selectedMembers.isEmpty || store.selectedMembers.contains(member))
         }
-    }
-}
-
-private struct RouteStopReorderDropDelegate: DropDelegate {
-    let targetID: RouteStop.ID
-    let draggedID: RouteStop.ID?
-    let move: (RouteStop.ID, RouteStop.ID) -> Void
-    let finish: () -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let draggedID, draggedID != targetID else { return }
-        move(draggedID, targetID)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        finish()
-        return true
-    }
-}
-
-private struct RouteTrashDropDelegate: DropDelegate {
-    let draggedID: RouteStop.ID?
-    @Binding var isTargeted: Bool
-    let delete: (RouteStop.ID) -> Void
-    let finish: () -> Void
-
-    func dropEntered(info: DropInfo) {
-        isTargeted = true
-    }
-
-    func dropExited(info: DropInfo) {
-        isTargeted = false
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        guard let draggedID else {
-            finish()
-            return false
-        }
-
-        delete(draggedID)
-        finish()
-        return true
     }
 }
 

@@ -373,13 +373,28 @@ enum FirebaseTripService {
                     else { return nil }
 
                     let destination = (document.get("destinations") as? [[String: Any]])?.first
+                    let progress: UpcomingTripSnapshot.Progress
+                    if document.get("status") as? String == "itinerary" {
+                        progress = .itinerary
+                    } else {
+                        let participants = try await document.reference
+                            .collection("participants")
+                            .getDocuments()
+                            .documents
+                            .filter { $0.get("status") as? String == "joined" }
+                        let hasFinishedPlaceSelection = !participants.isEmpty
+                            && participants.allSatisfy {
+                                $0.get("placeSelectionConfirmed") as? Bool == true
+                            }
+                        progress = hasFinishedPlaceSelection ? .placeGrouping : .placeSelection
+                    }
                     return UpcomingTripSnapshot(
                         tripID: document.documentID,
                         destinationName: destination?["name"] as? String ?? "여행",
                         countryName: destination?["country"] as? String ?? "",
                         startDate: startDate,
                         endDate: endDate,
-                        isItineraryReady: document.get("status") as? String == "itinerary"
+                        progress: progress
                     )
                 }
             }
@@ -415,6 +430,115 @@ enum FirebaseTripService {
             )
     }
 
+    static func saveItinerary(_ request: TripItinerarySaveRequest) async throws {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard let userID = Auth.auth().currentUser?.uid else {
+            throw TripServiceError.unauthenticated
+        }
+
+        let database = Firestore.firestore()
+        let tripReference = database.collection("trips").document(request.tripID)
+        let participantDocument = try await tripReference
+            .collection("participants")
+            .document(userID)
+            .getDocument()
+        guard participantDocument.exists,
+              participantDocument.get("status") as? String == "joined" else {
+            throw TripServiceError.notTripParticipant
+        }
+
+        let courseData: [[String: Any]] = request.courses.map { course in
+            [
+                "id": course.id,
+                "title": course.title,
+                "placeNames": course.placeNames,
+                "categories": course.categories,
+                "memberIDs": course.memberIDs,
+                "durationMinutes": course.durationMinutes
+            ]
+        }
+        let scheduleData: [[String: Any]] = request.schedules.map { schedule in
+            var data: [String: Any] = [
+                "id": schedule.id,
+                "courseID": schedule.courseID,
+                "day": schedule.day,
+                "startMinuteOfDay": schedule.startMinuteOfDay
+            ]
+            if let branchGroupID = schedule.branchGroupID {
+                data["branchGroupID"] = branchGroupID
+            }
+            return data
+        }
+
+        let batch = database.batch()
+        batch.setData(
+            [
+                "courses": courseData,
+                "schedules": scheduleData,
+                "updatedBy": userID,
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            forDocument: tripReference.collection("itinerary").document("current")
+        )
+        batch.setData(
+            [
+                "status": "itinerary",
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            forDocument: tripReference,
+            merge: true
+        )
+        try await batch.commit()
+    }
+
+    static func fetchItinerary(tripID: String) async throws -> TripItinerarySnapshot? {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard Auth.auth().currentUser != nil else {
+            throw TripServiceError.unauthenticated
+        }
+
+        let document = try await Firestore.firestore()
+            .collection("trips")
+            .document(tripID)
+            .collection("itinerary")
+            .document("current")
+            .getDocument()
+        guard document.exists else { return nil }
+
+        let courses: [TripItinerarySaveRequest.Course] =
+            (document.get("courses") as? [[String: Any]] ?? []).compactMap { data -> TripItinerarySaveRequest.Course? in
+            guard let id = data["id"] as? Int,
+                  let title = data["title"] as? String else { return nil }
+            return TripItinerarySaveRequest.Course(
+                id: id,
+                title: title,
+                placeNames: data["placeNames"] as? [String] ?? [],
+                categories: data["categories"] as? [String] ?? [],
+                memberIDs: data["memberIDs"] as? [String] ?? [],
+                durationMinutes: data["durationMinutes"] as? Int ?? 60
+            )
+        }
+        let schedules: [TripItinerarySaveRequest.Schedule] =
+            (document.get("schedules") as? [[String: Any]] ?? []).compactMap { data -> TripItinerarySaveRequest.Schedule? in
+            guard let id = data["id"] as? Int,
+                  let courseID = data["courseID"] as? Int,
+                  let day = data["day"] as? String,
+                  let startMinute = data["startMinuteOfDay"] as? Int else { return nil }
+            return TripItinerarySaveRequest.Schedule(
+                id: id,
+                courseID: courseID,
+                day: day,
+                startMinuteOfDay: startMinute,
+                branchGroupID: data["branchGroupID"] as? Int
+            )
+        }
+        return TripItinerarySnapshot(courses: courses, schedules: schedules)
+    }
+
     private static func makeInviteURL(code: String, expiresAt: Date) -> URL {
         var components = URLComponents(string: inviteURLBase)!
         components.queryItems = [
@@ -435,6 +559,7 @@ enum TripServiceError: LocalizedError {
     case expiredInviteCode
     case tripIsFull
     case inviteCodeGenerationFailed
+    case notTripParticipant
 
     var errorDescription: String? {
         switch self {
@@ -445,6 +570,7 @@ enum TripServiceError: LocalizedError {
         case .expiredInviteCode: "초대 코드의 유효 기간이 지났습니다."
         case .tripIsFull: "이미 모든 친구가 참여한 여행입니다."
         case .inviteCodeGenerationFailed: "초대 코드를 만들지 못했습니다. 다시 시도해 주세요."
+        case .notTripParticipant: "이 여행의 참여자만 일정을 저장할 수 있습니다."
         }
     }
 }

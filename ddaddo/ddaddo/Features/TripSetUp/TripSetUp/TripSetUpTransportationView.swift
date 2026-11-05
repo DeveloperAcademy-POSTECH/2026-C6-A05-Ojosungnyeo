@@ -94,7 +94,7 @@ struct TripSetUpTransportationView: View {
                 }
                 .padding(.top, DDSpacing.medium)
 
-                Text("\(store.selectedTransportation.title)으로 최대 \(store.selectedDuration.rawValue)분 이내에 이동할 수 있는 장소를 묶어요.")
+                Text("\(store.selectedTransportation.title)\(store.selectedTransportation.title == "자동차" ? "로" : "으로") 최대 \(store.selectedDuration.rawValue)분 이내에 이동할 수 있는 장소를 묶어요.")
                     .ddTypography(.caption12)
                     .foregroundStyle(DDColor.textSecondary)
                     .padding(.top, DDSpacing.small)

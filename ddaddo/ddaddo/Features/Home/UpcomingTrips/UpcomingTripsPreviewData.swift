@@ -11,21 +11,21 @@ enum UpcomingTripsPreviewData {
                 destination: "TOKYO",
                 country: "Japan",
             dateText: "11월 22일~25일",
-            isItineraryReady: true
+            progress: .placeSelection
             ),
             .init(
                 id: "shanghai",
                 destination: "SHANGHAI",
                 country: "China",
             dateText: "12월 5일~8일",
-            isItineraryReady: true
+            progress: .placeGrouping
             ),
             .init(
                 id: "sydney",
                 destination: "SYDNEY",
                 country: "Australia",
             dateText: "27년 3월 2일~9일",
-            isItineraryReady: true
+            progress: .itinerary
             )
         ]
 

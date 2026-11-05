@@ -325,13 +325,20 @@ private struct UpcomingTripsBroadcastBanner: View {
             .frame(maxWidth: .infinity)
             .overlay {
                 GeometryReader { proxy in
+                    let bannerScale = proxy.size.width / 370
+
                     Text(message)
                         .ddTypography(.captionEmphasis12)
                         .tracking(0.6)
                         .lineSpacing(2)
                         .foregroundStyle(DDColor.textOnPrimary)
                         .multilineTextAlignment(.leading)
-                        .frame(width: 96, height: 40, alignment: .leading)
+                        .lineLimit(2)
+                        .frame(
+                            width: 96 * bannerScale,
+                            height: 40 * bannerScale,
+                            alignment: .leading
+                        )
                         .background(Color.white)
                         .position(
                             x: proxy.size.width * 0.744,
@@ -385,22 +392,16 @@ private struct UpcomingTripTicketCard: View {
 
                 VStack(spacing: 0) {
                     HStack(alignment: .top, spacing: DDSpacing.small) {
-                        Label("Flight Ticket", systemImage: "airplane.ticket.fill")
-                            .ddTypography(.heading20)
+                        Text(trip.dateText)
+                            .ddTypography(.label14)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
 
                         Spacer(minLength: 0)
 
-                        Text(trip.dateText)
-                            .ddTypography(.label14)
-                            .foregroundStyle(
-                                Color(
-                                    red: 96 / 255,
-                                    green: 96 / 255,
-                                    blue: 96 / 255
-                                )
-                            )
+                        Text(trip.progressTitle)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.surfaceControl)
                             .lineLimit(1)
                     }
 

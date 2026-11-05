@@ -12,17 +12,26 @@ struct TimeTableView: View {
     let store: StoreOf<TimeTableFeature>
 
     var body: some View {
-        if store.isEditing {
-            TimeTableEditView(
-                timeTableStore: store,
-                store: store.scope(state: \.edit, action: \.edit)
-            )
-        } else {
-            TimeTableReadOnlyContent(
-                store: store,
-                onBack: { store.send(.backButtonTapped) },
-                onEdit: { store.send(.editButtonTapped) }
-            )
+        Group {
+            if store.isEditing {
+                TimeTableEditView(
+                    timeTableStore: store,
+                    store: store.scope(state: \.edit, action: \.edit)
+                )
+            } else {
+                TimeTableReadOnlyContent(
+                    store: store,
+                    onBack: { store.send(.backButtonTapped) },
+                    onEdit: { store.send(.editButtonTapped) }
+                )
+            }
+        }
+        .onAppear {
+            store.send(.validateSelectedDay)
+            store.send(.onAppear)
+        }
+        .onChange(of: store.availableDays) { _, _ in
+            store.send(.validateSelectedDay)
         }
     }
 }
@@ -100,7 +109,7 @@ private struct TimeTableReadOnlyContent: View {
     private var tripHeader: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DDSpacing.small) {
-                Text("여행 일정을 살펴보게따")
+                Text(store.headerTitle)
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
                     .lineLimit(1)
@@ -132,7 +141,7 @@ private struct TimeTableReadOnlyContent: View {
     private var dayPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: DDSpacing.small) {
-                ForEach(TripDay.allCases) { day in
+                ForEach(store.availableDays) { day in
                     Button {
                         store.send(.daySelected(day))
                     } label: {
@@ -244,7 +253,7 @@ private struct TimeTableReadOnlyContent: View {
                             }
                         }
                     }
-                    Text(first.category)
+                    Text(places.categorySummary)
                         .ddTypography(.labelEmphasis14)
                         .foregroundStyle(DDColor.actionPrimary)
                 }
@@ -295,10 +304,10 @@ private struct TimeTableReadOnlyContent: View {
                 }
             }
 
-            Text(course.placesSummary)
+            Text(course.categorySummary)
                 .ddTypography(.labelEmphasis14)
                 .foregroundStyle(DDColor.actionPrimary)
-                .lineLimit(1)
+                .lineLimit(2)
         }
         .padding(.horizontal, DDSpacing.xLarge)
         .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)

@@ -12,6 +12,7 @@ import Foundation
 struct PlaceGroupingFeature: Reducer {
     enum Delegate: Equatable {
         case proceedToItinerary
+        case reanalyzeGrouping
         case returnToUpcomingTrips
     }
 
@@ -47,7 +48,6 @@ struct PlaceGroupingFeature: Reducer {
         )
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
-        var isReanalyzing = false
         var hasRequestedPlacePhotos = false
         var sourcePlaceSelection: PlaceSelectionFeature.State?
         var selectedTab = Tab.preferences
@@ -117,9 +117,10 @@ struct PlaceGroupingFeature: Reducer {
         case placePhotoResponse(String, Data?)
         case backButtonTapped
         case travelCriteriaChangeTapped
+        case criteriaChangeCancelTapped
+        case criteriaChangeConfirmTapped
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
-        case reanalysisFinished
         case tabSelected(Tab)
         case memberTapped(String)
         case recommendedGroupTapped(String)
@@ -288,6 +289,15 @@ struct PlaceGroupingFeature: Reducer {
                 return .send(.delegate(.returnToUpcomingTrips))
 
             case .travelCriteriaChangeTapped:
+                state.isCriteriaChangeConfirmationPresented = true
+                return .none
+
+            case .criteriaChangeCancelTapped:
+                state.isCriteriaChangeConfirmationPresented = false
+                return .none
+
+            case .criteriaChangeConfirmTapped:
+                state.isCriteriaChangeConfirmationPresented = false
                 state.transportationSheet = TripSetUpTransportationFeature.State(
                     selection: state.transportationSelection
                 )
@@ -300,22 +310,18 @@ struct PlaceGroupingFeature: Reducer {
             case let .transportationSheet(.delegate(.completed(selection))):
                 state.isTransportationSheetPresented = false
                 state.transportationSelection = selection
+                state.travelCriteria = "\(selection.transportation.title) · 장소 간 최대 \(selection.duration.rawValue)분"
                 guard let source = state.sourcePlaceSelection else { return .none }
                 let refreshed = State(
                     placeSelection: source,
                     transportationSelection: selection
                 )
-                state.travelCriteria = refreshed.travelCriteria
                 state.members = refreshed.members
                 state.placeGroups = refreshed.placeGroups
                 state.recommendedGroups = refreshed.recommendedGroups
                 state.confirmedGroupIDs = []
                 state.selectedGroupID = nil
-                state.isReanalyzing = true
-                return .none
-            case .reanalysisFinished:
-                state.isReanalyzing = false
-                return .none
+                return .send(.delegate(.reanalyzeGrouping))
             case .transportationSheet:
                 return .none
             case .memberTapped:

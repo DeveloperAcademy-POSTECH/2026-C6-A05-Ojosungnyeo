@@ -54,14 +54,25 @@ struct PlaceGroupingView: View {
                 .transition(.move(edge: .trailing))
             }
 
-            if store.isReanalyzing {
-                LoadingView(message: "여행 취향과 장소를 다시 분석 중...")
-                    .zIndex(5)
-                    .task {
-                        try? await Task.sleep(for: .seconds(1.5))
-                        guard !Task.isCancelled else { return }
-                        store.send(.reanalysisFinished)
+            if store.isCriteriaChangeConfirmationPresented {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .zIndex(6)
+
+                DDConfirmationAlert(
+                    title: "알림",
+                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    onCancel: {
+                        store.send(.criteriaChangeCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.criteriaChangeConfirmTapped)
                     }
+                )
+                .frame(maxHeight: .infinity)
+                .zIndex(7)
             }
         }
         .animation(
@@ -74,7 +85,7 @@ struct PlaceGroupingView: View {
         )
         .animation(
             .easeInOut(duration: 0.2),
-            value: store.isReanalyzing
+            value: store.isCriteriaChangeConfirmationPresented
         )
         .sheet(
             isPresented: Binding(

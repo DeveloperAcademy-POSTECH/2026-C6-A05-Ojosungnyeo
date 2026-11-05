@@ -362,7 +362,6 @@ struct PlaceGroupingView: View {
             }
             .padding(.top, 8)
             .padding(.bottom, 34)
-            .background(DDColor.surfaceDefault)
         }
         .padding(.horizontal, DDSpacing.large)
     }

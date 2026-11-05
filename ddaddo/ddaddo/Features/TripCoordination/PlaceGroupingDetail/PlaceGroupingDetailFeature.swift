@@ -10,7 +10,7 @@ struct PlaceGroupingDetailFeature: Reducer {
     enum Delegate: Equatable {
         case confirmed
         case joined
-        case placeDeleted(String)
+        case placesReordered([String])
     }
 
     @ObservableState
@@ -26,11 +26,6 @@ struct PlaceGroupingDetailFeature: Reducer {
         var preferenceCategories: [String] = ["쇼핑", "디저트"]
         var currentMemberID = "juni"
         var isJoinConfirmationPresented = false
-        var pendingDeletionPlaceID: String?
-
-        var isDeleteConfirmationPresented: Bool {
-            pendingDeletionPlaceID != nil
-        }
 
         var canJoin: Bool {
             !groupMemberIDs.contains(currentMemberID)
@@ -112,10 +107,7 @@ struct PlaceGroupingDetailFeature: Reducer {
         case joinButtonTapped
         case joinConfirmationCancelTapped
         case joinConfirmationConfirmTapped
-        case deletePlaceTapped(String)
-        case deleteConfirmationCancelTapped
-        case deleteConfirmationConfirmTapped
-        case placeMoved(sourceID: String, beforeID: String)
+        case placeMoved(sourceID: String, beforeID: String?)
         case confirmButtonTapped
         case delegate(Delegate)
     }
@@ -143,42 +135,20 @@ struct PlaceGroupingDetailFeature: Reducer {
                 state.isJoinConfirmationPresented = false
                 return .send(.delegate(.joined))
 
-            case let .deletePlaceTapped(id):
-                guard state.canEditPlaces,
-                      state.places.contains(where: { $0.id == id })
-                else { return .none }
-                state.pendingDeletionPlaceID = id
-                return .none
-
-            case .deleteConfirmationCancelTapped:
-                state.pendingDeletionPlaceID = nil
-                return .none
-
-            case .deleteConfirmationConfirmTapped:
-                guard state.canEditPlaces,
-                      let id = state.pendingDeletionPlaceID
-                else {
-                    state.pendingDeletionPlaceID = nil
-                    return .none
-                }
-                state.places.removeAll { $0.id == id }
-                state.pendingDeletionPlaceID = nil
-                return .send(.delegate(.placeDeleted(id)))
-
             case let .placeMoved(sourceID, beforeID):
                 guard state.canEditPlaces else { return .none }
-                guard
-                    sourceID != beforeID,
-                    let sourceIndex = state.places.firstIndex(where: { $0.id == sourceID }),
-                    let destinationIndex = state.places.firstIndex(where: { $0.id == beforeID })
+                guard sourceID != beforeID,
+                      let sourceIndex = state.places.firstIndex(where: { $0.id == sourceID })
                 else { return .none }
 
                 let place = state.places.remove(at: sourceIndex)
-                let adjustedDestination = sourceIndex < destinationIndex
-                    ? destinationIndex - 1
-                    : destinationIndex
-                state.places.insert(place, at: adjustedDestination)
-                return .none
+                if let beforeID,
+                   let destinationIndex = state.places.firstIndex(where: { $0.id == beforeID }) {
+                    state.places.insert(place, at: destinationIndex)
+                } else {
+                    state.places.append(place)
+                }
+                return .send(.delegate(.placesReordered(state.places.map(\.id))))
 
             case .confirmButtonTapped:
                 return .send(.delegate(.confirmed))

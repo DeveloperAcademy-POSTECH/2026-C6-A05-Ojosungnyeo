@@ -133,10 +133,13 @@ struct PlaceGroupingView: View {
                 Button {
                     store.send(.backButtonTapped)
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 25, weight: .regular))
-                        .frame(width: 44, height: 44, alignment: .leading)
-                        .contentShape(Rectangle())
+                    ZStack(alignment: .topLeading) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 25, weight: .regular))
+                            .padding(.top, 4)
+                    }
+                    .frame(width: 44, height: 44, alignment: .topLeading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("예정된 여행으로 돌아가기")

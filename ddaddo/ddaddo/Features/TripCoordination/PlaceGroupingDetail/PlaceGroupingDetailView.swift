@@ -3,6 +3,7 @@
 //  ddaddo
 //
 
+import Combine
 import ComposableArchitecture
 import SwiftUI
 
@@ -21,9 +22,23 @@ struct PlaceGroupingDetailView: View {
     @State private var draggingPlaceID: String?
     @State private var dragLocation: CGPoint?
     @State private var dropFrames: [String: CGRect] = [:]
-    @State private var targetedPlaceID: String?
-    @State private var isTrashTargeted = false
-    @State private var containerHeight: CGFloat = 0
+    @State private var insertionBeforePlaceID: String?
+    @State private var isAppendTargeted = false
+    @State private var containerWidth: CGFloat = 0
+
+    private enum AutoScrollDirection {
+        case up
+        case down
+    }
+
+    @State private var autoScrollDirection: AutoScrollDirection?
+    private let appendTargetID = "placeGroupingAppendTarget"
+    private let placeRowSpacing: CGFloat = 12
+    private let autoScrollTimer = Timer.publish(
+        every: 0.16,
+        on: .main,
+        in: .common
+    ).autoconnect()
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -67,36 +82,14 @@ struct PlaceGroupingDetailView: View {
                 .zIndex(4)
             }
 
-            if store.isDeleteConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(5)
-
-                DDConfirmationAlert(
-                    title: "장소 삭제하기",
-                    message: "이 장소를 진짜 삭제할까요?",
-                    cancelTitle: "아니요",
-                    confirmTitle: "네",
-                    cancelColor: DDColor.actionPrimary,
-                    onCancel: {
-                        store.send(.deleteConfirmationCancelTapped)
-                    },
-                    onConfirm: {
-                        store.send(.deleteConfirmationConfirmTapped)
-                    }
-                )
-                .frame(maxHeight: .infinity)
-                .zIndex(6)
-            }
         }
         .coordinateSpace(name: "placeGroupingDetailDrag")
         .background {
             GeometryReader { proxy in
                 Color.clear
-                    .onAppear { containerHeight = proxy.size.height }
-                    .onChange(of: proxy.size.height) { _, height in
-                        containerHeight = height
+                    .onAppear { containerWidth = proxy.size.width }
+                    .onChange(of: proxy.size.width) { _, width in
+                        containerWidth = width
                     }
             }
         }
@@ -109,32 +102,27 @@ struct PlaceGroupingDetailView: View {
             .padding(.bottom, 11)
             .background(DDColor.surfaceDefault)
         }
-        .overlay(alignment: .bottom) {
-            if draggingPlaceID != nil {
-                trashDropOverlay
-                    .transition(.opacity)
-                    .zIndex(10)
-            }
-        }
         .overlay {
             if let draggingPlaceID,
                let dragLocation,
                let place = store.places.first(where: { $0.id == draggingPlaceID }) {
                 PlaceDragPreview(place: place)
-                    .frame(width: 370, height: 58)
-                    .position(dragLocation)
+                    .frame(width: max(0, containerWidth - 32), height: 58)
+                    .position(x: containerWidth / 2, y: dragLocation.y)
                     .allowsHitTesting(false)
                     .zIndex(11)
             }
         }
-        .onPreferenceChange(PlaceGroupingDropFramesKey.self) { dropFrames = $0 }
+        .onPreferenceChange(PlaceGroupingDropFramesKey.self) { frames in
+            dropFrames = frames
+            if let dragLocation {
+                updateAutoScrollDirection(at: dragLocation)
+                updateDropTarget(at: dragLocation)
+            }
+        }
         .animation(
             .easeInOut(duration: 0.2),
             value: store.isJoinConfirmationPresented
-        )
-        .animation(
-            .easeInOut(duration: 0.2),
-            value: store.isDeleteConfirmationPresented
         )
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -156,10 +144,13 @@ struct PlaceGroupingDetailView: View {
                 Button {
                     onBack()
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 25, weight: .regular))
-                        .frame(width: 44, height: 44, alignment: .leading)
-                        .contentShape(Rectangle())
+                    ZStack(alignment: .topLeading) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 25, weight: .regular))
+                            .padding(.top, 4)
+                    }
+                    .frame(width: 44, height: 44, alignment: .topLeading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -285,10 +276,12 @@ struct PlaceGroupingDetailView: View {
             Text("꼭 방문하고 싶은 장소")
                 .ddTypography(.heading18)
                 .foregroundStyle(DDColor.textPrimary)
+                .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .topLeading)
 
             if !store.showsEmptyState {
                 preferenceDescription
                     .ddTypography(.body16)
+                    .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .topLeading)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -341,56 +334,56 @@ struct PlaceGroupingDetailView: View {
     }
 
     private var placeList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(store.places) { place in
-                    PlaceDraggableRow(
-                        place: place,
-                        isEditable: store.canEditPlaces,
-                        isTargeted: targetedPlaceID == place.id,
-                        onDragChanged: { location in
-                            draggingPlaceID = place.id
-                            dragLocation = location
-                            updateDropTarget(at: location)
-                        },
-                        onDragEnded: { location in
-                            dragLocation = location
-                            updateDropTarget(at: location)
-                            commitDrop()
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: placeRowSpacing) {
+                    ForEach(store.places) { place in
+                        PlaceDraggableRow(
+                            place: place,
+                            isEditable: store.canEditPlaces,
+                            onDragChanged: { location in
+                                draggingPlaceID = place.id
+                                dragLocation = verticalDragLocation(from: location)
+                                updateAutoScrollDirection(at: location)
+                                updateDropTarget(at: location)
+                            },
+                            onDragEnded: { location in
+                                dragLocation = verticalDragLocation(from: location)
+                                updateAutoScrollDirection(at: location)
+                                updateDropTarget(at: location)
+                                commitDrop()
+                            }
+                        )
+                        .id(place.id)
+                        .opacity(draggingPlaceID == place.id ? 0.35 : 1)
+                        .background(dropFrame("row:\(place.id)"))
+                        .overlay(alignment: .top) {
+                            if draggingPlaceID != nil {
+                                insertionDropArea(before: place.id)
+                                    .offset(
+                                        y: -(
+                                            DDSpacing.xLarge / 2
+                                                + placeRowSpacing / 2
+                                        )
+                                    )
+                            }
                         }
-                    )
-                    .background(dropFrame("row:\(place.id)"))
+                    }
+
+                    if draggingPlaceID != nil {
+                        appendDropArea
+                            .id(appendTargetID)
+                    }
                 }
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.bottom, DDSpacing.xLarge)
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.bottom, DDSpacing.xLarge)
+            .background(dropFrame("list"))
+            .onReceive(autoScrollTimer) { _ in
+                autoScroll(using: proxy)
+            }
         }
         .scrollIndicators(.hidden)
-    }
-
-    private var trashDropOverlay: some View {
-        LinearGradient(
-            colors: [.clear, Color.black.opacity(0.8)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 246)
-        .overlay(alignment: .bottom) {
-            Image(systemName: "trash")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(DDColor.actionPrimary)
-                .frame(width: 56, height: 56)
-                .scaleEffect(isTrashTargeted ? 1.15 : 1)
-                .padding(.bottom, 22)
-                .animation(.easeInOut(duration: 0.15), value: isTrashTargeted)
-        }
-        .background(alignment: .bottom) {
-            Color.clear
-                .frame(height: 124)
-                .background(dropFrame("trash"))
-        }
-        .ignoresSafeArea(edges: .bottom)
-        .allowsHitTesting(false)
     }
 
     private func dropFrame(_ id: String) -> some View {
@@ -403,31 +396,182 @@ struct PlaceGroupingDetailView: View {
     }
 
     private func updateDropTarget(at location: CGPoint) {
-        isTrashTargeted = containerHeight > 0 && location.y >= containerHeight - 124
-        targetedPlaceID = isTrashTargeted
-            ? nil
-            : store.places.first(where: {
-                $0.id != draggingPlaceID &&
-                dropFrames["row:\($0.id)"]?.contains(location) == true
-            })?.id
+        if let insertionTarget = store.places.first(where: {
+            dropFrames["insert:\($0.id)"]?.contains(location) == true
+        })?.id {
+            insertionBeforePlaceID = insertionTarget
+            isAppendTargeted = false
+            return
+        }
+
+        if dropFrames["append"]?.contains(location) == true {
+            insertionBeforePlaceID = nil
+            isAppendTargeted = true
+            return
+        }
+
+        if let rowIndex = store.places.firstIndex(where: {
+            dropFrames["row:\($0.id)"]?.contains(location) == true
+        }), let rowFrame = dropFrames["row:\(store.places[rowIndex].id)"] {
+            if location.y < rowFrame.midY {
+                insertionBeforePlaceID = store.places[rowIndex].id
+                isAppendTargeted = false
+            } else if store.places.indices.contains(rowIndex + 1) {
+                insertionBeforePlaceID = store.places[rowIndex + 1].id
+                isAppendTargeted = false
+            } else {
+                insertionBeforePlaceID = nil
+                isAppendTargeted = true
+            }
+            return
+        }
+
+        insertionBeforePlaceID = nil
+        isAppendTargeted = false
     }
 
     private func commitDrop() {
         defer { finishDrag() }
         guard let draggingPlaceID else { return }
 
-        if isTrashTargeted {
-            store.send(.deletePlaceTapped(draggingPlaceID))
-        } else if let targetedPlaceID {
-            store.send(.placeMoved(sourceID: draggingPlaceID, beforeID: targetedPlaceID))
+        if let insertionBeforePlaceID {
+            store.send(.placeMoved(sourceID: draggingPlaceID, beforeID: insertionBeforePlaceID))
+        } else if isAppendTargeted {
+            store.send(.placeMoved(sourceID: draggingPlaceID, beforeID: nil))
         }
     }
 
     private func finishDrag() {
-        draggingPlaceID = nil
-        dragLocation = nil
-        targetedPlaceID = nil
-        isTrashTargeted = false
+        withAnimation(.easeOut(duration: 0.18)) {
+            draggingPlaceID = nil
+            dragLocation = nil
+            insertionBeforePlaceID = nil
+            isAppendTargeted = false
+            autoScrollDirection = nil
+        }
+    }
+
+    private func verticalDragLocation(from location: CGPoint) -> CGPoint {
+        CGPoint(x: containerWidth / 2, y: location.y)
+    }
+
+    private func insertionDropArea(before placeID: String) -> some View {
+        ZStack {
+            if insertionBeforePlaceID == placeID {
+                insertionIndicator
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: DDSpacing.xLarge)
+        .contentShape(.rect)
+        .background(dropFrame("insert:\(placeID)"))
+    }
+
+    private var appendDropArea: some View {
+        ZStack {
+            if isAppendTargeted {
+                insertionIndicator
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: DDSpacing.xLarge)
+        .contentShape(.rect)
+        .background(dropFrame("append"))
+    }
+
+    private var insertionIndicator: some View {
+        Capsule()
+            .fill(DDColor.actionPrimary)
+            .frame(height: 2)
+    }
+
+    private func updateAutoScrollDirection(at location: CGPoint) {
+        guard let listFrame = dropFrames["list"] else {
+            autoScrollDirection = nil
+            return
+        }
+
+        let topEdgeThreshold: CGFloat = 52
+        let bottomEdgeThreshold: CGFloat = 120
+        if location.y <= listFrame.minY + topEdgeThreshold,
+           canAutoScroll(.up, in: listFrame) {
+            autoScrollDirection = .up
+        } else if location.y >= listFrame.maxY - bottomEdgeThreshold,
+                  canAutoScroll(.down, in: listFrame) {
+            autoScrollDirection = .down
+        } else {
+            autoScrollDirection = nil
+        }
+    }
+
+    private func canAutoScroll(
+        _ direction: AutoScrollDirection,
+        in listFrame: CGRect
+    ) -> Bool {
+        let visibleIndices = store.places.indices.filter { index in
+            guard let frame = dropFrames["row:\(store.places[index].id)"] else {
+                return false
+            }
+            return frame.intersects(listFrame)
+        }
+
+        guard let firstVisibleIndex = visibleIndices.first,
+              let lastVisibleIndex = visibleIndices.last
+        else { return false }
+
+        switch direction {
+        case .up:
+            return firstVisibleIndex > store.places.startIndex
+        case .down:
+            if lastVisibleIndex < store.places.index(before: store.places.endIndex) {
+                return true
+            }
+            guard let appendFrame = dropFrames["append"] else { return true }
+            return !appendFrame.intersects(listFrame)
+        }
+    }
+
+    private func autoScroll(using proxy: ScrollViewProxy) {
+        guard let autoScrollDirection,
+              let listFrame = dropFrames["list"]
+        else { return }
+
+        let visibleIndices = store.places.indices.filter { index in
+            guard let frame = dropFrames["row:\(store.places[index].id)"] else {
+                return false
+            }
+            return frame.intersects(listFrame)
+        }
+
+        let targetID: String
+        let targetAnchor: UnitPoint
+        switch autoScrollDirection {
+        case .up:
+            guard let firstVisibleIndex = visibleIndices.first,
+                  firstVisibleIndex > store.places.startIndex
+            else {
+                self.autoScrollDirection = nil
+                return
+            }
+            targetID = store.places[store.places.index(before: firstVisibleIndex)].id
+            targetAnchor = .top
+        case .down:
+            guard let lastVisibleIndex = visibleIndices.last else {
+                self.autoScrollDirection = nil
+                return
+            }
+            if lastVisibleIndex < store.places.index(before: store.places.endIndex) {
+                targetID = store.places[store.places.index(after: lastVisibleIndex)].id
+                targetAnchor = .bottom
+            } else {
+                targetID = appendTargetID
+                targetAnchor = .center
+            }
+        }
+
+        withAnimation(.linear(duration: 0.14)) {
+            proxy.scrollTo(targetID, anchor: targetAnchor)
+        }
     }
 
 }
@@ -435,14 +579,12 @@ struct PlaceGroupingDetailView: View {
 private struct PlaceDraggableRow: View {
     let place: PlaceGroupingDetailFeature.Place
     let isEditable: Bool
-    let isTargeted: Bool
     let onDragChanged: (CGPoint) -> Void
     let onDragEnded: (CGPoint) -> Void
 
     var body: some View {
         placeCard
-        .frame(height: 58)
-        .background(isTargeted ? DDColor.actionPrimary.opacity(0.12) : .clear)
+            .frame(height: 58)
     }
 
     private var placeCard: some View {

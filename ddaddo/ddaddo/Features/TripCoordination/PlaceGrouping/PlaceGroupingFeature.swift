@@ -338,6 +338,21 @@ struct PlaceGroupingFeature: Reducer {
             case .detail(.delegate(.joined)):
                 if let selectedGroupID = state.selectedGroupID {
                     state.confirmedGroupIDs.insert(selectedGroupID)
+                    state.recommendedGroups = state.recommendedGroups.map { group in
+                        guard group.id == selectedGroupID,
+                              !group.memberIDs.contains(state.currentMemberID)
+                        else { return group }
+
+                        let memberIDs = group.memberIDs + [state.currentMemberID]
+                        return RecommendedGroup(
+                            id: group.id,
+                            title: group.title,
+                            participantSummary: "\(memberIDs.count)명",
+                            memberIDs: memberIDs,
+                            categories: group.categories,
+                            places: group.places
+                        )
+                    }
                 }
                 state.isDetailPresented = false
                 return .none

@@ -12,6 +12,7 @@ import Foundation
 struct PlaceGroupingFeature: Reducer {
     enum Delegate: Equatable {
         case proceedToItinerary
+        case returnToUpcomingTrips
     }
 
     enum Tab: Equatable {
@@ -114,6 +115,7 @@ struct PlaceGroupingFeature: Reducer {
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
         case placePhotoResponse(String, Data?)
+        case backButtonTapped
         case travelCriteriaChangeTapped
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
@@ -281,6 +283,9 @@ struct PlaceGroupingFeature: Reducer {
                     return place
                 }
                 return .none
+
+            case .backButtonTapped:
+                return .send(.delegate(.returnToUpcomingTrips))
 
             case .travelCriteriaChangeTapped:
                 state.transportationSheet = TripSetUpTransportationFeature.State(

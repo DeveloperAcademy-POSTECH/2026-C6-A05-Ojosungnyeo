@@ -206,6 +206,11 @@ struct HomeFeature: Reducer {
                 state.isPlaceGroupingPresented = false
                 state.isTripItineraryPresented = true
                 return .none
+            case .placeGrouping(.delegate(.returnToUpcomingTrips)):
+                state.isPlaceGroupingPresented = false
+                state.isPlaceAnalysisLoading = false
+                state.isUpcomingTripsPresented = true
+                return .none
             case .placeGrouping:
                 return .none
             case .upcomingTrips(.createTripButtonTapped):

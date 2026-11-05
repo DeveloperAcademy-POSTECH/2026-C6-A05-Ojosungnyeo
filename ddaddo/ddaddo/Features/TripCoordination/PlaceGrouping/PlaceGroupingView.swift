@@ -105,16 +105,35 @@ struct PlaceGroupingView: View {
     }
 
     private var tripHeader: some View {
-        VStack(spacing: 0) {
-            Text(store.tripTitle)
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textPrimary)
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                Text(store.tripTitle)
+                    .ddTypography(.label14)
+                    .foregroundStyle(DDColor.textPrimary)
 
-            Text(store.tripDates)
-                .ddTypography(.label14)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
-                .frame(width: 200, height: 20, alignment: .top)
+                Text(store.tripDates)
+                    .ddTypography(.label14)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
+                    .frame(width: 200, height: 20, alignment: .top)
+            }
+
+            HStack {
+                Button {
+                    store.send(.backButtonTapped)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 25, weight: .regular))
+                        .frame(width: 44, height: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("예정된 여행으로 돌아가기")
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(DDColor.textPrimary)
+            .padding(.horizontal, DDSpacing.large)
         }
         .frame(height: 51, alignment: .top)
     }

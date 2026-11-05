@@ -575,6 +575,12 @@ private struct TimeTableEditContent: View {
             .frame(height: 2)
     }
 
+    private var parallelInsertionIndicator: some View {
+        Capsule()
+            .fill(DDColor.actionPrimary)
+            .frame(width: 2)
+    }
+
     @ViewBuilder
     private var insertionIndicatorsOverlay: some View {
         if let targetedRowID,
@@ -605,6 +611,65 @@ private struct TimeTableEditContent: View {
                     .zIndex(2)
                     .allowsHitTesting(false)
             }
+        } else if case let .merge(rowID) = activeDropTarget,
+                  canMergeDraggedItem(into: rowID),
+                  let targetRow = rows.first(where: { $0.id == rowID }),
+                  let lastSource = targetRow.sources.last,
+                  let frame = dropFrames[dragFrameID(.row(rowID, lastSource))] {
+            parallelInsertionIndicator
+                .frame(height: max(0, frame.height - DDSpacing.large))
+                .position(x: frame.maxX + DDSpacing.small, y: frame.midY)
+                .zIndex(2)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func canMergeDraggedItem(into targetRowID: TimeTableEditRow.ID) -> Bool {
+        guard let dragging,
+              let targetRow = rows.first(where: { $0.id == targetRowID }),
+              let targetMembers = memberIDs(for: targetRow),
+              !targetMembers.isEmpty else { return false }
+
+        switch dragging {
+        case let .recommendation(groupID):
+            let sourceMembers = Set(
+                timeTableStore.recommendations
+                    .first(where: { $0.groupID == groupID })?
+                    .memberIDs ?? []
+            )
+            return !sourceMembers.isEmpty && sourceMembers.isDisjoint(with: targetMembers)
+
+        case let .row(sourceRowID, source):
+            guard sourceRowID != targetRowID,
+                  let sourceMembers = memberIDs(for: source),
+                  !sourceMembers.isEmpty else { return false }
+            return sourceMembers.isDisjoint(with: targetMembers)
+        }
+    }
+
+    private func memberIDs(for row: TimeTableEditRow) -> Set<String>? {
+        var members: Set<String> = []
+        for source in row.sources {
+            guard let sourceMembers = memberIDs(for: source),
+                  !sourceMembers.isEmpty,
+                  members.isDisjoint(with: sourceMembers) else { return nil }
+            members.formUnion(sourceMembers)
+        }
+        return members
+    }
+
+    private func memberIDs(for source: TimeTableEditRow.Source) -> Set<String>? {
+        switch source {
+        case let .schedule(scheduleID):
+            guard let schedule = store.draftPlacements.first(where: { $0.id == scheduleID }),
+                  let course = timeTableStore.coursesByID[schedule.courseID] else { return nil }
+            return Set(course.members.map(\.rawValue))
+
+        case let .recommendationGroup(groupID):
+            guard let recommendation = timeTableStore.recommendations.first(where: {
+                $0.groupID == groupID
+            }) else { return nil }
+            return Set(recommendation.memberIDs)
         }
     }
 

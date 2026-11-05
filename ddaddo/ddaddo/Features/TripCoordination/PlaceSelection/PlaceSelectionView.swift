@@ -171,9 +171,31 @@ struct PlaceSelectionView: View {
                 )
             )
         }
-        .allowsHitTesting(store.completionAlert == nil)
+        .allowsHitTesting(
+            store.completionAlert == nil && store.pendingDeletionPlaceID == nil
+        )
         .overlay {
-            if let alert = store.completionAlert {
+            if store.pendingDeletionPlaceID != nil {
+                ZStack {
+                    Color.black
+                        .opacity(0.55)
+                        .ignoresSafeArea()
+
+                    DDConfirmationAlert(
+                        title: "장소 삭제하기",
+                        message: "이 장소를 진짜 삭제할까요?",
+                        cancelTitle: "아니요",
+                        confirmTitle: "네",
+                        cancelColor: DDColor.actionPrimary,
+                        onCancel: {
+                            store.send(.deleteConfirmationCancelTapped)
+                        },
+                        onConfirm: {
+                            store.send(.deleteConfirmationConfirmTapped)
+                        }
+                    )
+                }
+            } else if let alert = store.completionAlert {
                 ZStack {
                     Color.black
                         .opacity(0.55)

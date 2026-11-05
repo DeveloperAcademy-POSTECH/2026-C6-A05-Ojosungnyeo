@@ -377,7 +377,7 @@ struct PlaceGroupingDetailView: View {
     private var placeList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: placeRowSpacing) {
+                VStack(spacing: placeRowSpacing) {
                     ForEach(store.places) { place in
                         PlaceDraggableRow(
                             place: place,
@@ -555,7 +555,6 @@ struct PlaceGroupingDetailView: View {
                 .scaleEffect(isTrashTargeted ? 1.15 : 1)
                 .animation(.easeInOut(duration: 0.15), value: isTrashTargeted)
         }
-        .background(dropFrame("trash"))
         .ignoresSafeArea(edges: .bottom)
         .allowsHitTesting(false)
     }
@@ -563,9 +562,9 @@ struct PlaceGroupingDetailView: View {
     private var trashTargetFrame: CGRect {
         CGRect(
             x: 0,
-            y: max(0, containerHeight - trashTargetHeight),
+            y: max(0, containerHeight - 64),
             width: containerWidth,
-            height: trashTargetHeight
+            height: .greatestFiniteMagnitude
         )
     }
 
@@ -577,7 +576,7 @@ struct PlaceGroupingDetailView: View {
 
         let topEdgeThreshold: CGFloat = 52
         let bottomEdgeThreshold: CGFloat = 120
-        let trashBoundary = containerHeight - trashTargetHeight
+        let trashBoundary = containerHeight - 64
         if location.y <= listFrame.minY + topEdgeThreshold,
            canAutoScroll(.up, in: listFrame) {
             autoScrollDirection = .up

@@ -197,7 +197,7 @@ struct MemberPlacesBottomSheet: View {
     private var placeList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: DDSpacing.medium) {
+                VStack(spacing: DDSpacing.medium) {
                     ForEach(places) { place in
                         PlacePinCard(
                             place: place,
@@ -259,14 +259,13 @@ struct MemberPlacesBottomSheet: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: min(246, containerHeight))
-        .overlay(alignment: .bottom) {
+        .frame(height: min(81, containerHeight))
+        .overlay {
             Image(systemName: "trash")
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(DDColor.actionPrimary)
                 .frame(width: 56, height: 56)
                 .scaleEffect(isTrashTargeted ? 1.15 : 1)
-                .padding(.bottom, 22)
                 .animation(.easeInOut(duration: 0.15), value: isTrashTargeted)
         }
         .allowsHitTesting(false)

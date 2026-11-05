@@ -77,6 +77,7 @@ struct PlaceSelectionFeature: Reducer {
         var hasSelectionEnded = false
         var isEditingConfirmedPlaces = false
         var completionAlert: CompletionAlert?
+        var pendingDeletionPlaceID: String?
         var placeSyncErrorMessage: String?
         var requestedPhotoPlaceIDs: Set<String> = []
         var hasRestoredSavedPlacesPresentation = false
@@ -368,6 +369,8 @@ struct PlaceSelectionFeature: Reducer {
         case pinnedPlaceDetailsResponse(String, PlaceDetails)
         case pinnedPlaceDetailsFailed(String)
         case deletePinnedPlaceButtonTapped(String)
+        case deleteConfirmationCancelTapped
+        case deleteConfirmationConfirmTapped
         case movePinnedPlace(sourceID: String, beforeID: String?)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
@@ -665,6 +668,18 @@ struct PlaceSelectionFeature: Reducer {
 
             case let .deletePinnedPlaceButtonTapped(placeID):
                 guard state.isViewingCurrentUser else { return .none }
+                state.pendingDeletionPlaceID = placeID
+                return .none
+
+            case .deleteConfirmationCancelTapped:
+                state.pendingDeletionPlaceID = nil
+                return .none
+
+            case .deleteConfirmationConfirmTapped:
+                guard state.isViewingCurrentUser,
+                      let placeID = state.pendingDeletionPlaceID
+                else { return .none }
+                state.pendingDeletionPlaceID = nil
                 state.memberPlaces[state.currentMember, default: []].removeAll {
                     $0.id == placeID
                 }

@@ -48,6 +48,7 @@ struct MemberGroupConfirmation: Equatable, Sendable {
     let member: TripMember
     let name: String
     let isConfirmed: Bool
+    let confirmedGroupIDs: [String]
 }
 
 struct MemberGroupMembership: Equatable, Sendable {

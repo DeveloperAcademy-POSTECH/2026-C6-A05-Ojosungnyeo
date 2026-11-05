@@ -125,7 +125,7 @@ struct PlaceGroupingDetailFeature: Reducer {
         case deletePlaceTapped(String)
         case deleteConfirmationCancelTapped
         case deleteConfirmationConfirmTapped
-        case placeMoved(sourceID: String, beforeID: String)
+        case placeMoved(sourceID: String, beforeID: String?)
         case confirmButtonTapped
         case cancellationNoticeDismissed
         case delegate(Delegate)
@@ -179,10 +179,8 @@ struct PlaceGroupingDetailFeature: Reducer {
 
             case let .placeMoved(sourceID, beforeID):
                 guard state.canEditPlaces else { return .none }
-                guard
-                    sourceID != beforeID,
-                    let sourceIndex = state.places.firstIndex(where: { $0.id == sourceID }),
-                    let destinationIndex = state.places.firstIndex(where: { $0.id == beforeID })
+                guard sourceID != beforeID,
+                      let sourceIndex = state.places.firstIndex(where: { $0.id == sourceID })
                 else { return .none }
 
                 let place = state.places.remove(at: sourceIndex)
@@ -190,8 +188,7 @@ struct PlaceGroupingDetailFeature: Reducer {
                     ? destinationIndex - 1
                     : destinationIndex
                 state.places.insert(place, at: adjustedDestination)
-                state.isGroupConfirmed = false
-                return .send(.delegate(.placesReordered(state.places.map(\.id))))
+                return .none
 
             case .confirmButtonTapped:
                 guard !state.isGroupConfirmed else { return .none }

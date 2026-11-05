@@ -310,7 +310,8 @@ enum FirebasePlaceSelectionService {
             return MemberGroupConfirmation(
                 member: member,
                 name: document.get("name") as? String ?? "친구",
-                isConfirmed: document.get("groupingConfirmed") as? Bool ?? false
+                isConfirmed: document.get("groupingConfirmed") as? Bool ?? false,
+                confirmedGroupIDs: document.get("confirmedGroupIDs") as? [String] ?? []
             )
         }
     }

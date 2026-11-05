@@ -188,7 +188,7 @@ struct PlaceGroupingDetailView: View {
 
     private var memberList: some View {
         HStack(alignment: .top, spacing: 8) {
-            HStack(alignment: .top, spacing: -29) {
+            HStack(alignment: .top, spacing: -22) {
                 ForEach(Array(groupMembers.enumerated()), id: \.element.id) { index, member in
                     memberButton(
                         member,
@@ -237,16 +237,28 @@ struct PlaceGroupingDetailView: View {
         _ member: PlaceGroupingDetailFeature.Member,
         isActive: Bool
     ) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 3) {
             DDMiniHeadAvatar(character: member.character, size: 56)
                 .opacity(isActive ? 1 : 0.5)
 
-            Text(member.name)
+            Text(displayName(member.name))
                 .ddTypography(.caption12)
                 .foregroundStyle(DDColor.textSecondary)
                 .opacity(isActive ? 1 : 0.5)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(width: 56, alignment: .top)
         }
         .frame(width: 56)
+    }
+
+    private func displayName(_ name: String) -> String {
+        let characters = Array(name)
+        guard characters.count > 3 else { return name }
+
+        return String(characters.prefix(3))
+            + "\n"
+            + String(characters.dropFirst(3))
     }
 
     private var joinButton: some View {

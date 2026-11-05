@@ -94,6 +94,7 @@ private struct TimeTableEditContent: View {
     @State private var isAppendTargeted = false
     @State private var isDeletionOverlayPresented = false
     @State private var dragLocation: CGPoint?
+    @State private var dragPreviewSize: CGSize?
     @State private var dropFrames: [String: CGRect] = [:]
 
     private enum DraggedItem: Equatable {
@@ -119,6 +120,15 @@ private struct TimeTableEditContent: View {
 
     private var rows: [TimeTableEditRow] {
         store.rowsByDay[timeTableStore.selectedDay] ?? []
+    }
+
+    private var draggedRowID: TimeTableEditRow.ID? {
+        guard case let .row(rowID, _) = dragging else { return nil }
+        return rowID
+    }
+
+    private var isReorderingSchedule: Bool {
+        draggedRowID != nil
     }
 
     private var availableRecommendationGroups: [ConfirmedRecommendationGroup] {
@@ -334,13 +344,21 @@ private struct TimeTableEditContent: View {
 
             LazyVStack(spacing: DDSpacing.large) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    HStack(alignment: .top, spacing: 20) {
-                        timelineMarker(index: index, count: rows.count)
-                        rowCards(row)
+                    VStack(spacing: DDSpacing.large) {
+                        if shouldShowReorderGap(before: row.id) {
+                            Color.clear
+                                .frame(height: 71)
+                                .accessibilityHidden(true)
+                        }
+
+                        HStack(alignment: .top, spacing: 20) {
+                            timelineMarker(index: index, count: rows.count)
+                            rowCards(row)
+                        }
+                        .padding(.leading, DDSpacing.medium)
+                        .padding(.trailing, DDSpacing.large)
+                        .background(dropFrame("row:\(row.id)"))
                     }
-                    .padding(.leading, DDSpacing.medium)
-                    .padding(.trailing, DDSpacing.large)
-                    .background(dropFrame("row:\(row.id)"))
                     .overlay(alignment: .top) {
                         if dragging != nil {
                             insertionDropArea(before: row.id)
@@ -351,6 +369,7 @@ private struct TimeTableEditContent: View {
                     }
                 }
             }
+            .animation(.easeInOut(duration: 0.2), value: targetedRowID)
         }
         .padding(.top, DDSpacing.large)
     }
@@ -409,7 +428,8 @@ private struct TimeTableEditContent: View {
                 let dragItem = DraggedItem.row(rowID, source)
                 editCard(title: course.title, subtitle: course.categorySummary,
                          memberIDs: course.members.map(\.rawValue), width: width, drag: dragItem)
-                    .opacity(dragging == dragItem ? 0 : 1)
+                    .opacity(dragging == dragItem ? 0.3 : 1)
+                    .saturation(dragging == dragItem ? 0.25 : 1)
             }
         case let .recommendationGroup(id):
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
@@ -418,7 +438,8 @@ private struct TimeTableEditContent: View {
                 editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
                          subtitle: places.categorySummary, memberIDs: first.memberIDs,
                          width: width, drag: dragItem)
-                    .opacity(dragging == dragItem ? 0 : 1)
+                    .opacity(dragging == dragItem ? 0.3 : 1)
+                    .saturation(dragging == dragItem ? 0.25 : 1)
             }
         }
     }
@@ -457,6 +478,7 @@ private struct TimeTableEditContent: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(DDColor.textTertiary, lineWidth: 1)
         }
+        .background(dropFrame(dragFrameID(drag)))
     }
 
     private func memberDots(_ memberIDs: [String]) -> some View {
@@ -501,6 +523,10 @@ private struct TimeTableEditContent: View {
                     switch phase {
                     case .second(true, let drag):
                         dragging = item
+                        if dragPreviewSize == nil,
+                           let frame = dropFrames[dragFrameID(item)] {
+                            dragPreviewSize = frame.size
+                        }
                         if case .row = item {
                             isDeletionOverlayPresented = true
                         }
@@ -546,9 +572,10 @@ private struct TimeTableEditContent: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: DDSpacing.large)
+        .frame(height: isReorderingSchedule && isAppendTargeted ? 71 + DDSpacing.large : DDSpacing.large)
         .contentShape(Rectangle())
         .background(dropFrame("append"))
+        .animation(.easeInOut(duration: 0.2), value: isAppendTargeted)
     }
 
     private func insertionDropArea(before rowID: TimeTableEditRow.ID) -> some View {
@@ -655,6 +682,7 @@ private struct TimeTableEditContent: View {
         dragging = nil
         isDeletionOverlayPresented = false
         dragLocation = nil
+        dragPreviewSize = nil
         activeDropTarget = nil
         targetedRowID = nil
         isAppendTargeted = false
@@ -662,30 +690,60 @@ private struct TimeTableEditContent: View {
 
     @ViewBuilder
     private func dragPreview(_ item: DraggedItem) -> some View {
-        switch item {
-        case let .recommendation(id):
-            let places = timeTableStore.recommendations.filter { $0.groupID == id }
-            if let first = places.first {
-                editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                         subtitle: places.categorySummary, memberIDs: first.memberIDs,
-                         width: 200, drag: item)
-            }
-        case let .row(_, source):
-            switch source {
+        Group {
+            switch item {
+            case let .recommendation(id):
+                let places = timeTableStore.recommendations.filter { $0.groupID == id }
+                if let first = places.first {
+                    editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
+                             subtitle: places.categorySummary, memberIDs: first.memberIDs,
+                             width: 200, drag: item)
+                }
+            case let .row(_, source):
+                switch source {
                 case let .schedule(scheduleID):
                     if let schedule = store.draftPlacements.first(where: { $0.id == scheduleID }),
                        let course = timeTableStore.coursesByID[schedule.courseID] {
                         editCard(title: course.title, subtitle: course.categorySummary,
-                                 memberIDs: course.members.map(\.rawValue), width: 200, drag: item)
+                                 memberIDs: course.members.map(\.rawValue),
+                                 width: dragPreviewSize?.width ?? 200, drag: item)
                     }
                 case let .recommendationGroup(groupID):
                     let places = timeTableStore.recommendations.filter { $0.groupID == groupID }
                     if let first = places.first {
                         editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
                                  subtitle: places.categorySummary, memberIDs: first.memberIDs,
-                                 width: 200, drag: item)
+                                 width: dragPreviewSize?.width ?? 200, drag: item)
                     }
                 }
+            }
+        }
+        .scaleEffect(isReorderingSchedule ? 1.015 : 1)
+        .shadow(
+            color: .black.opacity(isReorderingSchedule ? 0.28 : 0),
+            radius: isReorderingSchedule ? 12 : 0,
+            y: isReorderingSchedule ? 7 : 0
+        )
+    }
+
+    private func shouldShowReorderGap(before rowID: TimeTableEditRow.ID) -> Bool {
+        guard isReorderingSchedule,
+              targetedRowID == rowID,
+              draggedRowID != rowID else { return false }
+        return true
+    }
+
+    private func dragFrameID(_ item: DraggedItem) -> String {
+        switch item {
+        case let .recommendation(id):
+            return "card:recommendation:\(id)"
+        case let .row(rowID, source):
+            switch source {
+            case let .schedule(id):
+                return "card:row:\(rowID):schedule:\(id)"
+            case let .recommendationGroup(id):
+                return "card:row:\(rowID):recommendation:\(id)"
+            }
         }
     }
 

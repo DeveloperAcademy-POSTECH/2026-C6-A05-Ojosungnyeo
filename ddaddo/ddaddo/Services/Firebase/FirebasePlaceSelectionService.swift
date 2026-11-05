@@ -144,6 +144,53 @@ enum FirebasePlaceSelectionService {
         )
     }
 
+    static func joinGroup(tripID: String, groupID: String) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        try await participant.setData(
+            [
+                "joinedGroupIDs": FieldValue.arrayUnion([groupID]),
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+    }
+
+    nonisolated static func observeGroupMemberships(
+        tripID: String
+    ) -> AsyncThrowingStream<[MemberGroupMembership], Error> {
+        AsyncThrowingStream { continuation in
+            let registration = Firestore.firestore()
+                .collection("trips")
+                .document(tripID)
+                .collection("participants")
+                .order(by: "slotIndex")
+                .addSnapshotListener { snapshot, error in
+                    if let error {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                    guard let documents = snapshot?.documents else { return }
+                    var seenMembers = Set<TripMember>()
+                    let values = orderedParticipantDocuments(documents).compactMap {
+                        document -> MemberGroupMembership? in
+                        guard
+                            document.get("status") as? String == "joined",
+                            let avatarName = document.get("avatarName") as? String,
+                            let avatar = ParticipantAvatar(rawValue: avatarName)
+                        else { return nil }
+                        let member = TripMember(avatar: avatar)
+                        guard seenMembers.insert(member).inserted else { return nil }
+                        return MemberGroupMembership(
+                            member: member,
+                            groupIDs: document.get("joinedGroupIDs") as? [String] ?? []
+                        )
+                    }
+                    continuation.yield(values)
+                }
+            continuation.onTermination = { _ in registration.remove() }
+        }
+    }
+
     static func confirmGroups(tripID: String, groupIDs: [String]) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
         try await participant.setData(

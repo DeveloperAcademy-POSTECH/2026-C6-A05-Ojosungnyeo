@@ -184,7 +184,8 @@ struct RouteOverviewView: View {
                     HStack(alignment: .top, spacing: 20) {
                         timelineMarker(
                             index: index,
-                            isLast: index == store.visibleStopGroups.count - 1
+                            isLast: index == store.visibleStopGroups.count - 1,
+                            rowHeight: itineraryRowHeight(group)
                         )
 
                         itineraryCards(for: group)
@@ -219,31 +220,82 @@ struct RouteOverviewView: View {
     }
 
     private func stopCard(_ stop: RouteStop) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Text(stop.name)
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textPrimary)
-                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
+            Button {
+                guard stop.placeNames.count > 1 else { return }
+                store.send(.stopDisclosureTapped(stop.id))
+            } label: {
+                HStack(spacing: DDSpacing.xSmall) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(stop.name)
+                                .ddTypography(.bodyEmphasis16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .lineLimit(1)
 
-                participantDots(for: stop)
+                            participantDots(for: stop)
+                        }
+
+                        if !stop.category.isEmpty {
+                            Text(stop.category)
+                                .ddTypography(.labelEmphasis14)
+                                .foregroundStyle(DDColor.surfaceSelected)
+                                .lineLimit(2)
+                        }
+                    }
+
+                    Spacer(minLength: DDSpacing.small)
+
+                    if stop.placeNames.count > 1 {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(DDColor.textSecondary)
+                            .rotationEffect(
+                                store.expandedStopIDs.contains(stop.id)
+                                    ? .degrees(180) : .zero
+                            )
+                    }
+                }
+                .padding(.horizontal, DDSpacing.xLarge)
+                .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
+                .contentShape(.rect)
             }
+            .buttonStyle(.plain)
 
-            if !stop.category.isEmpty {
-                Text(stop.category)
-                    .ddTypography(.labelEmphasis14)
-                    .foregroundStyle(DDColor.surfaceSelected)
-                    .lineLimit(2)
+            if stop.placeNames.count > 1,
+               store.expandedStopIDs.contains(stop.id) {
+                VStack(spacing: DDSpacing.small) {
+                    ForEach(Array(stop.placeNames.enumerated()), id: \.offset) { index, placeName in
+                        HStack(spacing: DDSpacing.medium) {
+                            Text("\(index + 1)")
+                                .ddTypography(.labelEmphasis14)
+                                .foregroundStyle(DDColor.surfaceSelected)
+                                .frame(width: 18)
+
+                            Text(placeName)
+                                .ddTypography(.bodyEmphasis16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, DDSpacing.large)
+                        .frame(height: 44)
+                        .background(DDColor.surfaceDefault)
+                        .clipShape(.rect(cornerRadius: 14))
+                    }
+                }
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.bottom, DDSpacing.large)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, DDSpacing.xLarge)
-        .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(DDColor.textTertiary, lineWidth: 1)
         }
+        .animation(.easeInOut(duration: 0.2), value: store.expandedStopIDs)
     }
 
     @ViewBuilder
@@ -260,12 +312,16 @@ struct RouteOverviewView: View {
         }
     }
 
-    private func timelineMarker(index: Int, isLast: Bool) -> some View {
+    private func timelineMarker(
+        index: Int,
+        isLast: Bool,
+        rowHeight: CGFloat = 71
+    ) -> some View {
         ZStack(alignment: .top) {
             if !isLast {
                 Rectangle()
                     .fill(DDColor.textTertiary)
-                    .frame(width: 5, height: 92)
+                    .frame(width: 5, height: rowHeight + DDSpacing.large)
                     .offset(y: 7)
             }
 
@@ -279,7 +335,19 @@ struct RouteOverviewView: View {
                     .foregroundStyle(Color.black)
             }
         }
-        .frame(width: 15, height: 71, alignment: .top)
+        .frame(width: 15, height: rowHeight, alignment: .top)
+    }
+
+    private func itineraryRowHeight(_ group: RouteStopGroup) -> CGFloat {
+        let heights = group.stops.map { stop -> CGFloat in
+            guard stop.placeNames.count > 1,
+                  store.expandedStopIDs.contains(stop.id)
+            else { return 71 }
+            let rows = CGFloat(stop.placeNames.count) * 44
+            let spacing = CGFloat(max(stop.placeNames.count - 1, 0)) * DDSpacing.small
+            return 71 + rows + spacing + DDSpacing.large
+        }
+        return heights.max() ?? 71
     }
 
     private func members(for stop: RouteStop) -> [TripMember] {

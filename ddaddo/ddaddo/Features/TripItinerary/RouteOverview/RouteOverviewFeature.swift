@@ -65,7 +65,7 @@ struct RouteOverviewFeature: Reducer {
                             id: schedule.id,
                             order: index,
                             name: course.title,
-                            category: course.placesSummary,
+                            category: course.categorySummary,
                             latitude: 35.6812 + Double(index) * 0.006,
                             longitude: 139.7671 + Double(index % 2 == 0 ? index : -index) * 0.005,
                             members: Set(course.members),

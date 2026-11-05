@@ -176,10 +176,7 @@ struct TimeTableFeature: Reducer {
                     for groupID in recommendationSources {
                         let places = recommendations.filter { $0.groupID == groupID }
                         guard let first = places.first else { continue }
-                        let categories = places.reduce(into: [String]()) { result, place in
-                            guard !result.contains(place.category) else { return }
-                            result.append(place.category)
-                        }
+                        let categories = places.categoryValues
                         let memberIDs = places.flatMap(\.memberIDs).reduce(into: [String]()) {
                             guard !$0.contains($1) else { return }
                             $0.append($1)
@@ -665,6 +662,7 @@ struct TimeTableRecommendation: Equatable, Identifiable {
     let placeID: String
     let placeName: String
     let category: String
+    var groupCategories: [String] = []
     let memberIDs: [String]
     let placeOwnerMemberIDs: [String]
 
@@ -711,13 +709,19 @@ struct TimeTableRecommendation: Equatable, Identifiable {
 }
 
 extension Collection where Element == TimeTableRecommendation {
-    var categorySummary: String {
+    var categoryValues: [String] {
         reduce(into: [String]()) { result, recommendation in
-            guard !recommendation.category.isEmpty,
-                  !result.contains(recommendation.category) else { return }
-            result.append(recommendation.category)
+            let values = recommendation.groupCategories.isEmpty
+                ? [recommendation.category]
+                : recommendation.groupCategories
+            for category in values where !category.isEmpty && !result.contains(category) {
+                result.append(category)
+            }
         }
-        .joined(separator: " · ")
+    }
+
+    var categorySummary: String {
+        categoryValues.joined(separator: ", ")
     }
 }
 
@@ -802,7 +806,7 @@ struct TimeTableCourse: Equatable, Identifiable {
             guard !category.isEmpty, !result.contains(category) else { return }
             result.append(category)
         }
-        .joined(separator: " · ")
+        .joined(separator: ", ")
     }
 
     static let mockCoursesByID: [ID: Self] = {

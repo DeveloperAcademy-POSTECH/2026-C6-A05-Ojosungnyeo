@@ -228,9 +228,12 @@ struct RouteOverviewView: View {
                 participantDots(for: stop)
             }
 
-            Text(stop.category)
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textSecondary)
+            if !stop.category.isEmpty {
+                Text(stop.category)
+                    .ddTypography(.labelEmphasis14)
+                    .foregroundStyle(DDColor.surfaceSelected)
+                    .lineLimit(2)
+            }
         }
         .padding(.horizontal, DDSpacing.xLarge)
         .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)

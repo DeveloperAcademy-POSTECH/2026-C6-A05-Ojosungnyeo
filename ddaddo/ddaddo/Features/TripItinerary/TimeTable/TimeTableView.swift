@@ -253,9 +253,11 @@ private struct TimeTableReadOnlyContent: View {
                             }
                         }
                     }
-                    Text(places.categorySummary)
-                        .ddTypography(.labelEmphasis14)
-                        .foregroundStyle(DDColor.actionPrimary)
+                    if !places.categorySummary.isEmpty {
+                        Text(places.categorySummary)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.surfaceSelected)
+                    }
                 }
                 .padding(.horizontal, DDSpacing.xLarge)
                 .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
@@ -304,10 +306,12 @@ private struct TimeTableReadOnlyContent: View {
                 }
             }
 
-            Text(course.categorySummary)
-                .ddTypography(.labelEmphasis14)
-                .foregroundStyle(DDColor.actionPrimary)
-                .lineLimit(2)
+            if !course.categorySummary.isEmpty {
+                Text(course.categorySummary)
+                    .ddTypography(.labelEmphasis14)
+                    .foregroundStyle(DDColor.surfaceSelected)
+                    .lineLimit(2)
+            }
         }
         .padding(.horizontal, DDSpacing.xLarge)
         .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)

@@ -185,6 +185,7 @@ struct HomeFeature: Reducer {
                                 placeID: place.id,
                                 placeName: place.name,
                                 category: place.category,
+                                groupCategories: group.categories,
                                 memberIDs: group.memberIDs,
                                 placeOwnerMemberIDs: ownerIDs
                             )

@@ -95,6 +95,7 @@ private struct TimeTableEditContent: View {
     @State private var isDeletionOverlayPresented = false
     @State private var dragLocation: CGPoint?
     @State private var dragPreviewSize: CGSize?
+    @State private var dragPreviewX: CGFloat?
     @State private var dropFrames: [String: CGRect] = [:]
 
     private enum DraggedItem: Equatable {
@@ -212,11 +213,21 @@ private struct TimeTableEditContent: View {
         }
         .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
         .overlay {
-            if let dragging, let dragLocation {
-                dragPreview(dragging)
-                    .position(dragLocation)
-                    .allowsHitTesting(false)
+            GeometryReader { proxy in
+                ZStack {
+                    insertionIndicatorsOverlay
+
+                    if let dragging, let dragLocation {
+                        dragPreview(dragging)
+                            .position(
+                                x: resolvedDragPreviewX(for: dragging, fallback: dragLocation.x),
+                                y: dragLocation.y
+                            )
+                    }
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
             }
+            .allowsHitTesting(false)
         }
         .preferredColorScheme(.dark)
     }
@@ -344,32 +355,15 @@ private struct TimeTableEditContent: View {
 
             LazyVStack(spacing: DDSpacing.large) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    VStack(spacing: DDSpacing.large) {
-                        if shouldShowReorderGap(before: row.id) {
-                            Color.clear
-                                .frame(height: 71)
-                                .accessibilityHidden(true)
-                        }
-
-                        HStack(alignment: .top, spacing: 20) {
-                            timelineMarker(index: index, count: rows.count)
-                            rowCards(row)
-                        }
-                        .padding(.leading, DDSpacing.medium)
-                        .padding(.trailing, DDSpacing.large)
-                        .background(dropFrame("row:\(row.id)"))
+                    HStack(alignment: .top, spacing: 20) {
+                        timelineMarker(index: index, count: rows.count)
+                        rowCards(row)
                     }
-                    .overlay(alignment: .top) {
-                        if dragging != nil {
-                            insertionDropArea(before: row.id)
-                                .padding(.leading, 48)
-                                .padding(.trailing, DDSpacing.large)
-                                .offset(y: -(DDSpacing.xLarge / 2 + DDSpacing.small))
-                        }
-                    }
+                    .padding(.leading, DDSpacing.medium)
+                    .padding(.trailing, DDSpacing.large)
+                    .background(dropFrame("row:\(row.id)"))
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: targetedRowID)
         }
         .padding(.top, DDSpacing.large)
     }
@@ -526,6 +520,9 @@ private struct TimeTableEditContent: View {
                         if dragPreviewSize == nil,
                            let frame = dropFrames[dragFrameID(item)] {
                             dragPreviewSize = frame.size
+                            if case .row = item {
+                                dragPreviewX = frame.midX
+                            }
                         }
                         if case .row = item {
                             isDeletionOverlayPresented = true
@@ -539,8 +536,7 @@ private struct TimeTableEditContent: View {
                     }
                 }
                 .onEnded { phase in
-                    if case let .second(true, drag?) = phase {
-                        updateDropTarget(at: drag.location)
+                    if case .second(true, _?) = phase {
                         commitDrop()
                     }
                     finishDrag()
@@ -566,34 +562,50 @@ private struct TimeTableEditContent: View {
     }
 
     private var appendDropArea: some View {
-        ZStack {
-            if isAppendTargeted {
-                insertionIndicator
-            }
-        }
+        Color.clear
         .frame(maxWidth: .infinity)
-        .frame(height: isReorderingSchedule && isAppendTargeted ? 71 + DDSpacing.large : DDSpacing.large)
+        .frame(height: DDSpacing.large)
         .contentShape(Rectangle())
         .background(dropFrame("append"))
-        .animation(.easeInOut(duration: 0.2), value: isAppendTargeted)
-    }
-
-    private func insertionDropArea(before rowID: TimeTableEditRow.ID) -> some View {
-        ZStack {
-            if targetedRowID == rowID {
-                insertionIndicator
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: DDSpacing.xLarge)
-        .contentShape(Rectangle())
-        .background(dropFrame("insert:\(rowID)"))
     }
 
     private var insertionIndicator: some View {
         Capsule()
             .fill(DDColor.actionPrimary)
             .frame(height: 2)
+    }
+
+    @ViewBuilder
+    private var insertionIndicatorsOverlay: some View {
+        if let targetedRowID,
+           let frame = dropFrames["row:\(targetedRowID)"] {
+            insertionIndicator
+                .frame(width: max(0, frame.width - 48 - DDSpacing.large))
+                .position(
+                    x: frame.minX + 48 + (frame.width - 48 - DDSpacing.large) / 2,
+                    y: frame.minY - DDSpacing.small
+                )
+                .zIndex(2)
+                .allowsHitTesting(false)
+        } else if isAppendTargeted {
+            if let lastRow = rows.last,
+               let frame = dropFrames["row:\(lastRow.id)"] {
+                insertionIndicator
+                    .frame(width: max(0, frame.width - 48 - DDSpacing.large))
+                    .position(
+                        x: frame.minX + 48 + (frame.width - 48 - DDSpacing.large) / 2,
+                        y: frame.maxY + DDSpacing.small
+                    )
+                    .zIndex(2)
+                    .allowsHitTesting(false)
+            } else if let frame = dropFrames["append"] {
+                insertionIndicator
+                    .frame(width: frame.width)
+                    .position(x: frame.midX, y: frame.midY)
+                    .zIndex(2)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     private var deletionDropArea: some View {
@@ -632,12 +644,10 @@ private struct TimeTableEditContent: View {
 
     private func updateDropTarget(at location: CGPoint) {
         let target: DropTarget?
-        if case .row = dragging, dropFrames["trash"]?.contains(location) == true {
+        if let insertionTarget = insertionTarget(at: location) {
+            target = insertionTarget
+        } else if case .row = dragging, dropFrames["trash"]?.contains(location) == true {
             target = .trash
-        } else if let row = rows.first(where: {
-            dropFrames["insert:\($0.id)"]?.contains(location) == true
-        }) {
-            target = .row(row.id)
         } else if let row = rows.first(where: { dropFrames["row:\($0.id)"]?.contains(location) == true }),
            let frame = dropFrames["row:\(row.id)"] {
             switch dragging {
@@ -665,6 +675,26 @@ private struct TimeTableEditContent: View {
         isAppendTargeted = target == .append
     }
 
+    private func insertionTarget(at location: CGPoint) -> DropTarget? {
+        for row in rows {
+            guard let frame = dropFrames["row:\(row.id)"] else { continue }
+
+            let horizontalRange = (frame.minX + 48)...(frame.maxX - DDSpacing.large)
+            let verticalRange = (frame.minY - DDSpacing.large)...frame.minY
+            if horizontalRange.contains(location.x), verticalRange.contains(location.y) {
+                return .row(row.id)
+            }
+        }
+
+        guard let lastRow = rows.last,
+              let lastFrame = dropFrames["row:\(lastRow.id)"] else { return nil }
+        let horizontalRange = (lastFrame.minX + 48)...(lastFrame.maxX - DDSpacing.large)
+        let verticalRange = lastFrame.maxY...(lastFrame.maxY + DDSpacing.large)
+        return horizontalRange.contains(location.x) && verticalRange.contains(location.y)
+            ? .append
+            : nil
+    }
+
     private func commitDrop() {
         switch activeDropTarget {
         case let .row(id): _ = drop(before: id)
@@ -683,6 +713,7 @@ private struct TimeTableEditContent: View {
         isDeletionOverlayPresented = false
         dragLocation = nil
         dragPreviewSize = nil
+        dragPreviewX = nil
         activeDropTarget = nil
         targetedRowID = nil
         isAppendTargeted = false
@@ -726,13 +757,6 @@ private struct TimeTableEditContent: View {
         )
     }
 
-    private func shouldShowReorderGap(before rowID: TimeTableEditRow.ID) -> Bool {
-        guard isReorderingSchedule,
-              targetedRowID == rowID,
-              draggedRowID != rowID else { return false }
-        return true
-    }
-
     private func dragFrameID(_ item: DraggedItem) -> String {
         switch item {
         case let .recommendation(id):
@@ -745,6 +769,11 @@ private struct TimeTableEditContent: View {
                 return "card:row:\(rowID):recommendation:\(id)"
             }
         }
+    }
+
+    private func resolvedDragPreviewX(for item: DraggedItem, fallback: CGFloat) -> CGFloat {
+        guard case .row = item else { return fallback }
+        return dragPreviewX ?? fallback
     }
 
     private func drop(before targetID: String?) -> Bool {

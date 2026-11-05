@@ -187,7 +187,9 @@ struct HomeFeature: Reducer {
                                 category: place.category,
                                 groupCategories: group.categories,
                                 memberIDs: group.memberIDs,
-                                placeOwnerMemberIDs: ownerIDs
+                                placeOwnerMemberIDs: ownerIDs,
+                                latitude: place.latitude,
+                                longitude: place.longitude
                             )
                         }
                     }

@@ -191,7 +191,15 @@ struct TimeTableFeature: Reducer {
                             placeNames: places.map(\.placeName),
                             categories: categories,
                             members: memberIDs.compactMap(TripMember.init(rawValue:)),
-                            durationMinutes: max(60, places.count * 60)
+                            durationMinutes: max(60, places.count * 60),
+                            places: places.map {
+                                ItineraryPlace(
+                                    name: $0.placeName,
+                                    category: $0.category,
+                                    latitude: $0.latitude,
+                                    longitude: $0.longitude
+                                )
+                            }
                         )
                         coursesByID[nextCourseID] = course
                         edit.draftPlacements.append(
@@ -277,7 +285,8 @@ struct TimeTableFeature: Reducer {
                         placeNames: course.placeNames,
                         categories: course.categories,
                         members: course.memberIDs.compactMap(TripMember.init(rawValue:)),
-                        durationMinutes: course.durationMinutes
+                        durationMinutes: course.durationMinutes,
+                        places: course.places
                     )
                     return (value.id, value)
                 })
@@ -458,7 +467,8 @@ struct TimeTableFeature: Reducer {
                             placeNames: course.placeNames,
                             categories: course.categories,
                             memberIDs: course.members.map(\.rawValue),
-                            durationMinutes: course.durationMinutes
+                            durationMinutes: course.durationMinutes,
+                            places: course.places
                         )
                     }
                 let schedules = state.edit.draftPlacements.map { schedule in
@@ -675,6 +685,8 @@ struct TimeTableRecommendation: Equatable, Identifiable {
     var groupCategories: [String] = []
     let memberIDs: [String]
     let placeOwnerMemberIDs: [String]
+    var latitude: Double = 0
+    var longitude: Double = 0
 
     #if DEBUG
     static let debugTokyoRecommendations: [Self] = [
@@ -769,6 +781,7 @@ struct TimeTableCourse: Equatable, Identifiable {
     let categories: [String]
     let members: [TripMember]
     let durationMinutes: Int
+    let places: [ItineraryPlace]
 
     init(
         id: Int,
@@ -777,7 +790,8 @@ struct TimeTableCourse: Equatable, Identifiable {
         placeNames: [String],
         categories: [String] = [],
         members: [TripMember],
-        durationMinutes: Int
+        durationMinutes: Int,
+        places: [ItineraryPlace] = []
     ) {
         self.id = id
         self.title = title
@@ -786,6 +800,7 @@ struct TimeTableCourse: Equatable, Identifiable {
         self.categories = categories
         self.members = members
         self.durationMinutes = durationMinutes
+        self.places = places
     }
 
     func kind(among tripMembers: [TripMember]) -> Kind? {

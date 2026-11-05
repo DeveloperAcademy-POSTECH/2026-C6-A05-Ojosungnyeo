@@ -456,7 +456,15 @@ enum FirebaseTripService {
                 "placeNames": course.placeNames,
                 "categories": course.categories,
                 "memberIDs": course.memberIDs,
-                "durationMinutes": course.durationMinutes
+                "durationMinutes": course.durationMinutes,
+                "places": course.places.map {
+                    [
+                        "name": $0.name,
+                        "category": $0.category,
+                        "latitude": $0.latitude,
+                        "longitude": $0.longitude
+                    ]
+                }
             ]
         }
         let scheduleData: [[String: Any]] = request.schedules.map { schedule in
@@ -519,7 +527,19 @@ enum FirebaseTripService {
                 placeNames: data["placeNames"] as? [String] ?? [],
                 categories: data["categories"] as? [String] ?? [],
                 memberIDs: data["memberIDs"] as? [String] ?? [],
-                durationMinutes: data["durationMinutes"] as? Int ?? 60
+                durationMinutes: data["durationMinutes"] as? Int ?? 60,
+                places: (data["places"] as? [[String: Any]] ?? []).compactMap { place in
+                    guard let name = place["name"] as? String,
+                          let latitude = place["latitude"] as? Double,
+                          let longitude = place["longitude"] as? Double
+                    else { return nil }
+                    return ItineraryPlace(
+                        name: name,
+                        category: place["category"] as? String ?? "",
+                        latitude: latitude,
+                        longitude: longitude
+                    )
+                }
             )
         }
         let schedules: [TripItinerarySaveRequest.Schedule] =

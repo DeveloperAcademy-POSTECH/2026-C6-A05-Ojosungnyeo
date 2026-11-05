@@ -39,7 +39,7 @@ struct RouteOverviewFeature: Reducer {
         }
 
         var visibleStops: [RouteStop] {
-            visibleStopGroups.flatMap(\.stops)
+            visibleStopGroups.flatMap(\.stops).flatMap(\.mapStops)
         }
 
         var selectedPlace: RoutePlace {
@@ -68,6 +68,7 @@ struct RouteOverviewFeature: Reducer {
                             name: course.title,
                             category: course.categorySummary,
                             placeNames: course.placeNames,
+                            places: course.places,
                             latitude: 35.6812 + Double(index) * 0.006,
                             longitude: 139.7671 + Double(index % 2 == 0 ? index : -index) * 0.005,
                             members: Set(course.members),
@@ -146,6 +147,7 @@ struct RouteStop: Equatable, Identifiable {
     let name: String
     let category: String
     let placeNames: [String]
+    let places: [ItineraryPlace]
     let latitude: Double
     let longitude: Double
     let members: Set<TripMember>
@@ -157,6 +159,7 @@ struct RouteStop: Equatable, Identifiable {
         name: String,
         category: String,
         placeNames: [String]? = nil,
+        places: [ItineraryPlace] = [],
         latitude: Double,
         longitude: Double,
         members: Set<TripMember>,
@@ -167,6 +170,7 @@ struct RouteStop: Equatable, Identifiable {
         self.name = name
         self.category = category
         self.placeNames = placeNames ?? [name]
+        self.places = places
         self.latitude = latitude
         self.longitude = longitude
         self.members = members
@@ -180,11 +184,29 @@ struct RouteStop: Equatable, Identifiable {
             name: name,
             category: category,
             placeNames: placeNames,
+            places: places,
             latitude: latitude,
             longitude: longitude,
             members: members,
             scheduleID: scheduleID
         )
+    }
+
+    var mapStops: [RouteStop] {
+        guard !places.isEmpty else { return [self] }
+        return places.enumerated().map { index, place in
+            RouteStop(
+                id: 1_000_000 + id * 10_000 + index,
+                order: order,
+                name: place.name,
+                category: place.category,
+                placeNames: [place.name],
+                latitude: place.latitude,
+                longitude: place.longitude,
+                members: members,
+                scheduleID: scheduleID
+            )
+        }
     }
 
     static let stopsByDay: [TripDay: [RouteStop]] = [

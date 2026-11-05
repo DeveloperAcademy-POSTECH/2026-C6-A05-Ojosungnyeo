@@ -176,6 +176,7 @@ struct SelectedPlaceBottomSheet: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
+        .ddFillBottomSheetToScreenEdge()
         .task(id: isCopyToastPresented) {
             guard isCopyToastPresented else { return }
             try? await Task.sleep(nanoseconds: 1_500_000_000)

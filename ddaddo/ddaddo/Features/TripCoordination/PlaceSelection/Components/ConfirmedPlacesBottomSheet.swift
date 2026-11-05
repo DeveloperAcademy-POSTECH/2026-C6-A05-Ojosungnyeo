@@ -91,5 +91,6 @@ struct ConfirmedPlacesBottomSheet: View {
             .stroke(DDColor.borderDefault, lineWidth: 1)
             .allowsHitTesting(false)
         }
+        .ddFillBottomSheetToScreenEdge()
     }
 }

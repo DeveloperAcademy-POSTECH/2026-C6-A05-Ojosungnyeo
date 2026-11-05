@@ -68,6 +68,7 @@ struct PlaceSelectionBottomSheet: View {
             .stroke(DDColor.borderDefault, lineWidth: 1)
             .allowsHitTesting(false)
         }
+        .ddFillBottomSheetToScreenEdge()
     }
 
     private var avatarGroup: some View {

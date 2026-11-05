@@ -228,6 +228,9 @@ struct PlaceGroupingView: View {
                 )
                 .frame(height: 535)
         }
+        .ddFillBottomSheetToScreenEdge(
+            color: Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)
+        )
         .ignoresSafeArea(edges: .bottom)
     }
 

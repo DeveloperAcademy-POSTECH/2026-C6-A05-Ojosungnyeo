@@ -131,6 +131,7 @@ struct MemberPlacesBottomSheet: View {
             .stroke(DDColor.borderDefault, lineWidth: 1)
             .allowsHitTesting(false)
         }
+        .ddFillBottomSheetToScreenEdge()
     }
 
     private var memberSelector: some View {

@@ -137,6 +137,7 @@ struct RouteOverviewView: View {
         )
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .ddFillBottomSheetToScreenEdge()
         .offset(y: tabBarCoveredHeight)
         .contentShape(.rect)
         .gesture(

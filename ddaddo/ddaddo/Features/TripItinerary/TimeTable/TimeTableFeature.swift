@@ -27,6 +27,7 @@ struct TimeTableFeature: Reducer {
             .day1: 22, .day2: 23, .day3: 24, .day4: 25
         ]
         var coursesByID: [TimeTableCourse.ID: TimeTableCourse] = [:]
+        var expandedCourseIDs: Set<TimeTableCourse.ID> = []
         var groups: [TimeTableGroup] = []
         var placements: [TimeTableSchedule] = []
         var hasLoadedItinerary = false
@@ -226,6 +227,7 @@ struct TimeTableFeature: Reducer {
         case daySelected(TripDay)
         case groupAddButtonTapped(TimeTableGroup.ID)
         case scheduleTapped(TimeTableSchedule.ID)
+        case courseDisclosureTapped(TimeTableCourse.ID)
         case validateSelectedDay
         case onAppear
         case itineraryLoaded(TripItinerarySnapshot?)
@@ -242,6 +244,14 @@ struct TimeTableFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .backButtonTapped, .groupAddButtonTapped, .scheduleTapped, .delegate:
+                return .none
+
+            case let .courseDisclosureTapped(courseID):
+                if state.expandedCourseIDs.contains(courseID) {
+                    state.expandedCourseIDs.remove(courseID)
+                } else {
+                    state.expandedCourseIDs.insert(courseID)
+                }
                 return .none
 
             case .onAppear:

@@ -125,7 +125,7 @@ struct PlaceSelectionFeature: Reducer {
         }
 
         var navigationTitle: String {
-            "\(numberOfNights)박 \(numberOfDays)일 \(destinationName)여행"
+            "\(numberOfNights)박 \(numberOfDays)일 \(destinationName) 여행"
         }
 
         var currentMember: TripMember {

@@ -114,6 +114,8 @@ struct PlaceGroupingFeature: Reducer {
         case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
+        case groupConfirmationsResponse([MemberGroupConfirmation])
+        case groupConfirmationsFailed
         case placePhotoResponse(String, Data?)
         case backButtonTapped
         case travelCriteriaChangeTapped
@@ -139,6 +141,7 @@ struct PlaceGroupingFeature: Reducer {
                 var effects = placePhotoEffects(state: &state)
                 if let tripID = state.sourcePlaceSelection?.tripID {
                     effects.append(fetchMemberPlacesEffect(tripID: tripID))
+                    effects.append(fetchGroupConfirmationsEffect(tripID: tripID))
                     effects.append(
                         observeMemberPlacesEffect(tripID: tripID)
                         .cancellable(id: "place-grouping-member-places", cancelInFlight: true)
@@ -209,6 +212,18 @@ struct PlaceGroupingFeature: Reducer {
                 return .merge(placePhotoEffects(state: &state))
 
             case .memberPlacesFailed:
+                return .none
+
+            case let .groupConfirmationsResponse(confirmations):
+                guard let currentMemberConfirmation = confirmations.first(where: {
+                    $0.member.rawValue == state.currentMemberID
+                }), currentMemberConfirmation.isConfirmed else { return .none }
+                let availableGroupIDs = Set(state.recommendedGroups.map(\.id))
+                state.confirmedGroupIDs = Set(currentMemberConfirmation.confirmedGroupIDs)
+                    .intersection(availableGroupIDs)
+                return .none
+
+            case .groupConfirmationsFailed:
                 return .none
 
             case let .placePhotoResponse(placeID, data):
@@ -438,6 +453,18 @@ struct PlaceGroupingFeature: Reducer {
                 await send(.memberPlacesResponse(memberPlaces))
             } catch {
                 await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func fetchGroupConfirmationsEffect(tripID: String) -> Effect<Action> {
+        .run { send in
+            do {
+                await send(.groupConfirmationsResponse(
+                    try await placeClient.fetchGroupConfirmations(tripID)
+                ))
+            } catch {
+                await send(.groupConfirmationsFailed)
             }
         }
     }

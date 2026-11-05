@@ -236,7 +236,11 @@ struct HomeFeature: Reducer {
                 return .none
             case let .upcomingTrips(.delegate(.proceedToGrouping(placeSelection))):
                 state.placeSelection = placeSelection
-                state.placeGrouping = PlaceGroupingFeature.State(placeSelection: placeSelection)
+                if state.placeGrouping.sourcePlaceSelection?.tripID == placeSelection.tripID {
+                    state.placeGrouping.sourcePlaceSelection = placeSelection
+                } else {
+                    state.placeGrouping = PlaceGroupingFeature.State(placeSelection: placeSelection)
+                }
                 state.isUpcomingTripsPresented = false
                 state.isPlaceSelectionPresented = false
                 state.isPlaceAnalysisLoading = false

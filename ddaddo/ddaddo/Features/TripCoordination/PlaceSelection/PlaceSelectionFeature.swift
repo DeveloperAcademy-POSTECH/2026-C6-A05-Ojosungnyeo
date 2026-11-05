@@ -77,6 +77,7 @@ struct PlaceSelectionFeature: Reducer {
         var hasSelectionEnded = false
         var isEditingConfirmedPlaces = false
         var completionAlert: CompletionAlert?
+        var pendingDeletionPlaceID: String?
         var placeSyncErrorMessage: String?
         var requestedPhotoPlaceIDs: Set<String> = []
         var hasRestoredSavedPlacesPresentation = false
@@ -125,7 +126,7 @@ struct PlaceSelectionFeature: Reducer {
         }
 
         var navigationTitle: String {
-            "\(numberOfNights)박 \(numberOfDays)일 \(destinationName)여행"
+            "\(numberOfNights)박 \(numberOfDays)일 \(destinationName) 여행"
         }
 
         var currentMember: TripMember {
@@ -368,7 +369,9 @@ struct PlaceSelectionFeature: Reducer {
         case pinnedPlaceDetailsResponse(String, PlaceDetails)
         case pinnedPlaceDetailsFailed(String)
         case deletePinnedPlaceButtonTapped(String)
-        case movePinnedPlace(sourceID: String, beforeID: String)
+        case deleteConfirmationCancelTapped
+        case deleteConfirmationConfirmTapped
+        case movePinnedPlace(sourceID: String, beforeID: String?)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
         case confirmedPlacesEditButtonTapped
@@ -665,6 +668,18 @@ struct PlaceSelectionFeature: Reducer {
 
             case let .deletePinnedPlaceButtonTapped(placeID):
                 guard state.isViewingCurrentUser else { return .none }
+                state.pendingDeletionPlaceID = placeID
+                return .none
+
+            case .deleteConfirmationCancelTapped:
+                state.pendingDeletionPlaceID = nil
+                return .none
+
+            case .deleteConfirmationConfirmTapped:
+                guard state.isViewingCurrentUser,
+                      let placeID = state.pendingDeletionPlaceID
+                else { return .none }
+                state.pendingDeletionPlaceID = nil
                 state.memberPlaces[state.currentMember, default: []].removeAll {
                     $0.id == placeID
                 }
@@ -686,17 +701,15 @@ struct PlaceSelectionFeature: Reducer {
             case let .movePinnedPlace(sourceID, beforeID):
                 guard state.isViewingCurrentUser else { return .none }
                 var places = state.memberPlaces[state.currentMember, default: []]
-                guard
-                    sourceID != beforeID,
-                    let sourceIndex = places.firstIndex(where: { $0.id == sourceID }),
-                    let destinationIndex = places.firstIndex(where: { $0.id == beforeID })
+                guard sourceID != beforeID,
+                      let sourceIndex = places.firstIndex(where: { $0.id == sourceID })
                 else { return .none }
 
                 let place = places.remove(at: sourceIndex)
-                let adjustedDestination = sourceIndex < destinationIndex
-                    ? destinationIndex - 1
-                    : destinationIndex
-                places.insert(place, at: adjustedDestination)
+                let destinationIndex = beforeID.flatMap { beforeID in
+                    places.firstIndex(where: { $0.id == beforeID })
+                } ?? places.endIndex
+                places.insert(place, at: destinationIndex)
                 state.memberPlaces[state.currentMember] = places
 
                 let tripID = state.tripID

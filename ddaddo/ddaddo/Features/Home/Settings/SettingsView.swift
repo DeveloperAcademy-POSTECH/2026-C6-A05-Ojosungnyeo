@@ -102,9 +102,18 @@ struct SettingsView: View {
             sectionTitle("계정")
                 .padding(.top, 24)
                 .padding(.bottom, 4)
-            Button { store.send(.accountManagementTapped) } label: {
-                card { HStack { rowText("계정 관리", "로그인과 회원 탈퇴를 관리해요"); Spacer(); Image(systemName: "chevron.right") } }
-            }.buttonStyle(.plain)
+            card {
+                HStack {
+                    rowText("계정 관리", "로그인과 회원 탈퇴를 관리해요")
+                    Spacer()
+                    navigationButton(
+                        systemName: "chevron.right",
+                        accessibilityLabel: "계정 관리로 이동"
+                    ) {
+                        store.send(.accountManagementTapped)
+                    }
+                }
+            }
             Spacer()
         }.padding(.horizontal, 24)
     }
@@ -145,14 +154,14 @@ struct SettingsView: View {
                 .padding(.top, 24)
                 .padding(.bottom, 4)
             card(minHeight: 78) {
-                VStack(alignment: .center, spacing: 4) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Apple로 로그인")
                         .ddTypography(.bodyEmphasis16)
                     Text("현재 연결된 계정")
                         .ddTypography(.caption12)
                         .foregroundStyle(DDColor.textSecondary)
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             sectionTitle("계정 작업")
                 .padding(.top, 24)
@@ -236,15 +245,57 @@ struct SettingsView: View {
     }
 
     private func header(_ title: String) -> some View {
-        Button { store.send(.backButtonTapped) } label: {
-            HStack(spacing: 10) { Image(systemName: "chevron.left"); Text(title).ddTypography(.title24); Spacer() }
-                .foregroundStyle(DDColor.textPrimary).frame(height: 61)
-        }.buttonStyle(.plain)
+        HStack(spacing: 10) {
+            navigationButton(
+                systemName: "chevron.left",
+                accessibilityLabel: "이전 화면으로 이동",
+                width: 10
+            ) {
+                store.send(.backButtonTapped)
+            }
+            Text(title)
+                .ddTypography(.title24)
+            Spacer()
+        }
+        .foregroundStyle(DDColor.textPrimary)
+        .frame(height: 61)
     }
     private func sectionTitle(_ title: String) -> some View { Text(title).ddTypography(.labelEmphasis14).frame(maxWidth: .infinity, alignment: .leading) }
     private func card<Content: View>(minHeight: CGFloat = 74, @ViewBuilder _ content: () -> Content) -> some View { content().padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) } }
     private func rowText(_ title: String, _ subtitle: String) -> some View { VStack(alignment: .leading, spacing: 4) { Text(title).ddTypography(.bodyEmphasis16); Text(subtitle).ddTypography(.caption12).foregroundStyle(DDColor.textSecondary) } }
-    private func accountAction(_ title: String, _ subtitle: String, color: Color, action: @escaping () -> Void) -> some View { Button(action: action) { HStack { rowText(title, subtitle).foregroundStyle(color); Spacer(); Image(systemName: "chevron.right").foregroundStyle(DDColor.textPrimary) }.frame(height: 76) }.buttonStyle(.plain) }
+    private func accountAction(
+        _ title: String,
+        _ subtitle: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack {
+            rowText(title, subtitle)
+                .foregroundStyle(color)
+            Spacer()
+            navigationButton(
+                systemName: "chevron.right",
+                accessibilityLabel: "\(title) 화면으로 이동",
+                action: action
+            )
+            .foregroundStyle(DDColor.textPrimary)
+        }
+        .frame(height: 76)
+    }
+    private func navigationButton(
+        systemName: String,
+        accessibilityLabel: String,
+        width: CGFloat = 44,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .frame(width: width, height: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+    }
     private var withdrawalCheckbox: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 5)

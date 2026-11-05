@@ -12,6 +12,8 @@ import Foundation
 struct PlaceGroupingFeature: Reducer {
     enum Delegate: Equatable {
         case proceedToItinerary
+        case reanalyzeGrouping
+        case returnToUpcomingTrips
     }
 
     enum Tab: Equatable {
@@ -46,8 +48,7 @@ struct PlaceGroupingFeature: Reducer {
         )
         var transportationSheet = TripSetUpTransportationFeature.State()
         var isTransportationSheetPresented = false
-        var isReanalyzing = false
-        var hasRequestedPlacePhotos = false
+        var requestedPlacePhotoIDs: Set<String> = []
         var sourcePlaceSelection: PlaceSelectionFeature.State?
         var selectedTab = Tab.preferences
         var members = PlaceGroupingPreviewData.members
@@ -113,11 +114,15 @@ struct PlaceGroupingFeature: Reducer {
         case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
+        case groupConfirmationsResponse([MemberGroupConfirmation])
+        case groupConfirmationsFailed
         case placePhotoResponse(String, Data?)
+        case backButtonTapped
         case travelCriteriaChangeTapped
+        case criteriaChangeCancelTapped
+        case criteriaChangeConfirmTapped
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
-        case reanalysisFinished
         case tabSelected(Tab)
         case memberTapped(String)
         case recommendedGroupTapped(String)
@@ -133,35 +138,10 @@ struct PlaceGroupingFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                var effects: [Effect<Action>] = []
-                if !state.hasRequestedPlacePhotos {
-                    state.hasRequestedPlacePhotos = true
-                    let placesByID = state.recommendedGroups
-                        .flatMap(\.places)
-                        .reduce(into: [String: PinnedPlace]()) { result, place in
-                            result[place.id] = place
-                        }
-                    effects.append(contentsOf: placesByID.values.map { place in
-                        .run { send in
-                            if let image = place.photoData.first {
-                                await send(.placePhotoResponse(place.id, image))
-                                return
-                            }
-                            do {
-                                guard let result = try await placeClient.autocomplete(place.name).first else {
-                                    await send(.placePhotoResponse(place.id, nil))
-                                    return
-                                }
-                                let details = try await placeClient.fetchDetails(result)
-                                await send(.placePhotoResponse(place.id, details.photoData.first))
-                            } catch {
-                                await send(.placePhotoResponse(place.id, nil))
-                            }
-                        }
-                    })
-                }
+                var effects = placePhotoEffects(state: &state)
                 if let tripID = state.sourcePlaceSelection?.tripID {
                     effects.append(fetchMemberPlacesEffect(tripID: tripID))
+                    effects.append(fetchGroupConfirmationsEffect(tripID: tripID))
                     effects.append(
                         observeMemberPlacesEffect(tripID: tripID)
                         .cancellable(id: "place-grouping-member-places", cancelInFlight: true)
@@ -229,9 +209,21 @@ struct PlaceGroupingFeature: Reducer {
                     )
                 }
                 state.confirmedGroupIDs.formIntersection(state.recommendedGroups.map(\.id))
-                return .none
+                return .merge(placePhotoEffects(state: &state))
 
             case .memberPlacesFailed:
+                return .none
+
+            case let .groupConfirmationsResponse(confirmations):
+                guard let currentMemberConfirmation = confirmations.first(where: {
+                    $0.member.rawValue == state.currentMemberID
+                }), currentMemberConfirmation.isConfirmed else { return .none }
+                let availableGroupIDs = Set(state.recommendedGroups.map(\.id))
+                state.confirmedGroupIDs = Set(currentMemberConfirmation.confirmedGroupIDs)
+                    .intersection(availableGroupIDs)
+                return .none
+
+            case .groupConfirmationsFailed:
                 return .none
 
             case let .placePhotoResponse(placeID, data):
@@ -282,7 +274,19 @@ struct PlaceGroupingFeature: Reducer {
                 }
                 return .none
 
+            case .backButtonTapped:
+                return .send(.delegate(.returnToUpcomingTrips))
+
             case .travelCriteriaChangeTapped:
+                state.isCriteriaChangeConfirmationPresented = true
+                return .none
+
+            case .criteriaChangeCancelTapped:
+                state.isCriteriaChangeConfirmationPresented = false
+                return .none
+
+            case .criteriaChangeConfirmTapped:
+                state.isCriteriaChangeConfirmationPresented = false
                 state.transportationSheet = TripSetUpTransportationFeature.State(
                     selection: state.transportationSelection
                 )
@@ -295,22 +299,18 @@ struct PlaceGroupingFeature: Reducer {
             case let .transportationSheet(.delegate(.completed(selection))):
                 state.isTransportationSheetPresented = false
                 state.transportationSelection = selection
+                state.travelCriteria = "\(selection.transportation.title) · 장소 간 최대 \(selection.duration.rawValue)분"
                 guard let source = state.sourcePlaceSelection else { return .none }
                 let refreshed = State(
                     placeSelection: source,
                     transportationSelection: selection
                 )
-                state.travelCriteria = refreshed.travelCriteria
                 state.members = refreshed.members
                 state.placeGroups = refreshed.placeGroups
                 state.recommendedGroups = refreshed.recommendedGroups
                 state.confirmedGroupIDs = []
                 state.selectedGroupID = nil
-                state.isReanalyzing = true
-                return .none
-            case .reanalysisFinished:
-                state.isReanalyzing = false
-                return .none
+                return .send(.delegate(.reanalyzeGrouping))
             case .transportationSheet:
                 return .none
             case .memberTapped:
@@ -360,6 +360,38 @@ struct PlaceGroupingFeature: Reducer {
                         id: group.id,
                         name: group.name,
                         places: group.places.filter { $0.id != placeID },
+                        radius: group.radius
+                    )
+                }
+                return .none
+            case let .detail(.delegate(.placesReordered(placeIDs))):
+                guard let selectedGroupID = state.selectedGroupID else { return .none }
+                let orderByID = Dictionary(
+                    uniqueKeysWithValues: placeIDs.enumerated().map { ($1, $0) }
+                )
+                let reorder: ([PinnedPlace]) -> [PinnedPlace] = { places in
+                    places.sorted {
+                        orderByID[$0.id, default: Int.max]
+                            < orderByID[$1.id, default: Int.max]
+                    }
+                }
+                state.recommendedGroups = state.recommendedGroups.map { group in
+                    guard group.id == selectedGroupID else { return group }
+                    return RecommendedGroup(
+                        id: group.id,
+                        title: group.title,
+                        participantSummary: group.participantSummary,
+                        memberIDs: group.memberIDs,
+                        categories: group.categories,
+                        places: reorder(group.places)
+                    )
+                }
+                state.placeGroups = state.placeGroups.map { group in
+                    guard group.id == selectedGroupID else { return group }
+                    return MapPlaceGroup(
+                        id: group.id,
+                        name: group.name,
+                        places: reorder(group.places),
                         radius: group.radius
                     )
                 }
@@ -425,6 +457,18 @@ struct PlaceGroupingFeature: Reducer {
         }
     }
 
+    private func fetchGroupConfirmationsEffect(tripID: String) -> Effect<Action> {
+        .run { send in
+            do {
+                await send(.groupConfirmationsResponse(
+                    try await placeClient.fetchGroupConfirmations(tripID)
+                ))
+            } catch {
+                await send(.groupConfirmationsFailed)
+            }
+        }
+    }
+
     private func observeMemberPlacesEffect(tripID: String) -> Effect<Action> {
         let stream = placeClient.observeMemberPlaces(tripID)
         return .run { send in
@@ -434,6 +478,36 @@ struct PlaceGroupingFeature: Reducer {
                 }
             } catch {
                 await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func placePhotoEffects(state: inout State) -> [Effect<Action>] {
+        let placesByID = state.recommendedGroups
+            .flatMap(\.places)
+            .reduce(into: [String: PinnedPlace]()) { result, place in
+                result[place.id] = place
+            }
+        let placesNeedingPhotos = placesByID.values.filter { place in
+            place.photoData.isEmpty
+                && place.thumbnailName.isEmpty
+                && !state.requestedPlacePhotoIDs.contains(place.id)
+        }
+        state.requestedPlacePhotoIDs.formUnion(placesNeedingPhotos.map(\.id))
+
+        return placesNeedingPhotos.map { place in
+            .run { send in
+                do {
+                    let result = PlaceSearchResult(
+                        id: place.id,
+                        name: place.name,
+                        address: place.description
+                    )
+                    let details = try await placeClient.fetchDetails(result)
+                    await send(.placePhotoResponse(place.id, details.photoData.first))
+                } catch {
+                    await send(.placePhotoResponse(place.id, nil))
+                }
             }
         }
     }

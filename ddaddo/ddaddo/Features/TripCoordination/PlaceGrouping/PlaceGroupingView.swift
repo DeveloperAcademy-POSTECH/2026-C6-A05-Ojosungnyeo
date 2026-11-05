@@ -54,14 +54,25 @@ struct PlaceGroupingView: View {
                 .transition(.move(edge: .trailing))
             }
 
-            if store.isReanalyzing {
-                LoadingView(message: "여행 취향과 장소를 다시 분석 중...")
-                    .zIndex(5)
-                    .task {
-                        try? await Task.sleep(for: .seconds(1.5))
-                        guard !Task.isCancelled else { return }
-                        store.send(.reanalysisFinished)
+            if store.isCriteriaChangeConfirmationPresented {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .zIndex(6)
+
+                DDConfirmationAlert(
+                    title: "알림",
+                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    onCancel: {
+                        store.send(.criteriaChangeCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.criteriaChangeConfirmTapped)
                     }
+                )
+                .frame(maxHeight: .infinity)
+                .zIndex(7)
             }
         }
         .animation(
@@ -74,7 +85,7 @@ struct PlaceGroupingView: View {
         )
         .animation(
             .easeInOut(duration: 0.2),
-            value: store.isReanalyzing
+            value: store.isCriteriaChangeConfirmationPresented
         )
         .sheet(
             isPresented: Binding(
@@ -105,16 +116,38 @@ struct PlaceGroupingView: View {
     }
 
     private var tripHeader: some View {
-        VStack(spacing: 0) {
-            Text(store.tripTitle)
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textPrimary)
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                Text(store.tripTitle)
+                    .ddTypography(.label14)
+                    .foregroundStyle(DDColor.textPrimary)
 
-            Text(store.tripDates)
-                .ddTypography(.label14)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
-                .frame(width: 200, height: 20, alignment: .top)
+                Text(store.tripDates)
+                    .ddTypography(.label14)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
+                    .frame(width: 200, height: 20, alignment: .top)
+            }
+
+            HStack {
+                Button {
+                    store.send(.backButtonTapped)
+                } label: {
+                    ZStack(alignment: .topLeading) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 25, weight: .regular))
+                            .padding(.top, 4)
+                    }
+                    .frame(width: 44, height: 44, alignment: .topLeading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("예정된 여행으로 돌아가기")
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(DDColor.textPrimary)
+            .padding(.horizontal, DDSpacing.large)
         }
         .frame(height: 51, alignment: .top)
     }
@@ -147,11 +180,11 @@ struct PlaceGroupingView: View {
                 .fill(Color(red: 85 / 255, green: 85 / 255, blue: 85 / 255))
                 .frame(width: 142, height: 5)
                 .padding(.top, 16)
-                .padding(.bottom, 17)
+                .padding(.bottom, 14)
 
             tabSelector
                 .padding(.horizontal, DDSpacing.large)
-                .padding(.bottom, 15)
+                .padding(.bottom, 14)
 
             if store.selectedTab == .preferences {
                 ScrollView {
@@ -171,15 +204,23 @@ struct PlaceGroupingView: View {
         .frame(height: 413, alignment: .top)
         .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .overlay(alignment: .top) {
+            UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40)
+                .stroke(
+                    Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
+                    lineWidth: 1
+                )
+                .frame(height: 535)
+        }
         .ignoresSafeArea(edges: .bottom)
     }
 
     private var tabSelector: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: DDSpacing.xSmall) {
             tabButton("여행 취향", tab: .preferences)
             tabButton("추천 그룹", tab: .recommendedGroups)
         }
-        .padding(3)
+        .padding(DDSpacing.xSmall)
         .frame(height: 44)
         .background(DDColor.surfaceElevated)
         .clipShape(.capsule)
@@ -199,7 +240,7 @@ struct PlaceGroupingView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     store.selectedTab == tab
-                        ? Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255)
+                        ? DDColor.actionSecondary
                         : Color.clear
                 )
                 .clipShape(.capsule)
@@ -214,7 +255,7 @@ struct PlaceGroupingView: View {
             HStack(spacing: DDSpacing.large) {
                 DDMiniHeadAvatar(character: member.avatar, size: 40)
 
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
                     Text(member.name)
                         .ddTypography(.bodyEmphasis16)
                         .foregroundStyle(DDColor.textPrimary)
@@ -226,13 +267,17 @@ struct PlaceGroupingView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 19)
+            .padding(.leading, 19)
+            .padding(.trailing, 20)
             .frame(height: 72)
             .background(DDColor.surfaceElevated)
             .clipShape(.rect(cornerRadius: 20))
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(DDColor.borderDefault, lineWidth: 1)
+                    .stroke(
+                        Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
+                        lineWidth: 1
+                    )
             }
         }
         .buttonStyle(.plain)

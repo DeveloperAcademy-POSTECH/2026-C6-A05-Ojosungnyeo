@@ -11,6 +11,7 @@ struct PlaceGroupingDetailFeature: Reducer {
         case confirmed
         case joined
         case placeDeleted(String)
+        case placesReordered([String])
     }
 
     @ObservableState
@@ -115,7 +116,7 @@ struct PlaceGroupingDetailFeature: Reducer {
         case deletePlaceTapped(String)
         case deleteConfirmationCancelTapped
         case deleteConfirmationConfirmTapped
-        case placeMoved(sourceID: String, beforeID: String)
+        case placeMoved(sourceID: String, beforeID: String?)
         case confirmButtonTapped
         case delegate(Delegate)
     }
@@ -167,18 +168,18 @@ struct PlaceGroupingDetailFeature: Reducer {
 
             case let .placeMoved(sourceID, beforeID):
                 guard state.canEditPlaces else { return .none }
-                guard
-                    sourceID != beforeID,
-                    let sourceIndex = state.places.firstIndex(where: { $0.id == sourceID }),
-                    let destinationIndex = state.places.firstIndex(where: { $0.id == beforeID })
+                guard sourceID != beforeID,
+                      let sourceIndex = state.places.firstIndex(where: { $0.id == sourceID })
                 else { return .none }
 
                 let place = state.places.remove(at: sourceIndex)
-                let adjustedDestination = sourceIndex < destinationIndex
-                    ? destinationIndex - 1
-                    : destinationIndex
-                state.places.insert(place, at: adjustedDestination)
-                return .none
+                if let beforeID,
+                   let destinationIndex = state.places.firstIndex(where: { $0.id == beforeID }) {
+                    state.places.insert(place, at: destinationIndex)
+                } else {
+                    state.places.append(place)
+                }
+                return .send(.delegate(.placesReordered(state.places.map(\.id))))
 
             case .confirmButtonTapped:
                 return .send(.delegate(.confirmed))

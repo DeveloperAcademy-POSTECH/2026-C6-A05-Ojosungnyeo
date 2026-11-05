@@ -7,11 +7,21 @@
 
 import ComposableArchitecture
 import SwiftUI
+import UIKit
+
+private func activeWindowBottomSafeAreaInset() -> CGFloat {
+    UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .filter { $0.activationState == .foregroundActive }
+        .flatMap(\.windows)
+        .first(where: \.isKeyWindow)?
+        .safeAreaInsets.bottom ?? 0
+}
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
     @GestureState private var sheetDragTranslation: CGFloat = 0
-    @State private var bottomSafeAreaInset: CGFloat = 0
+    @State private var bottomSafeAreaInset = activeWindowBottomSafeAreaInset()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -141,7 +151,7 @@ struct PlaceSelectionView: View {
             }
         }
         .onPreferenceChange(BottomSafeAreaInsetPreferenceKey.self) {
-            bottomSafeAreaInset = $0
+            bottomSafeAreaInset = max($0, activeWindowBottomSafeAreaInset())
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
@@ -149,6 +159,10 @@ struct PlaceSelectionView: View {
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
         .task {
+            bottomSafeAreaInset = max(
+                bottomSafeAreaInset,
+                activeWindowBottomSafeAreaInset()
+            )
             store.send(.onAppear)
         }
         .onDisappear {

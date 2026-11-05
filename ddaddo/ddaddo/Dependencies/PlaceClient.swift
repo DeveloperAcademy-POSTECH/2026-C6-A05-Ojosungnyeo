@@ -17,6 +17,8 @@ struct PlaceClient: DependencyKey, Sendable {
     var replacePlaces: @Sendable (String, [PinnedPlace]) async throws -> Void
     var confirmPlaces: @Sendable (String) async throws -> Void
     var joinGroup: @Sendable (String, String) async throws -> Void
+    var setGroupConfirmation: @Sendable (String, String, Bool, Bool) async throws -> Void
+    var updateGroupPlaces: @Sendable (String, String, [String], String?) async throws -> Void
     var observeGroupMemberships: @Sendable (String) -> AsyncThrowingStream<[MemberGroupMembership], Error>
     var confirmGroups: @Sendable (String, [String]) async throws -> Void
     var fetchGroupConfirmations: @Sendable (String) async throws -> [MemberGroupConfirmation]
@@ -61,6 +63,22 @@ struct PlaceClient: DependencyKey, Sendable {
                     groupID: groupID
                 )
             },
+            setGroupConfirmation: { tripID, groupID, isConfirmed, sendsPush in
+                try await FirebasePlaceSelectionService.setGroupConfirmation(
+                    tripID: tripID,
+                    groupID: groupID,
+                    isConfirmed: isConfirmed,
+                    sendsPush: sendsPush
+                )
+            },
+            updateGroupPlaces: { tripID, groupID, orderedPlaceIDs, deletedPlaceID in
+                try await FirebasePlaceSelectionService.updateGroupPlaces(
+                    tripID: tripID,
+                    groupID: groupID,
+                    orderedPlaceIDs: orderedPlaceIDs,
+                    deletedPlaceID: deletedPlaceID
+                )
+            },
             observeGroupMemberships: { tripID in
                 FirebasePlaceSelectionService.observeGroupMemberships(tripID: tripID)
             },
@@ -101,6 +119,8 @@ struct PlaceClient: DependencyKey, Sendable {
         replacePlaces: { _, _ in },
         confirmPlaces: { _ in },
         joinGroup: { _, _ in },
+        setGroupConfirmation: { _, _, _, _ in },
+        updateGroupPlaces: { _, _, _, _ in },
         observeGroupMemberships: { _ in AsyncThrowingStream { $0.finish() } },
         confirmGroups: { _, _ in },
         fetchGroupConfirmations: { _ in [] },

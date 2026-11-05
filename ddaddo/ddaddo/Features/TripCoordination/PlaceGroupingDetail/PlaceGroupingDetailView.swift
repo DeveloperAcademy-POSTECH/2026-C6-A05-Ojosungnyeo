@@ -101,13 +101,25 @@ struct PlaceGroupingDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DDCTAButton(title: "확정하기") {
+            DDCTAButton(
+                title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
+                isEnabled: !store.isGroupConfirmed
+            ) {
                 store.send(.confirmButtonTapped)
             }
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, DDSpacing.xLarge)
             .padding(.bottom, 11)
             .background(DDColor.surfaceDefault)
+        }
+        .overlay(alignment: .top) {
+            if let notice = store.cancellationNotice {
+                ConfirmationCancellationBanner(notice: notice)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(12)
+            }
         }
         .overlay(alignment: .bottom) {
             if draggingPlaceID != nil {
@@ -136,6 +148,13 @@ struct PlaceGroupingDetailView: View {
             .easeInOut(duration: 0.2),
             value: store.isDeleteConfirmationPresented
         )
+        .animation(.easeOut(duration: 0.25), value: store.cancellationNotice)
+        .task(id: store.cancellationNotice) {
+            guard store.cancellationNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            store.send(.cancellationNoticeDismissed)
+        }
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
     }
@@ -418,6 +437,42 @@ struct PlaceGroupingDetailView: View {
         isTrashTargeted = false
     }
 
+}
+
+private struct ConfirmationCancellationBanner: View {
+    let notice: PlaceGroupingDetailFeature.CancellationNotice
+
+    var body: some View {
+        HStack(spacing: 14) {
+            DDMiniHeadAvatar(character: notice.character, size: 64)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.triangle.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(DDColor.actionPrimary)
+
+                    Text("확정 취소")
+                        .ddTypography(.title24)
+                        .foregroundStyle(DDColor.textPrimary)
+                }
+
+                Text("\(notice.memberName)가 수정함에 따라 확정이 취소되어따.")
+                    .ddTypography(.body16)
+                    .foregroundStyle(DDColor.textSecondary)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 98, alignment: .leading)
+        .background(DDColor.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(DDColor.borderDefault, lineWidth: 1)
+        }
+    }
 }
 
 private struct PlaceDraggableRow: View {

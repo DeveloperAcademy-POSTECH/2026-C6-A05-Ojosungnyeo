@@ -53,4 +53,15 @@ struct MemberGroupConfirmation: Equatable, Sendable {
 struct MemberGroupMembership: Equatable, Sendable {
     let member: TripMember
     let groupIDs: [String]
+    let confirmedGroupIDs: [String]
+    let deletedPlaceIDsByGroupID: [String: [String]]
+    let orderedPlaceIDsByGroupID: [String: [String]]
+    let latestGroupEdit: GroupEditEvent?
+}
+
+struct GroupEditEvent: Equatable, Sendable {
+    let id: String
+    let groupID: String
+    let editor: TripMember
+    let editorName: String
 }

@@ -87,6 +87,22 @@ struct PlaceGroupingView: View {
             .easeInOut(duration: 0.2),
             value: store.isCriteriaChangeConfirmationPresented
         )
+        .overlay(alignment: .top) {
+            if let notice = store.cancellationNotice {
+                ConfirmationCancellationBanner(notice: notice)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(20)
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: store.cancellationNotice)
+        .task(id: store.cancellationNotice) {
+            guard store.cancellationNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            store.send(.cancellationNoticeDismissed)
+        }
         .sheet(
             isPresented: Binding(
                 get: { store.isTransportationSheetPresented },

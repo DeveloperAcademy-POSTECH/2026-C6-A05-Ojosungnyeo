@@ -62,6 +62,7 @@ struct PlaceGroupingFeature: Reducer {
         var confirmedGroupIDsByMemberID: [String: Set<String>] = [:]
         var hasLoadedServerGroupConfirmations = false
         var confirmedGroupIDs: Set<String> = []
+        var cancellationNotice: PlaceGroupingDetailFeature.CancellationNotice?
         var selectedGroupID: String?
         var detail = PlaceGroupingDetailFeature.State()
         var isDetailPresented = false
@@ -124,6 +125,7 @@ struct PlaceGroupingFeature: Reducer {
         case groupMembershipsFailed
         case groupConfirmationsResponse([MemberGroupConfirmation])
         case groupConfirmationsFailed
+        case cancellationNoticeDismissed
         case placePhotoResponse(String, Data?)
         case backButtonTapped
         case travelCriteriaChangeTapped
@@ -271,14 +273,14 @@ struct PlaceGroupingFeature: Reducer {
                 let otherMemberEdits = newEditEvents.filter {
                     $0.editor.rawValue != state.currentMemberID
                 }
-                let cancelledGroupIDs = state.confirmedGroupIDs.intersection(
-                    otherMemberEdits.map(\.groupID)
-                )
-                guard !cancelledGroupIDs.isEmpty else { return .none }
+                let editedGroupIDs = Set(otherMemberEdits.map(\.groupID))
+                let cancelledGroupIDs = state.confirmedGroupIDs.intersection(editedGroupIDs)
+                let selectedGroupWasConfirmed = state.detail.isGroupConfirmed
 
-                state.confirmedGroupIDs.subtract(cancelledGroupIDs)
-                if let selectedGroupID = state.selectedGroupID,
-                   cancelledGroupIDs.contains(selectedGroupID),
+                state.confirmedGroupIDs.subtract(editedGroupIDs)
+                if state.isDetailPresented,
+                   selectedGroupWasConfirmed,
+                   let selectedGroupID = state.selectedGroupID,
                    let editEvent = otherMemberEdits.last(where: {
                        $0.groupID == selectedGroupID
                    }) {
@@ -287,7 +289,15 @@ struct PlaceGroupingFeature: Reducer {
                         memberName: editEvent.editorName,
                         character: editEvent.editor.avatar
                     )
+                } else if let editEvent = otherMemberEdits.last(where: {
+                    cancelledGroupIDs.contains($0.groupID)
+                }) {
+                    state.cancellationNotice = .init(
+                        memberName: editEvent.editorName,
+                        character: editEvent.editor.avatar
+                    )
                 }
+                guard !cancelledGroupIDs.isEmpty else { return .none }
                 guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
                 return .run { _ in
                     for groupID in cancelledGroupIDs {
@@ -296,6 +306,10 @@ struct PlaceGroupingFeature: Reducer {
                         )
                     }
                 }
+
+            case .cancellationNoticeDismissed:
+                state.cancellationNotice = nil
+                return .none
 
             case .groupMembershipsFailed,
                  .groupConfirmationsResponse,

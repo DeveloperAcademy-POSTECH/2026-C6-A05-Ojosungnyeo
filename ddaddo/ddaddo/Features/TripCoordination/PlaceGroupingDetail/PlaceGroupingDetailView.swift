@@ -680,7 +680,7 @@ struct PlaceGroupingDetailView: View {
 
 }
 
-private struct ConfirmationCancellationBanner: View {
+struct ConfirmationCancellationBanner: View {
     let notice: PlaceGroupingDetailFeature.CancellationNotice
 
     var body: some View {

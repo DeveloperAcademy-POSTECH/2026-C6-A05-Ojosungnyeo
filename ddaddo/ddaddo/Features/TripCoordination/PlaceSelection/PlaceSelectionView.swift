@@ -59,6 +59,14 @@ struct PlaceSelectionView: View {
 
             }
 
+            // Keep the custom sheet attached to the physical screen bottom even
+            // when this view is hosted inside a container with a different safe area.
+            DDColor.surfaceDefault
+                .frame(maxWidth: .infinity)
+                .frame(height: bottomSheetBackgroundHeight)
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
+
             if store.isShowingConfirmedPlaces
                 && !store.isMemberPlacesSheetPresented
                 && store.selectedPlace == nil {
@@ -142,6 +150,7 @@ struct PlaceSelectionView: View {
             }
 
         }
+        .ignoresSafeArea(.container, edges: .bottom)
         .background {
             GeometryReader { geometry in
                 Color.clear.preference(
@@ -368,6 +377,21 @@ struct PlaceSelectionView: View {
             expandedHeight,
             max(collapsedHeight, restingHeight - sheetDragTranslation)
         )
+    }
+
+    private var bottomSheetBackgroundHeight: CGFloat {
+        if store.isShowingConfirmedPlaces
+            && !store.isMemberPlacesSheetPresented
+            && store.selectedPlace == nil {
+            return 379 + bottomSafeAreaInset
+        }
+        if store.selectedPlace != nil {
+            return 355 + bottomSafeAreaInset
+        }
+        if store.isMemberPlacesSheetPresented {
+            return currentMemberSheetHeight
+        }
+        return currentSheetHeight
     }
 
     private var sheetDragGesture: some Gesture {

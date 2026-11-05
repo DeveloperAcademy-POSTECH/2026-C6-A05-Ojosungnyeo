@@ -7,10 +7,15 @@ import ComposableArchitecture
 import Foundation
 
 struct PlaceGroupingDetailFeature: Reducer {
+    struct CancellationNotice: Equatable {
+        let memberName: String
+        let character: DDMiniHeadAvatar.Character
+    }
+
     enum Delegate: Equatable {
         case confirmed
         case joined
-        case placeDeleted(String)
+        case placeDeleted(String, [String])
         case placesReordered([String])
     }
 
@@ -26,6 +31,8 @@ struct PlaceGroupingDetailFeature: Reducer {
         var groupMemberIDs: Set<String> = ["tae", "header"]
         var preferenceCategories: [String] = ["쇼핑", "디저트"]
         var currentMemberID = "juni"
+        var isGroupConfirmed = false
+        var cancellationNotice: CancellationNotice?
         var isJoinConfirmationPresented = false
         var pendingDeletionPlaceID: String?
 
@@ -53,7 +60,8 @@ struct PlaceGroupingDetailFeature: Reducer {
             tripDates: String,
             group: PlaceGroupingFeature.RecommendedGroup,
             allMembers: [PlaceGroupingFeature.Member],
-            currentMemberID: String
+            currentMemberID: String,
+            isGroupConfirmed: Bool
         ) {
             self.tripTitle = tripTitle
             self.tripDates = tripDates
@@ -81,6 +89,7 @@ struct PlaceGroupingDetailFeature: Reducer {
             selectedMemberIDs = Set(group.memberIDs)
             preferenceCategories = group.categories
             self.currentMemberID = currentMemberID
+            self.isGroupConfirmed = isGroupConfirmed
             isOwnedGroup = group.memberIDs.contains(currentMemberID)
         }
     }
@@ -118,6 +127,7 @@ struct PlaceGroupingDetailFeature: Reducer {
         case deleteConfirmationConfirmTapped
         case placeMoved(sourceID: String, beforeID: String?)
         case confirmButtonTapped
+        case cancellationNoticeDismissed
         case delegate(Delegate)
     }
 
@@ -163,8 +173,9 @@ struct PlaceGroupingDetailFeature: Reducer {
                     return .none
                 }
                 state.places.removeAll { $0.id == id }
+                state.isGroupConfirmed = false
                 state.pendingDeletionPlaceID = nil
-                return .send(.delegate(.placeDeleted(id)))
+                return .send(.delegate(.placeDeleted(id, state.places.map(\.id))))
 
             case let .placeMoved(sourceID, beforeID):
                 guard state.canEditPlaces else { return .none }
@@ -179,10 +190,17 @@ struct PlaceGroupingDetailFeature: Reducer {
                 } else {
                     state.places.append(place)
                 }
+                state.isGroupConfirmed = false
                 return .send(.delegate(.placesReordered(state.places.map(\.id))))
 
             case .confirmButtonTapped:
+                guard !state.isGroupConfirmed else { return .none }
+                state.isGroupConfirmed = true
                 return .send(.delegate(.confirmed))
+
+            case .cancellationNoticeDismissed:
+                state.cancellationNotice = nil
+                return .none
 
             case .backButtonTapped, .delegate:
                 return .none

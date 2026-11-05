@@ -144,6 +144,178 @@ enum FirebasePlaceSelectionService {
         )
     }
 
+    static func joinGroup(tripID: String, groupID: String) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        try await participant.setData(
+            [
+                "joinedGroupIDs": FieldValue.arrayUnion([groupID]),
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+    }
+
+    static func setGroupConfirmation(
+        tripID: String,
+        groupID: String,
+        isConfirmed: Bool,
+        sendsPush: Bool
+    ) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        var data: [String: Any] = [
+            "confirmedGroupIDs": isConfirmed
+                ? FieldValue.arrayUnion([groupID])
+                : FieldValue.arrayRemove([groupID]),
+            "groupingConfirmed": false,
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+        if !isConfirmed, sendsPush {
+            data["groupCancellationEvent"] = [
+                "id": UUID().uuidString,
+                "groupID": groupID,
+                "createdAt": FieldValue.serverTimestamp()
+            ]
+        }
+        try await participant.setData(
+            data,
+            merge: true
+        )
+    }
+
+    static func updateGroupPlaces(
+        tripID: String,
+        groupID: String,
+        orderedPlaceIDs: [String],
+        deletedPlaceID: String?
+    ) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        let snapshot = try await participant.getDocument()
+        var deletedPlaceIDsByGroupID = snapshot.get("deletedPlaceIDsByGroupID")
+            as? [String: [String]] ?? [:]
+        if let deletedPlaceID {
+            var deletedPlaceIDs = Set(deletedPlaceIDsByGroupID[groupID] ?? [])
+            deletedPlaceIDs.insert(deletedPlaceID)
+            deletedPlaceIDsByGroupID[groupID] = deletedPlaceIDs.sorted()
+        }
+        var orderedPlaceIDsByGroupID = snapshot.get("orderedPlaceIDsByGroupID")
+            as? [String: [String]] ?? [:]
+        orderedPlaceIDsByGroupID[groupID] = orderedPlaceIDs
+
+        try await participant.setData(
+            [
+                "deletedPlaceIDsByGroupID": deletedPlaceIDsByGroupID,
+                "orderedPlaceIDsByGroupID": orderedPlaceIDsByGroupID,
+                "groupEditEvent": [
+                    "id": UUID().uuidString,
+                    "groupID": groupID,
+                    "kind": deletedPlaceID == nil ? "reordered" : "deleted",
+                    "deletedPlaceID": deletedPlaceID.map { $0 as Any } ?? NSNull(),
+                    "createdAt": FieldValue.serverTimestamp()
+                ],
+                "confirmedGroupIDs": FieldValue.arrayRemove([groupID]),
+                "groupingConfirmed": false,
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+    }
+
+    static func updateGroupingConfiguration(
+        tripID: String,
+        eventID: String,
+        transportation: String,
+        durationMinutes: Int
+    ) async throws {
+        let participant = try await currentParticipantReference(tripID: tripID)
+        try await participant.setData(
+            [
+                "groupingConfigurationEvent": [
+                    "id": eventID,
+                    "transportation": transportation,
+                    "durationMinutes": durationMinutes,
+                    "createdAt": FieldValue.serverTimestamp()
+                ],
+                "groupingConfirmed": false,
+                "confirmedGroupIDs": [],
+                "updatedAt": FieldValue.serverTimestamp()
+            ],
+            merge: true
+        )
+    }
+
+    nonisolated static func observeGroupMemberships(
+        tripID: String
+    ) -> AsyncThrowingStream<[MemberGroupMembership], Error> {
+        AsyncThrowingStream { continuation in
+            let registration = Firestore.firestore()
+                .collection("trips")
+                .document(tripID)
+                .collection("participants")
+                .order(by: "slotIndex")
+                .addSnapshotListener { snapshot, error in
+                    if let error {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                    guard let documents = snapshot?.documents else { return }
+                    var seenMembers = Set<TripMember>()
+                    let values = orderedParticipantDocuments(documents).compactMap {
+                        document -> MemberGroupMembership? in
+                        guard
+                            document.get("status") as? String == "joined",
+                            let avatarName = document.get("avatarName") as? String,
+                            let avatar = ParticipantAvatar(rawValue: avatarName)
+                        else { return nil }
+                        let member = TripMember(avatar: avatar)
+                        guard seenMembers.insert(member).inserted else { return nil }
+                        let editData = document.get("groupEditEvent") as? [String: Any]
+                        let latestGroupEdit: GroupEditEvent?
+                        if let editID = editData?["id"] as? String,
+                           let groupID = editData?["groupID"] as? String {
+                            latestGroupEdit = GroupEditEvent(
+                                id: editID,
+                                groupID: groupID,
+                                editor: member,
+                                editorName: document.get("name") as? String ?? "친구"
+                            )
+                        } else {
+                            latestGroupEdit = nil
+                        }
+                        let configurationData = document.get("groupingConfigurationEvent")
+                            as? [String: Any]
+                        let latestGroupingConfiguration: GroupingConfigurationEvent?
+                        if let eventID = configurationData?["id"] as? String,
+                           let transportation = configurationData?["transportation"] as? String,
+                           let durationMinutes = configurationData?["durationMinutes"] as? Int {
+                            latestGroupingConfiguration = GroupingConfigurationEvent(
+                                id: eventID,
+                                transportation: transportation,
+                                durationMinutes: durationMinutes,
+                                editor: member,
+                                createdAt: (configurationData?["createdAt"] as? Timestamp)?
+                                    .dateValue() ?? .distantPast
+                            )
+                        } else {
+                            latestGroupingConfiguration = nil
+                        }
+                        return MemberGroupMembership(
+                            member: member,
+                            groupIDs: document.get("joinedGroupIDs") as? [String] ?? [],
+                            confirmedGroupIDs: document.get("confirmedGroupIDs") as? [String] ?? [],
+                            deletedPlaceIDsByGroupID: document.get("deletedPlaceIDsByGroupID")
+                                as? [String: [String]] ?? [:],
+                            orderedPlaceIDsByGroupID: document.get("orderedPlaceIDsByGroupID")
+                                as? [String: [String]] ?? [:],
+                            latestGroupEdit: latestGroupEdit,
+                            latestGroupingConfiguration: latestGroupingConfiguration
+                        )
+                    }
+                    continuation.yield(values)
+                }
+            continuation.onTermination = { _ in registration.remove() }
+        }
+    }
+
     static func confirmGroups(tripID: String, groupIDs: [String]) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
         try await participant.setData(

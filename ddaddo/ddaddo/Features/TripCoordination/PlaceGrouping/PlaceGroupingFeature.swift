@@ -55,7 +55,16 @@ struct PlaceGroupingFeature: Reducer {
         var placeGroups = PlaceGroupingPreviewData.placeGroups
         var recommendedGroups = PlaceGroupingPreviewData.recommendedGroups
         var currentMemberID = "juni"
+        var joinedMemberIDsByGroupID: [String: Set<String>] = [:]
+        var deletedPlaceIDsByGroupID: [String: Set<String>] = [:]
+        var orderedPlaceIDsByGroupID: [String: [String]] = [:]
+        var processedGroupEditEventIDs: Set<String> = []
+        var processedGroupingConfigurationEventIDs: Set<String> = []
+        var hasLoadedGroupingConfiguration = false
+        var confirmedGroupIDsByMemberID: [String: Set<String>] = [:]
+        var hasLoadedServerGroupConfirmations = false
         var confirmedGroupIDs: Set<String> = []
+        var cancellationNotice: PlaceGroupingDetailFeature.CancellationNotice?
         var selectedGroupID: String?
         var detail = PlaceGroupingDetailFeature.State()
         var isDetailPresented = false
@@ -114,8 +123,11 @@ struct PlaceGroupingFeature: Reducer {
         case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
+        case groupMembershipsResponse([MemberGroupMembership])
+        case groupMembershipsFailed
         case groupConfirmationsResponse([MemberGroupConfirmation])
         case groupConfirmationsFailed
+        case cancellationNoticeDismissed
         case placePhotoResponse(String, Data?)
         case backButtonTapped
         case travelCriteriaChangeTapped
@@ -146,11 +158,18 @@ struct PlaceGroupingFeature: Reducer {
                         observeMemberPlacesEffect(tripID: tripID)
                         .cancellable(id: "place-grouping-member-places", cancelInFlight: true)
                     )
+                    effects.append(
+                        observeGroupMembershipsEffect(tripID: tripID)
+                            .cancellable(id: "place-grouping-memberships", cancelInFlight: true)
+                    )
                 }
                 return .merge(effects)
 
             case .onDisappear:
-                return .cancel(id: "place-grouping-member-places")
+                return .merge(
+                    .cancel(id: "place-grouping-member-places"),
+                    .cancel(id: "place-grouping-memberships")
+                )
 
             case .refreshMemberPlaces:
                 guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
@@ -208,22 +227,119 @@ struct PlaceGroupingFeature: Reducer {
                         places: group.places.map(enrich)
                     )
                 }
+                state.applyJoinedGroupMemberships()
+                state.applyDeletedGroupPlaces()
+                state.applyGroupPlaceOrders()
                 state.confirmedGroupIDs.formIntersection(state.recommendedGroups.map(\.id))
                 return .merge(placePhotoEffects(state: &state))
 
             case .memberPlacesFailed:
                 return .none
 
-            case let .groupConfirmationsResponse(confirmations):
-                guard let currentMemberConfirmation = confirmations.first(where: {
-                    $0.member.rawValue == state.currentMemberID
-                }), currentMemberConfirmation.isConfirmed else { return .none }
-                let availableGroupIDs = Set(state.recommendedGroups.map(\.id))
-                state.confirmedGroupIDs = Set(currentMemberConfirmation.confirmedGroupIDs)
-                    .intersection(availableGroupIDs)
+            case let .groupMembershipsResponse(memberships):
+                state.joinedMemberIDsByGroupID = memberships.reduce(into: [:]) { result, membership in
+                    for groupID in membership.groupIDs {
+                        result[groupID, default: []].insert(membership.member.rawValue)
+                    }
+                }
+                state.applyJoinedGroupMemberships()
+                state.deletedPlaceIDsByGroupID = memberships.reduce(into: [:]) { result, membership in
+                    for (groupID, placeIDs) in membership.deletedPlaceIDsByGroupID {
+                        result[groupID, default: []].formUnion(placeIDs)
+                    }
+                }
+                state.applyDeletedGroupPlaces()
+                state.orderedPlaceIDsByGroupID = memberships.reduce(into: [:]) { result, membership in
+                    for (groupID, placeIDs) in membership.orderedPlaceIDsByGroupID {
+                        result[groupID] = placeIDs
+                    }
+                }
+                state.applyGroupPlaceOrders()
+
+                let configurationEvents = memberships.compactMap(\.latestGroupingConfiguration)
+                if !state.hasLoadedGroupingConfiguration {
+                    state.hasLoadedGroupingConfiguration = true
+                    state.processedGroupingConfigurationEventIDs.formUnion(
+                        configurationEvents.map(\.id)
+                    )
+                    if let latestConfiguration = configurationEvents.max(by: {
+                        $0.createdAt < $1.createdAt
+                    }) {
+                        state.applyGroupingConfiguration(latestConfiguration)
+                    }
+                } else if let latestConfiguration = configurationEvents
+                    .filter({
+                        !state.processedGroupingConfigurationEventIDs.contains($0.id)
+                            && $0.editor.rawValue != state.currentMemberID
+                    })
+                    .max(by: { $0.createdAt < $1.createdAt }) {
+                    state.processedGroupingConfigurationEventIDs.formUnion(
+                        configurationEvents.map(\.id)
+                    )
+                    state.applyGroupingConfiguration(latestConfiguration)
+                    return .send(.delegate(.reanalyzeGrouping))
+                }
+
+                let latestConfirmations = Dictionary(uniqueKeysWithValues: memberships.map {
+                    ($0.member.rawValue, Set($0.confirmedGroupIDs))
+                })
+                state.confirmedGroupIDsByMemberID = latestConfirmations
+                let latestEditEvents = memberships.compactMap(\.latestGroupEdit)
+                guard state.hasLoadedServerGroupConfirmations else {
+                    state.hasLoadedServerGroupConfirmations = true
+                    state.confirmedGroupIDs = latestConfirmations[state.currentMemberID, default: []]
+                    state.processedGroupEditEventIDs.formUnion(latestEditEvents.map(\.id))
+                    return .none
+                }
+
+                let newEditEvents = latestEditEvents.filter {
+                    !state.processedGroupEditEventIDs.contains($0.id)
+                }
+                state.processedGroupEditEventIDs.formUnion(newEditEvents.map(\.id))
+                let otherMemberEdits = newEditEvents.filter {
+                    $0.editor.rawValue != state.currentMemberID
+                }
+                let editedGroupIDs = Set(otherMemberEdits.map(\.groupID))
+                let cancelledGroupIDs = state.confirmedGroupIDs.intersection(editedGroupIDs)
+                let selectedGroupWasConfirmed = state.detail.isGroupConfirmed
+
+                state.confirmedGroupIDs.subtract(editedGroupIDs)
+                if state.isDetailPresented,
+                   selectedGroupWasConfirmed,
+                   let selectedGroupID = state.selectedGroupID,
+                   let editEvent = otherMemberEdits.last(where: {
+                       $0.groupID == selectedGroupID
+                   }) {
+                    state.detail.isGroupConfirmed = false
+                    state.detail.cancellationNotice = .init(
+                        memberName: editEvent.editorName,
+                        character: editEvent.editor.avatar
+                    )
+                } else if let editEvent = otherMemberEdits.last(where: {
+                    cancelledGroupIDs.contains($0.groupID)
+                }) {
+                    state.cancellationNotice = .init(
+                        memberName: editEvent.editorName,
+                        character: editEvent.editor.avatar
+                    )
+                }
+                guard !cancelledGroupIDs.isEmpty else { return .none }
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { _ in
+                    for groupID in cancelledGroupIDs {
+                        try? await placeClient.setGroupConfirmation(
+                            tripID, groupID, false, false
+                        )
+                    }
+                }
+
+            case .cancellationNoticeDismissed:
+                state.cancellationNotice = nil
                 return .none
 
-            case .groupConfirmationsFailed:
+            case .groupMembershipsFailed,
+                 .groupConfirmationsResponse,
+                 .groupConfirmationsFailed:
                 return .none
 
             case let .placePhotoResponse(placeID, data):
@@ -308,9 +424,25 @@ struct PlaceGroupingFeature: Reducer {
                 state.members = refreshed.members
                 state.placeGroups = refreshed.placeGroups
                 state.recommendedGroups = refreshed.recommendedGroups
+                state.applyJoinedGroupMemberships()
                 state.confirmedGroupIDs = []
                 state.selectedGroupID = nil
-                return .send(.delegate(.reanalyzeGrouping))
+                guard let tripID = state.sourcePlaceSelection?.tripID else {
+                    return .send(.delegate(.reanalyzeGrouping))
+                }
+                let eventID = UUID().uuidString
+                state.processedGroupingConfigurationEventIDs.insert(eventID)
+                return .merge(
+                    .run { _ in
+                        try? await placeClient.updateGroupingConfiguration(
+                            tripID,
+                            eventID,
+                            selection.transportation.rawValue,
+                            selection.duration.rawValue
+                        )
+                    },
+                    .send(.delegate(.reanalyzeGrouping))
+                )
             case .transportationSheet:
                 return .none
             case .memberTapped:
@@ -325,24 +457,44 @@ struct PlaceGroupingFeature: Reducer {
                     tripDates: state.tripDates,
                     group: group,
                     allMembers: state.members,
-                    currentMemberID: state.currentMemberID
+                    currentMemberID: state.currentMemberID,
+                    isGroupConfirmed: state.confirmedGroupIDs.contains(id)
                 )
                 state.isDetailPresented = true
                 return .none
             case .detail(.delegate(.confirmed)):
-                if let selectedGroupID = state.selectedGroupID {
-                    state.confirmedGroupIDs.insert(selectedGroupID)
-                }
-                state.isDetailPresented = false
-                return .none
-            case .detail(.delegate(.joined)):
-                if let selectedGroupID = state.selectedGroupID {
-                    state.confirmedGroupIDs.insert(selectedGroupID)
-                }
-                state.isDetailPresented = false
-                return .none
-            case let .detail(.delegate(.placeDeleted(placeID))):
                 guard let selectedGroupID = state.selectedGroupID else { return .none }
+                state.confirmedGroupIDs.insert(selectedGroupID)
+                state.isDetailPresented = false
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { _ in
+                    try? await placeClient.setGroupConfirmation(
+                        tripID, selectedGroupID, true, false
+                    )
+                }
+            case .detail(.delegate(.joined)):
+                guard let selectedGroupID = state.selectedGroupID else { return .none }
+                state.confirmedGroupIDs.insert(selectedGroupID)
+                state.joinedMemberIDsByGroupID[selectedGroupID, default: []]
+                    .insert(state.currentMemberID)
+                state.applyJoinedGroupMemberships()
+                state.isDetailPresented = false
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { send in
+                    do {
+                        try await placeClient.joinGroup(tripID, selectedGroupID)
+                        try await placeClient.setGroupConfirmation(
+                            tripID, selectedGroupID, true, false
+                        )
+                    } catch {
+                        await send(.groupMembershipsFailed)
+                    }
+                }
+            case let .detail(.delegate(.placeDeleted(placeID, orderedPlaceIDs))):
+                guard let selectedGroupID = state.selectedGroupID else { return .none }
+                state.confirmedGroupIDs.remove(selectedGroupID)
+                state.deletedPlaceIDsByGroupID[selectedGroupID, default: []].insert(placeID)
+                state.orderedPlaceIDsByGroupID[selectedGroupID] = orderedPlaceIDs
                 state.recommendedGroups = state.recommendedGroups.map { group in
                     guard group.id == selectedGroupID else { return group }
                     return RecommendedGroup(
@@ -363,39 +515,31 @@ struct PlaceGroupingFeature: Reducer {
                         radius: group.radius
                     )
                 }
-                return .none
-            case let .detail(.delegate(.placesReordered(placeIDs))):
-                guard let selectedGroupID = state.selectedGroupID else { return .none }
-                let orderByID = Dictionary(
-                    uniqueKeysWithValues: placeIDs.enumerated().map { ($1, $0) }
-                )
-                let reorder: ([PinnedPlace]) -> [PinnedPlace] = { places in
-                    places.sorted {
-                        orderByID[$0.id, default: Int.max]
-                            < orderByID[$1.id, default: Int.max]
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { send in
+                    do {
+                        try await placeClient.updateGroupPlaces(
+                            tripID, selectedGroupID, orderedPlaceIDs, placeID
+                        )
+                    } catch {
+                        await send(.groupMembershipsFailed)
                     }
                 }
-                state.recommendedGroups = state.recommendedGroups.map { group in
-                    guard group.id == selectedGroupID else { return group }
-                    return RecommendedGroup(
-                        id: group.id,
-                        title: group.title,
-                        participantSummary: group.participantSummary,
-                        memberIDs: group.memberIDs,
-                        categories: group.categories,
-                        places: reorder(group.places)
-                    )
+            case let .detail(.delegate(.placesReordered(orderedPlaceIDs))):
+                guard let selectedGroupID = state.selectedGroupID else { return .none }
+                state.confirmedGroupIDs.remove(selectedGroupID)
+                state.orderedPlaceIDsByGroupID[selectedGroupID] = orderedPlaceIDs
+                state.applyGroupPlaceOrders()
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { send in
+                    do {
+                        try await placeClient.updateGroupPlaces(
+                            tripID, selectedGroupID, orderedPlaceIDs, nil
+                        )
+                    } catch {
+                        await send(.groupMembershipsFailed)
+                    }
                 }
-                state.placeGroups = state.placeGroups.map { group in
-                    guard group.id == selectedGroupID else { return group }
-                    return MapPlaceGroup(
-                        id: group.id,
-                        name: group.name,
-                        places: reorder(group.places),
-                        radius: group.radius
-                    )
-                }
-                return .none
             case .detail(.backButtonTapped):
                 state.isDetailPresented = false
                 return .none
@@ -482,32 +626,164 @@ struct PlaceGroupingFeature: Reducer {
         }
     }
 
+    private func observeGroupMembershipsEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observeGroupMemberships(tripID)
+        return .run { send in
+            do {
+                for try await memberships in stream {
+                    await send(.groupMembershipsResponse(memberships))
+                }
+            } catch {
+                await send(.groupMembershipsFailed)
+            }
+        }
+    }
+
     private func placePhotoEffects(state: inout State) -> [Effect<Action>] {
-        let placesByID = state.recommendedGroups
+        let places = state.recommendedGroups
             .flatMap(\.places)
             .reduce(into: [String: PinnedPlace]()) { result, place in
                 result[place.id] = place
             }
-        let placesNeedingPhotos = placesByID.values.filter { place in
-            place.photoData.isEmpty
-                && place.thumbnailName.isEmpty
-                && !state.requestedPlacePhotoIDs.contains(place.id)
-        }
-        state.requestedPlacePhotoIDs.formUnion(placesNeedingPhotos.map(\.id))
+            .values
+            .filter {
+                $0.photoData.isEmpty && !state.requestedPlacePhotoIDs.contains($0.id)
+            }
 
-        return placesNeedingPhotos.map { place in
+        state.requestedPlacePhotoIDs.formUnion(places.map(\.id))
+        return places.map { place in
             .run { send in
                 do {
-                    let result = PlaceSearchResult(
-                        id: place.id,
-                        name: place.name,
-                        address: place.description
-                    )
+                    guard let result = try await placeClient.autocomplete(place.name).first else {
+                        await send(.placePhotoResponse(place.id, nil))
+                        return
+                    }
                     let details = try await placeClient.fetchDetails(result)
                     await send(.placePhotoResponse(place.id, details.photoData.first))
                 } catch {
                     await send(.placePhotoResponse(place.id, nil))
                 }
+            }
+        }
+    }
+}
+
+private extension PlaceGroupingFeature.State {
+    mutating func applyGroupingConfiguration(_ event: GroupingConfigurationEvent) {
+        guard let transportation = Transportation(rawValue: event.transportation),
+              let duration = TravelDuration(rawValue: event.durationMinutes),
+              let sourcePlaceSelection
+        else { return }
+
+        let selection = TripSetUpTransportationFeature.Selection(
+            transportation: transportation,
+            duration: duration
+        )
+        transportationSelection = selection
+        transportationSheet = TripSetUpTransportationFeature.State(selection: selection)
+        travelCriteria = "\(transportation.title) · 장소 간 최대 \(duration.rawValue)분"
+
+        let refreshed = PlaceGroupingEngine.makeGroups(
+            from: sourcePlaceSelection,
+            selection: selection
+        )
+        members = refreshed.members
+        placeGroups = refreshed.mapGroups
+        recommendedGroups = refreshed.recommendedGroups
+        applyJoinedGroupMemberships()
+        applyDeletedGroupPlaces()
+        applyGroupPlaceOrders()
+        confirmedGroupIDs = []
+        selectedGroupID = nil
+        isDetailPresented = false
+    }
+
+    mutating func applyJoinedGroupMemberships() {
+        recommendedGroups = recommendedGroups.map { group in
+            let joinedMemberIDs = joinedMemberIDsByGroupID[group.id, default: []]
+            guard !joinedMemberIDs.isEmpty else { return group }
+
+            let memberIDs = group.memberIDs + joinedMemberIDs
+                .filter { !group.memberIDs.contains($0) }
+                .sorted()
+            return PlaceGroupingFeature.RecommendedGroup(
+                id: group.id,
+                title: group.title,
+                participantSummary: "\(memberIDs.count)명",
+                memberIDs: memberIDs,
+                categories: group.categories,
+                places: group.places
+            )
+        }
+    }
+
+    mutating func applyDeletedGroupPlaces() {
+        recommendedGroups = recommendedGroups.map { group in
+            let deletedPlaceIDs = deletedPlaceIDsByGroupID[group.id, default: []]
+            guard !deletedPlaceIDs.isEmpty else { return group }
+            return PlaceGroupingFeature.RecommendedGroup(
+                id: group.id,
+                title: group.title,
+                participantSummary: group.participantSummary,
+                memberIDs: group.memberIDs,
+                categories: group.categories,
+                places: group.places.filter { !deletedPlaceIDs.contains($0.id) }
+            )
+        }
+        placeGroups = placeGroups.map { group in
+            let deletedPlaceIDs = deletedPlaceIDsByGroupID[group.id, default: []]
+            guard !deletedPlaceIDs.isEmpty else { return group }
+            return MapPlaceGroup(
+                id: group.id,
+                name: group.name,
+                places: group.places.filter { !deletedPlaceIDs.contains($0.id) },
+                radius: group.radius
+            )
+        }
+        if let selectedGroupID,
+           let deletedPlaceIDs = deletedPlaceIDsByGroupID[selectedGroupID],
+           !deletedPlaceIDs.isEmpty {
+            detail.places.removeAll { deletedPlaceIDs.contains($0.id) }
+        }
+    }
+
+    mutating func applyGroupPlaceOrders() {
+        func ordered(_ places: [PinnedPlace], ids: [String]) -> [PinnedPlace] {
+            let indexByID = Dictionary(uniqueKeysWithValues: ids.enumerated().map {
+                ($0.element, $0.offset)
+            })
+            return places.sorted {
+                indexByID[$0.id, default: Int.max] < indexByID[$1.id, default: Int.max]
+            }
+        }
+
+        recommendedGroups = recommendedGroups.map { group in
+            guard let ids = orderedPlaceIDsByGroupID[group.id] else { return group }
+            return PlaceGroupingFeature.RecommendedGroup(
+                id: group.id,
+                title: group.title,
+                participantSummary: group.participantSummary,
+                memberIDs: group.memberIDs,
+                categories: group.categories,
+                places: ordered(group.places, ids: ids)
+            )
+        }
+        placeGroups = placeGroups.map { group in
+            guard let ids = orderedPlaceIDsByGroupID[group.id] else { return group }
+            return MapPlaceGroup(
+                id: group.id,
+                name: group.name,
+                places: ordered(group.places, ids: ids),
+                radius: group.radius
+            )
+        }
+        if let selectedGroupID,
+           let ids = orderedPlaceIDsByGroupID[selectedGroupID] {
+            let indexByID = Dictionary(uniqueKeysWithValues: ids.enumerated().map {
+                ($0.element, $0.offset)
+            })
+            detail.places.sort {
+                indexByID[$0.id, default: Int.max] < indexByID[$1.id, default: Int.max]
             }
         }
     }
@@ -558,7 +834,11 @@ private enum PlaceGroupingEngine {
             let uniquePlaces = unique(region.map(\.place))
             return MapPlaceGroup(
                 id: "region-\(index)",
-                name: regionName(destination: state.destinationName, index: index),
+                name: courseName(
+                    places: uniquePlaces,
+                    destination: state.destinationName,
+                    index: index
+                ),
                 places: uniquePlaces,
                 radius: max(800, regionRadius(uniquePlaces) + 500)
             )
@@ -567,12 +847,12 @@ private enum PlaceGroupingEngine {
         var recommendations: [PlaceGroupingFeature.RecommendedGroup] = []
         for (regionIndex, region) in regions.enumerated() {
             let regionPlaces = unique(region.map(\.place))
-            let title = regionName(
+            let title = courseName(
+                places: regionPlaces,
                 destination: state.destinationName,
                 index: regionIndex
             )
             let memberIDs = Array(Set(region.map { $0.member.rawValue })).sorted()
-            let memberComponents = categoryConnectedMembers(memberIDs, region: region)
             let categories = Array(Set(regionPlaces.map {
                 normalizedCategory($0.category)
             })).sorted()
@@ -580,9 +860,7 @@ private enum PlaceGroupingEngine {
                 .init(
                     id: "region-\(regionIndex)",
                     title: title,
-                    participantSummary: memberComponents
-                        .map { "\($0.count)명" }
-                        .joined(separator: " · "),
+                    participantSummary: "\(memberIDs.count)명",
                     memberIDs: memberIDs,
                     categories: categories,
                     places: regionPlaces
@@ -628,36 +906,6 @@ private enum PlaceGroupingEngine {
         return Double(selection.duration.rawValue) * metersPerMinute
     }
 
-    private static func categoryConnectedMembers(
-        _ members: [String],
-        region: [OwnedPlace]
-    ) -> [[String]] {
-        var visited = Set<String>()
-        var result: [[String]] = []
-        let categories = Dictionary(uniqueKeysWithValues: members.map { member in
-            (member, Set(region.filter { $0.member.rawValue == member }.map {
-                normalizedCategory($0.place.category)
-            }))
-        })
-        for start in members where !visited.contains(start) {
-            var queue = [start]
-            visited.insert(start)
-            var component: [String] = []
-            while let member = queue.popLast() {
-                component.append(member)
-                for candidate in members where !visited.contains(candidate) {
-                    if !(categories[member, default: []]
-                        .intersection(categories[candidate, default: []]).isEmpty) {
-                        visited.insert(candidate)
-                        queue.append(candidate)
-                    }
-                }
-            }
-            result.append(component.sorted())
-        }
-        return result
-    }
-
     private static func normalizedCategory(_ raw: String) -> String {
         let value = raw.lowercased()
         if value.contains("카페") || value.contains("디저트") || value.contains("coffee") || value.contains("cafe") { return "카페" }
@@ -688,7 +936,17 @@ private enum PlaceGroupingEngine {
         return places.filter { ids.insert($0.id).inserted }
     }
 
-    private static func regionName(destination: String, index: Int) -> String {
-        "\(destination) 지역 \(index + 1)"
+    private static func courseName(
+        places: [PinnedPlace],
+        destination: String,
+        index: Int
+    ) -> String {
+        guard let representativePlace = places.first else {
+            return "\(destination) 코스 \(index + 1)"
+        }
+        if places.count == 1 {
+            return "\(representativePlace.name) 코스"
+        }
+        return "\(representativePlace.name) 중심 코스"
     }
 }

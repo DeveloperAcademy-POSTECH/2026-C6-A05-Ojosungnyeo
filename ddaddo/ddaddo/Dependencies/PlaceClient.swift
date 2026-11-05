@@ -16,6 +16,11 @@ struct PlaceClient: DependencyKey, Sendable {
     var deletePlace: @Sendable (String, String) async throws -> Void
     var replacePlaces: @Sendable (String, [PinnedPlace]) async throws -> Void
     var confirmPlaces: @Sendable (String) async throws -> Void
+    var joinGroup: @Sendable (String, String) async throws -> Void
+    var setGroupConfirmation: @Sendable (String, String, Bool, Bool) async throws -> Void
+    var updateGroupPlaces: @Sendable (String, String, [String], String?) async throws -> Void
+    var updateGroupingConfiguration: @Sendable (String, String, String, Int) async throws -> Void
+    var observeGroupMemberships: @Sendable (String) -> AsyncThrowingStream<[MemberGroupMembership], Error>
     var confirmGroups: @Sendable (String, [String]) async throws -> Void
     var fetchGroupConfirmations: @Sendable (String) async throws -> [MemberGroupConfirmation]
     var completeGrouping: @Sendable (String) async throws -> Void
@@ -53,6 +58,39 @@ struct PlaceClient: DependencyKey, Sendable {
             confirmPlaces: { tripID in
                 try await FirebasePlaceSelectionService.confirmPlaces(tripID: tripID)
             },
+            joinGroup: { tripID, groupID in
+                try await FirebasePlaceSelectionService.joinGroup(
+                    tripID: tripID,
+                    groupID: groupID
+                )
+            },
+            setGroupConfirmation: { tripID, groupID, isConfirmed, sendsPush in
+                try await FirebasePlaceSelectionService.setGroupConfirmation(
+                    tripID: tripID,
+                    groupID: groupID,
+                    isConfirmed: isConfirmed,
+                    sendsPush: sendsPush
+                )
+            },
+            updateGroupPlaces: { tripID, groupID, orderedPlaceIDs, deletedPlaceID in
+                try await FirebasePlaceSelectionService.updateGroupPlaces(
+                    tripID: tripID,
+                    groupID: groupID,
+                    orderedPlaceIDs: orderedPlaceIDs,
+                    deletedPlaceID: deletedPlaceID
+                )
+            },
+            updateGroupingConfiguration: { tripID, eventID, transportation, durationMinutes in
+                try await FirebasePlaceSelectionService.updateGroupingConfiguration(
+                    tripID: tripID,
+                    eventID: eventID,
+                    transportation: transportation,
+                    durationMinutes: durationMinutes
+                )
+            },
+            observeGroupMemberships: { tripID in
+                FirebasePlaceSelectionService.observeGroupMemberships(tripID: tripID)
+            },
             confirmGroups: { tripID, groupIDs in
                 try await FirebasePlaceSelectionService.confirmGroups(
                     tripID: tripID,
@@ -89,6 +127,11 @@ struct PlaceClient: DependencyKey, Sendable {
         deletePlace: { _, _ in },
         replacePlaces: { _, _ in },
         confirmPlaces: { _ in },
+        joinGroup: { _, _ in },
+        setGroupConfirmation: { _, _, _, _ in },
+        updateGroupPlaces: { _, _, _, _ in },
+        updateGroupingConfiguration: { _, _, _, _ in },
+        observeGroupMemberships: { _ in AsyncThrowingStream { $0.finish() } },
         confirmGroups: { _, _ in },
         fetchGroupConfirmations: { _ in [] },
         completeGrouping: { _ in }

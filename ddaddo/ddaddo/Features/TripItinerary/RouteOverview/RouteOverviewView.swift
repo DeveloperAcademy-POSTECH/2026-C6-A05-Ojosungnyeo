@@ -9,6 +9,7 @@ import ComposableArchitecture
 import SwiftUI
 
 struct RouteOverviewView: View {
+    private let tabBarCoveredHeight: CGFloat = 96
     let store: StoreOf<RouteOverviewFeature>
     var onBack: () -> Void = {
         // Preview and isolated usages can omit navigation handling.
@@ -130,9 +131,14 @@ struct RouteOverviewView: View {
         .padding(.trailing, DDSpacing.large)
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: isItineraryExpanded ? 413 : 139, alignment: .top)
+        .frame(
+            height: (isItineraryExpanded ? 413 : 139) + tabBarCoveredHeight,
+            alignment: .top
+        )
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .ddFillBottomSheetToScreenEdge()
+        .offset(y: tabBarCoveredHeight)
         .contentShape(.rect)
         .gesture(
             DragGesture(minimumDistance: 12)
@@ -223,9 +229,12 @@ struct RouteOverviewView: View {
                 participantDots(for: stop)
             }
 
-            Text(stop.category)
-                .ddTypography(.label14)
-                .foregroundStyle(DDColor.textSecondary)
+            if !stop.category.isEmpty {
+                Text(stop.category)
+                    .ddTypography(.labelEmphasis14)
+                    .foregroundStyle(DDColor.surfaceSelected)
+                    .lineLimit(2)
+            }
         }
         .padding(.horizontal, DDSpacing.xLarge)
         .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)

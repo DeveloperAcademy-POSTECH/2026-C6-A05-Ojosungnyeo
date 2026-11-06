@@ -171,6 +171,20 @@ struct TimeTableFeature: Reducer {
             return !hasTimeSelectionConflict
         }
 
+        mutating func updateDayOfMonthMapping() {
+            guard let tripStartDate else { return }
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .current
+            let startDay = calendar.startOfDay(for: tripStartDate)
+            dayOfMonthByDay = Dictionary(uniqueKeysWithValues: availableDays.enumerated().compactMap {
+                index, day in
+                guard let date = calendar.date(byAdding: .day, value: index, to: startDay) else {
+                    return nil
+                }
+                return (day, calendar.component(.day, from: date))
+            })
+        }
+
         mutating func resetScheduledItinerary() {
             selectedDay = .day1
             coursesByID = [:]
@@ -326,6 +340,7 @@ struct TimeTableFeature: Reducer {
                 state.destinationName = snapshot.destinationName
                 state.tripStartDate = snapshot.startDate
                 state.tripEndDate = snapshot.endDate
+                state.updateDayOfMonthMapping()
                 let joinedParticipants = snapshot.participants.filter(\.hasJoined)
                 state.tripMembers = joinedParticipants.compactMap { participant in
                     participant.avatarName
@@ -828,6 +843,11 @@ enum TripDay: String, CaseIterable, Equatable, Identifiable {
     case day3 = "DAY 3"
     case day4 = "DAY 4"
     case day5 = "DAY 5"
+    case day6 = "DAY 6"
+    case day7 = "DAY 7"
+    case day8 = "DAY 8"
+    case day9 = "DAY 9"
+    case day10 = "DAY 10"
 
     var id: Self { self }
 }

@@ -116,31 +116,36 @@ struct RouteEditorView: View {
                 .buttonStyle(.plain)
             }
 
-            ScrollView(.horizontal) {
-                HStack(spacing: DDSpacing.small) {
-                    ForEach(store.availableDays) { day in
-                        Button {
-                            store.send(.daySelected(day))
-                        } label: {
-                            Text(day.rawValue)
-                                .ddTypography(.labelEmphasis14)
-                                .foregroundStyle(DDColor.textPrimary)
-                                .frame(width: 64, height: 40)
-                                .background(
-                                    day == store.availableDays.first
-                                        ? DDColor.borderDefault
-                                        : Color.clear
-                                )
-                                .clipShape(.capsule)
-                                .overlay {
-                                    Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
-                                }
-                        }
-                        .buttonStyle(.plain)
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: DDSpacing.small),
+                    count: 5
+                ),
+                alignment: .leading,
+                spacing: DDSpacing.small
+            ) {
+                ForEach(store.availableDays) { day in
+                    Button {
+                        store.send(.daySelected(day))
+                    } label: {
+                        Text(day.rawValue)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(
+                                day == store.availableDays.first
+                                    ? DDColor.borderDefault
+                                    : Color.clear
+                            )
+                            .clipShape(.capsule)
+                            .overlay {
+                                Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
+                            }
                     }
+                    .buttonStyle(.plain)
                 }
             }
-            .scrollIndicators(.hidden)
 
             Spacer(minLength: 0)
         }

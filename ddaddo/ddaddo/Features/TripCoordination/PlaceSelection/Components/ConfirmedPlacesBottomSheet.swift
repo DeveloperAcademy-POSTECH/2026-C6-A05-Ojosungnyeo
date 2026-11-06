@@ -43,10 +43,10 @@ struct ConfirmedPlacesBottomSheet: View {
 
                 Text("확정완료")
                     .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
-                    .foregroundStyle(DDColor.textOnPrimary)
+                    .foregroundStyle(DDColor.textTertiary)
                     .padding(.horizontal, DDSpacing.medium)
                     .frame(height: 28)
-                    .background(DDColor.surfaceSelected)
+                    .background(DDColor.surfaceControl)
                     .clipShape(.capsule)
             }
             .padding(.top, DDSpacing.xLarge)

@@ -157,7 +157,7 @@ struct TransportationSelectView: View {
             let duration = store.selectedDuration
         else { return nil }
 
-        return "\(transportation.title)으로 최대 \(duration.rawValue)분 이내에 이동할 수 있는 장소를 묶어요."
+        return "\(transportation.title.withKoreanParticle(.direction)) 최대 \(duration.rawValue)분 이내에 이동할 수 있는 장소를 묶어요."
     }
 
     private var bottomAction: some View {

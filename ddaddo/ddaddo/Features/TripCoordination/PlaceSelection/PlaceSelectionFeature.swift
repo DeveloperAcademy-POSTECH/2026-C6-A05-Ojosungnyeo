@@ -232,6 +232,11 @@ struct PlaceSelectionFeature: Reducer {
             participants: [Participant],
             remainingSeconds: Int
         ) {
+            let previousCurrentMember = self.participants.first(where: \.isCurrentUser)?.member
+            let incomingCurrentMember = participants.first(where: \.isCurrentUser)?.member
+            let shouldSelectCurrentMember = self.tripID != tripID
+                || previousCurrentMember != incomingCurrentMember
+
             self.tripID = tripID
             self.tripTitle = tripTitle
             self.destinationName = destinationName
@@ -241,8 +246,10 @@ struct PlaceSelectionFeature: Reducer {
             self.remainingSeconds = remainingSeconds
 
             let selectableMembers = participants.filter(\.hasJoined).map(\.member)
-            if !selectableMembers.contains(selectedMember) {
-                selectedMember = participants.first(where: \.isCurrentUser)?.member
+            if shouldSelectCurrentMember, let incomingCurrentMember {
+                selectedMember = incomingCurrentMember
+            } else if !selectableMembers.contains(selectedMember) {
+                selectedMember = incomingCurrentMember
                     ?? selectableMembers.first
                     ?? .tae
             }

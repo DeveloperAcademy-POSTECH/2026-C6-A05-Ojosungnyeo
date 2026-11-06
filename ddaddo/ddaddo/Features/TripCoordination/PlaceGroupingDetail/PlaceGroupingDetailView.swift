@@ -356,7 +356,7 @@ struct PlaceGroupingDetailView: View {
                 .scaledToFit()
                 .frame(width: 159, height: 170)
 
-            Text("\(emptyStateMemberName)는 이 지역에 그룹핑된 장소가 없어요")
+            Text("\(emptyStateMemberName.withKoreanParticle(.topic)) 이 지역에 그룹핑된 장소가 없어요")
                 .ddTypography(.body16)
                 .foregroundStyle(DDColor.borderSubtle)
         }
@@ -698,7 +698,7 @@ struct ConfirmationCancellationBanner: View {
                         .foregroundStyle(DDColor.textPrimary)
                 }
 
-                Text("\(notice.memberName)가 수정함에 따라 확정이 취소되어따.")
+                Text("\(notice.memberName.withKoreanParticle(.subject)) 수정함에 따라 확정이 취소되어따.")
                     .ddTypography(.body16)
                     .foregroundStyle(DDColor.textSecondary)
                     .lineLimit(2)

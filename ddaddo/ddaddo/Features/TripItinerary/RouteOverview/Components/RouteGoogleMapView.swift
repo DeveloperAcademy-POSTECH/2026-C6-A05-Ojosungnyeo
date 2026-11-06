@@ -338,22 +338,22 @@ struct RouteGoogleMapView: UIViewRepresentable {
         scale: CGFloat
     ) -> UIImage? {
         guard let source = UIImage(named: assetName) else { return nil }
-        let size = CGSize(width: 48 * scale, height: 96 * scale)
+        let size = CGSize(width: 36 * scale, height: 72 * scale)
         return UIGraphicsImageRenderer(size: size).image { _ in
             source.draw(
                 in: CGRect(
                     x: 0,
                     y: 0,
-                    width: 48 * scale,
-                    height: 72 * scale
+                    width: 36 * scale,
+                    height: 54 * scale
                 )
             )
 
             let circleRect = CGRect(
-                x: 16.5 * scale,
-                y: 80 * scale,
-                width: 15 * scale,
-                height: 15 * scale
+                x: 12 * scale,
+                y: 60 * scale,
+                width: 12 * scale,
+                height: 12 * scale
             )
             badgeColor.setFill()
             UIBezierPath(ovalIn: circleRect).fill()
@@ -361,16 +361,16 @@ struct RouteGoogleMapView: UIViewRepresentable {
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 10 * scale, weight: .medium),
+                .font: UIFont.systemFont(ofSize: 8 * scale, weight: .medium),
                 .foregroundColor: UIColor.black,
                 .paragraphStyle: paragraph
             ]
             String(number).draw(
                 in: CGRect(
-                    x: 16.5 * scale,
-                    y: 81.5 * scale,
-                    width: 15 * scale,
-                    height: 12 * scale
+                    x: 12 * scale,
+                    y: 61 * scale,
+                    width: 12 * scale,
+                    height: 10 * scale
                 ),
                 withAttributes: attributes
             )

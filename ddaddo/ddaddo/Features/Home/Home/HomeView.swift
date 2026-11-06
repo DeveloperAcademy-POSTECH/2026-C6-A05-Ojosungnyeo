@@ -226,7 +226,10 @@ struct HomeView: View {
     }
 
     private var mascotMessageText: Text {
-        let nickname = store.nickname.isEmpty ? "지구인" : store.nickname
+        let originalNickname = store.nickname.isEmpty ? "지구인" : store.nickname
+        let nickname = originalNickname.count > 3
+            ? "\(originalNickname.prefix(3))…"
+            : originalNickname
         let bodyColor = Color(red: 0.38, green: 0.38, blue: 0.38)
         let nicknameColor = DDColor.textOnPrimary
 

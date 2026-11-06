@@ -14,6 +14,7 @@ struct RouteOverviewFeature: Reducer {
         var selectedDay = TripDay.day1
         var selectedMembers: Set<TripMember> = []
         var selectedMemberOrder: [TripMember] = []
+        var expandedStopIDs: Set<RouteStop.ID> = []
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
         var stopsByDay = RouteStop.stopsByDay
         let places = RoutePlace.mockPlaces
@@ -38,7 +39,7 @@ struct RouteOverviewFeature: Reducer {
         }
 
         var visibleStops: [RouteStop] {
-            visibleStopGroups.flatMap(\.stops)
+            visibleStopGroups.flatMap(\.stops).flatMap(\.mapStops)
         }
 
         var selectedPlace: RoutePlace {
@@ -66,6 +67,8 @@ struct RouteOverviewFeature: Reducer {
                             order: index,
                             name: course.title,
                             category: course.categorySummary,
+                            placeNames: course.placeNames,
+                            places: course.places,
                             latitude: 35.6812 + Double(index) * 0.006,
                             longitude: 139.7671 + Double(index % 2 == 0 ? index : -index) * 0.005,
                             members: Set(course.members),
@@ -82,6 +85,7 @@ struct RouteOverviewFeature: Reducer {
         case backButtonTapped
         case daySelected(TripDay)
         case memberTapped(TripMember)
+        case stopDisclosureTapped(RouteStop.ID)
         case placeChanged(RoutePlace.ID?)
         case addressCopyButtonTapped(String)
     }
@@ -112,6 +116,14 @@ struct RouteOverviewFeature: Reducer {
                 }
                 return .none
 
+            case let .stopDisclosureTapped(stopID):
+                if state.expandedStopIDs.contains(stopID) {
+                    state.expandedStopIDs.remove(stopID)
+                } else {
+                    state.expandedStopIDs.insert(stopID)
+                }
+                return .none
+
             case let .placeChanged(placeID):
                 guard let placeID else { return .none }
                 state.selectedPlaceID = placeID
@@ -134,6 +146,8 @@ struct RouteStop: Equatable, Identifiable {
     let order: Int
     let name: String
     let category: String
+    let placeNames: [String]
+    let places: [ItineraryPlace]
     let latitude: Double
     let longitude: Double
     let members: Set<TripMember>
@@ -144,6 +158,8 @@ struct RouteStop: Equatable, Identifiable {
         order: Int,
         name: String,
         category: String,
+        placeNames: [String]? = nil,
+        places: [ItineraryPlace] = [],
         latitude: Double,
         longitude: Double,
         members: Set<TripMember>,
@@ -153,6 +169,8 @@ struct RouteStop: Equatable, Identifiable {
         self.order = order
         self.name = name
         self.category = category
+        self.placeNames = placeNames ?? [name]
+        self.places = places
         self.latitude = latitude
         self.longitude = longitude
         self.members = members
@@ -165,11 +183,30 @@ struct RouteStop: Equatable, Identifiable {
             order: order,
             name: name,
             category: category,
+            placeNames: placeNames,
+            places: places,
             latitude: latitude,
             longitude: longitude,
             members: members,
             scheduleID: scheduleID
         )
+    }
+
+    var mapStops: [RouteStop] {
+        guard !places.isEmpty else { return [self] }
+        return places.enumerated().map { index, place in
+            RouteStop(
+                id: 1_000_000 + id * 10_000 + index,
+                order: order,
+                name: place.name,
+                category: place.category,
+                placeNames: [place.name],
+                latitude: place.latitude,
+                longitude: place.longitude,
+                members: members,
+                scheduleID: scheduleID
+            )
+        }
     }
 
     static let stopsByDay: [TripDay: [RouteStop]] = [

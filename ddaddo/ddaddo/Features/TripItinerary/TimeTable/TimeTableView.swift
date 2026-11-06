@@ -205,7 +205,11 @@ private struct TimeTableReadOnlyContent: View {
     private var originalScheduleRows: some View {
         ForEach(Array(scheduledCourses.enumerated()), id: \.element.schedule.id) { index, item in
             HStack(alignment: .top, spacing: 20) {
-                timelineMarker(number: index + 1, isLast: index == scheduledCourses.count - 1)
+                timelineMarker(
+                    number: index + 1,
+                    isLast: index == scheduledCourses.count - 1,
+                    rowHeight: scheduleCardHeight(item.course)
+                )
                 scheduleCard(item.course)
             }
             .padding(.leading, DDSpacing.medium)
@@ -269,12 +273,16 @@ private struct TimeTableReadOnlyContent: View {
     }
     #endif
 
-    private func timelineMarker(number: Int, isLast: Bool) -> some View {
+    private func timelineMarker(
+        number: Int,
+        isLast: Bool,
+        rowHeight: CGFloat = 71
+    ) -> some View {
         ZStack(alignment: .top) {
             if !isLast {
                 Rectangle()
                     .fill(DDColor.textTertiary)
-                    .frame(width: 5, height: 87)
+                    .frame(width: 5, height: rowHeight + DDSpacing.large)
                     .offset(y: 7)
             }
 
@@ -284,43 +292,103 @@ private struct TimeTableReadOnlyContent: View {
                 .frame(width: 15, height: 15)
                 .background(DDColor.actionPrimary, in: Circle())
         }
-        .frame(width: 16, height: 71, alignment: .top)
+        .frame(width: 16, height: rowHeight, alignment: .top)
     }
 
     private func scheduleCard(_ course: TimeTableCourse) -> some View {
         VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
-            HStack(spacing: DDSpacing.xSmall) {
-                Text(course.title)
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textPrimary)
-                    .lineLimit(1)
+            Button {
+                guard course.placeNames.count > 1 else { return }
+                store.send(.courseDisclosureTapped(course.id))
+            } label: {
+                HStack(spacing: DDSpacing.xSmall) {
+                    VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
+                        HStack(spacing: DDSpacing.xSmall) {
+                            Text(course.title)
+                                .ddTypography(.bodyEmphasis16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .lineLimit(1)
 
-                if course.kind(among: store.tripMembers) == .separate {
-                    HStack(spacing: -5) {
-                        ForEach(TripMember.allCases.filter(course.members.contains)) { member in
-                            Circle()
-                                .fill(member.routeAccentColor)
-                                .frame(width: 14, height: 14)
+                            if course.kind(among: store.tripMembers) == .separate {
+                                HStack(spacing: -5) {
+                                    ForEach(TripMember.allCases.filter(course.members.contains)) { member in
+                                        Circle()
+                                            .fill(member.routeAccentColor)
+                                            .frame(width: 14, height: 14)
+                                    }
+                                }
+                            }
+                        }
+
+                        if !course.categorySummary.isEmpty {
+                            Text(course.categorySummary)
+                                .ddTypography(.labelEmphasis14)
+                                .foregroundStyle(DDColor.surfaceSelected)
+                                .lineLimit(2)
                         }
                     }
-                }
-            }
 
-            if !course.categorySummary.isEmpty {
-                Text(course.categorySummary)
-                    .ddTypography(.labelEmphasis14)
-                    .foregroundStyle(DDColor.surfaceSelected)
-                    .lineLimit(2)
+                    Spacer(minLength: DDSpacing.small)
+
+                    if course.placeNames.count > 1 {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(DDColor.textSecondary)
+                            .rotationEffect(
+                                store.expandedCourseIDs.contains(course.id)
+                                    ? .degrees(180) : .zero
+                            )
+                    }
+                }
+                .padding(.horizontal, DDSpacing.xLarge)
+                .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+
+            if course.placeNames.count > 1,
+               store.expandedCourseIDs.contains(course.id) {
+                VStack(spacing: DDSpacing.small) {
+                    ForEach(Array(course.placeNames.enumerated()), id: \.offset) { index, placeName in
+                        HStack(spacing: DDSpacing.medium) {
+                            Text("\(index + 1)")
+                                .ddTypography(.labelEmphasis14)
+                                .foregroundStyle(DDColor.surfaceSelected)
+                                .frame(width: 18)
+
+                            Text(placeName)
+                                .ddTypography(.bodyEmphasis16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, DDSpacing.large)
+                        .frame(height: 44)
+                        .background(DDColor.surfaceDefault)
+                        .clipShape(.rect(cornerRadius: 14))
+                    }
+                }
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.bottom, DDSpacing.large)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, DDSpacing.xLarge)
-        .frame(maxWidth: .infinity, minHeight: 71, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(DDColor.textTertiary, lineWidth: 1)
         }
+        .animation(.easeInOut(duration: 0.2), value: store.expandedCourseIDs)
+    }
+
+    private func scheduleCardHeight(_ course: TimeTableCourse) -> CGFloat {
+        guard course.placeNames.count > 1,
+              store.expandedCourseIDs.contains(course.id)
+        else { return 71 }
+        let placeRowsHeight = CGFloat(course.placeNames.count) * 44
+        let rowSpacing = CGFloat(max(course.placeNames.count - 1, 0)) * DDSpacing.small
+        return 71 + placeRowsHeight + rowSpacing + DDSpacing.large
     }
 }
 

@@ -100,7 +100,15 @@ private extension TripItineraryFeature.State {
             placeNames: [place.name],
             categories: [place.category],
             members: timeTable.tripMembers,
-            durationMinutes: 60
+            durationMinutes: 60,
+            places: [
+                ItineraryPlace(
+                    name: place.name,
+                    category: place.category,
+                    latitude: place.latitude,
+                    longitude: place.longitude
+                )
+            ]
         )
 
         let existingPlacementIDs = timeTable.edit.draftPlacements.map(\.id)

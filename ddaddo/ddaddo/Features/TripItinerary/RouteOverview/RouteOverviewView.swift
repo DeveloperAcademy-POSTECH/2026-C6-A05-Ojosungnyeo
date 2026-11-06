@@ -67,7 +67,7 @@ struct RouteOverviewView: View {
             .contentShape(Rectangle())
 
             VStack(spacing: 0) {
-                Text("3박 4일 도쿄 여행")
+                Text(store.tripHeaderTitle)
                     .ddTypography(.bodyEmphasis16)
                     .foregroundStyle(DDColor.textPrimary)
             }
@@ -79,7 +79,7 @@ struct RouteOverviewView: View {
     private var dayPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: DDSpacing.small) {
-                ForEach(TripDay.allCases) { day in
+                ForEach(store.availableDays) { day in
                     Button {
                         store.send(.daySelected(day))
                     } label: {

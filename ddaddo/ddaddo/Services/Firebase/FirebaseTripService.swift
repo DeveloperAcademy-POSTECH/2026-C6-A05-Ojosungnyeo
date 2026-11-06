@@ -515,6 +515,46 @@ enum FirebaseTripService {
             .collection("itinerary")
             .document("current")
             .getDocument()
+        return itinerarySnapshot(from: document)
+    }
+
+    static func observeItinerary(
+        tripID: String
+    ) -> AsyncThrowingStream<TripItinerarySnapshot?, Error> {
+        AsyncThrowingStream { continuation in
+            guard FirebaseService.isConfigured else {
+                continuation.finish(throwing: TripServiceError.firebaseNotConfigured)
+                return
+            }
+            guard Auth.auth().currentUser != nil else {
+                continuation.finish(throwing: TripServiceError.unauthenticated)
+                return
+            }
+
+            let listener = Firestore.firestore()
+                .collection("trips")
+                .document(tripID)
+                .collection("itinerary")
+                .document("current")
+                .addSnapshotListener { document, error in
+                    if let error {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                    guard let document else {
+                        continuation.yield(nil)
+                        return
+                    }
+                    continuation.yield(itinerarySnapshot(from: document))
+                }
+
+            continuation.onTermination = { _ in
+                listener.remove()
+            }
+        }
+    }
+
+    private static func itinerarySnapshot(from document: DocumentSnapshot) -> TripItinerarySnapshot? {
         guard document.exists else { return nil }
 
         let courses: [TripItinerarySaveRequest.Course] =

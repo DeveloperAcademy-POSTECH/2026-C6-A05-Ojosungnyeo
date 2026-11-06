@@ -48,11 +48,27 @@ struct TripItineraryFeature: Reducer {
             case .routeOverview(.backButtonTapped):
                 return .send(.delegate(.returnToUpcomingTrips))
 
+            case .routeOverview(.onAppear):
+                state.synchronizeRouteWithTimeTable()
+                return .send(.timeTable(.onAppear))
+
+            case let .routeOverview(.daySelected(day)):
+                state.timeTable.selectedDay = day
+                return .none
+
+            case let .timeTable(.daySelected(day)):
+                state.routeOverview.selectedDay = day
+                return .none
+
             case .timeTable(.delegate(.addPlaceRequested)):
                 state.routeEditor = RouteEditorFeature.State(
                     availableDays: state.timeTable.availableDays
                 )
                 state.isRouteEditorPresented = true
+                return .none
+
+            case .timeTable(.delegate(.itineraryUpdated)):
+                state.synchronizeRouteWithTimeTable()
                 return .none
 
             case .routeEditor(.delegate(.dismissed)):
@@ -85,9 +101,26 @@ struct TripItineraryFeature: Reducer {
 
 private extension TripItineraryFeature.State {
     mutating func synchronizeRouteWithTimeTable() {
+        let headerTitle = timeTable.routeHeaderTitle
+        let availableDays = timeTable.availableDays
+        let tripMembers = timeTable.tripMembers
+        let currentMember = timeTable.currentTripMember ?? tripMembers.first ?? .tae
+        let selectedDay = timeTable.selectedDay
+        let placements = timeTable.placements
+        let coursesByID = timeTable.coursesByID
+
+        routeOverview.tripHeaderTitle = headerTitle
+        routeOverview.availableDays = availableDays
+        routeOverview.memberOrder = tripMembers
+        routeOverview.currentMember = currentMember
+        routeOverview.selectedMembers.formIntersection(tripMembers)
+        routeOverview.selectedMemberOrder.removeAll { !tripMembers.contains($0) }
+        routeOverview.selectedDay = availableDays.contains(selectedDay)
+            ? selectedDay
+            : availableDays.first ?? .day1
         routeOverview.replaceItinerary(
-            placements: timeTable.placements,
-            coursesByID: timeTable.coursesByID
+            placements: placements,
+            coursesByID: coursesByID
         )
     }
 

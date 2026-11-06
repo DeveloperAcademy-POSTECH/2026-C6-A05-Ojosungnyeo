@@ -163,18 +163,10 @@ struct MemberPlacesBottomSheet: View {
                     action: confirmButtonTapped
                 )
                 .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
-                .foregroundStyle(
-                    isConfirmationComplete || canConfirm
-                        ? DDColor.textOnPrimary
-                        : DDColor.textTertiary
-                )
+                .foregroundStyle(canConfirm ? DDColor.textOnPrimary : DDColor.textTertiary)
                 .padding(.horizontal, DDSpacing.medium)
                 .frame(height: 28)
-                .background(
-                    isConfirmationComplete || canConfirm
-                        ? DDColor.actionPrimary
-                        : DDColor.surfaceControl
-                )
+                .background(canConfirm ? DDColor.actionPrimary : DDColor.surfaceControl)
                 .clipShape(.capsule)
                 .disabled(isConfirmationComplete || !canConfirm)
             }

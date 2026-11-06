@@ -183,19 +183,29 @@ private struct TimeTableReadOnlyContent: View {
                 #if DEBUG
                 if store.isLocalPreview, store.recommendationTripID == nil,
                    let savedRows = store.savedPreviewRowsByDay?[store.selectedDay] {
-                    ForEach(Array(savedRows.enumerated()), id: \.element.id) { index, row in
-                        HStack(alignment: .top, spacing: 20) {
-                            timelineMarker(number: index + 1, isLast: index == savedRows.count - 1)
-                            savedPreviewRow(row)
+                    if savedRows.isEmpty {
+                        TimeTableEmptyStateView()
+                    } else {
+                        ForEach(Array(savedRows.enumerated()), id: \.element.id) { index, row in
+                            HStack(alignment: .top, spacing: 20) {
+                                timelineMarker(number: index + 1, isLast: index == savedRows.count - 1)
+                                savedPreviewRow(row)
+                            }
+                            .padding(.leading, DDSpacing.medium)
+                            .padding(.trailing, DDSpacing.large)
                         }
-                        .padding(.leading, DDSpacing.medium)
-                        .padding(.trailing, DDSpacing.large)
                     }
+                } else if scheduledCourses.isEmpty {
+                    TimeTableEmptyStateView()
                 } else {
                     originalScheduleRows
                 }
                 #else
-                originalScheduleRows
+                if scheduledCourses.isEmpty {
+                    TimeTableEmptyStateView()
+                } else {
+                    originalScheduleRows
+                }
                 #endif
             }
         }
@@ -680,6 +690,25 @@ struct TimeTableContent: View {
                 .frame(width: 15, height: 15)
         }
         .frame(width: 13, height: height, alignment: .top)
+    }
+}
+
+private struct TimeTableEmptyStateView: View {
+    var body: some View {
+        VStack(spacing: DDSpacing.small) {
+            Text("아직 추가된 일정이 없어따.")
+                .ddTypography(.heading20)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text("편집을 눌러 친구들과 여행 일정을 세워보세따!")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 180, alignment: .center)
+        .offset(y: 24)
     }
 }
 

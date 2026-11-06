@@ -106,7 +106,7 @@ playground.xcworkspace
 Carthage/Build/
 
 # Accio dependency management
-Dependencies/
+/Dependencies/
 .accio/
 
 # fastlane
@@ -142,6 +142,12 @@ iOSInjectionProject/
 ### Env
 *.xcconfig
 .env
+GoogleService-Info.plist
+
+# Firebase Cloud Functions
+functions/node_modules/
+functions/.runtimeconfig.json
+firebase-debug.log
 
 
 # End of https://www.toptal.com/developers/gitignore/api/swift,xcode,macos,cocoapods

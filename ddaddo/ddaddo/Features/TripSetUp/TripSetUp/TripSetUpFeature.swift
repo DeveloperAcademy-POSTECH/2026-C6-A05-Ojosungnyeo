@@ -1,0 +1,293 @@
+//
+//  TripSetUpFeature.swift
+//  ddaddo
+//
+
+import ComposableArchitecture
+import Foundation
+
+struct TripSetUpFeature: Reducer {
+    enum Delegate: Equatable {
+        case returnHome
+        case returnToUpcomingTrips
+    }
+
+    @ObservableState
+    struct State: Equatable {
+        static let maximumTravelerCount = 4
+
+        var selectedCities: [TripSearchFeature.City] = []
+        var travelerCount = 1
+        var tripStartDate: Date?
+        var tripEndDate: Date?
+        var draftStartDate: Date?
+        var draftEndDate: Date?
+        var isDatePickerPresented = false
+        var transportationSelection: TripSetUpTransportationFeature.Selection?
+        var transportationSheet = TripSetUpTransportationFeature.State()
+        var isTransportationSheetPresented = false
+        var isConfirmationAlertPresented = false
+        var isCreatingTrip = false
+        var creationErrorMessage: String?
+        var waitingForParticipants: WaitingForParticipantsFeature.State? = nil
+        var isWaitingForParticipantsPresented = false
+
+        init(selectedCities: [TripSearchFeature.City] = []) {
+            self.selectedCities = selectedCities
+        }
+
+        var tripTitle: String {
+            guard let firstCity = selectedCities.first else { return "" }
+            guard selectedCities.count > 1 else { return "\(firstCity.name) 여행" }
+            return "\(firstCity.name) 외 \(selectedCities.count - 1)개 도시 여행"
+        }
+
+        var destinationSummary: String {
+            guard !selectedCities.isEmpty else { return "" }
+            var countries: [String] = []
+            for city in selectedCities where !countries.contains(city.country) {
+                countries.append(city.country)
+            }
+            return "\(countries.joined(separator: ", ")) · \(selectedCities.count)개 도시"
+        }
+        var transportationSummary: String? {
+            guard let transportationSelection else { return nil }
+            return "\(transportationSelection.transportation.title) · \(transportationSelection.duration.title)"
+        }
+        var isSaveEnabled: Bool {
+            guard
+                let tripStartDate,
+                let tripEndDate,
+                tripStartDate < tripEndDate
+            else { return false }
+
+            return (1...Self.maximumTravelerCount).contains(travelerCount)
+                && transportationSelection != nil
+        }
+
+        var tripDateSummary: String? {
+            guard let tripStartDate, let tripEndDate else { return nil }
+
+            let calendar = Calendar.autoupdatingCurrent
+            guard let nights = calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: tripStartDate),
+                to: calendar.startOfDay(for: tripEndDate)
+            ).day, nights >= 0 else { return nil }
+
+            let start = calendar.dateComponents([.year, .month, .day], from: tripStartDate)
+            let end = calendar.dateComponents([.year, .month, .day], from: tripEndDate)
+
+            guard
+                let startYear = start.year,
+                let startMonth = start.month,
+                let startDay = start.day,
+                let endYear = end.year,
+                let endMonth = end.month,
+                let endDay = end.day
+            else { return nil }
+
+            let dateSummary: String
+            if nights == 0 {
+                dateSummary = "\(startMonth)월 \(startDay)일"
+            } else if startYear == endYear, startMonth == endMonth {
+                dateSummary = "\(startMonth)월 \(startDay)일 ~ \(endDay)일"
+            } else if startYear == endYear {
+                dateSummary = "\(startMonth)월 \(startDay)일 ~ \(endMonth)월 \(endDay)일"
+            } else {
+                dateSummary = "\(startYear)년 \(startMonth)월 \(startDay)일 ~ \(endYear)년 \(endMonth)월 \(endDay)일"
+            }
+
+            return "\(dateSummary) · \(nights)박 \(nights + 1)일"
+        }
+    }
+
+    @CasePathable
+    enum Action: Equatable {
+        case backButtonTapped
+        case travelScheduleButtonTapped
+        case tripDateTapped(Date)
+        case tripDatePickerCloseButtonTapped
+        case tripDatePickerConfirmButtonTapped
+        case travelerDecreaseButtonTapped
+        case travelerIncreaseButtonTapped
+        case transportationCardTapped
+        case transportationSheetDismissed
+        case transportationSheet(TripSetUpTransportationFeature.Action)
+        case saveButtonTapped
+        case confirmationCancelButtonTapped
+        case confirmationConfirmButtonTapped
+        case tripCreationResponse(TripInvitationSnapshot)
+        case tripCreationFailed(String)
+        case creationErrorDismissed
+        case waitingForParticipantsDismissed
+        case waitingForParticipants(WaitingForParticipantsFeature.Action)
+        case delegate(Delegate)
+    }
+
+    @Dependency(\.tripClient) var tripClient
+
+    var body: some Reducer<State, Action> {
+        Reduce { state, action in
+            switch action {
+            case .travelScheduleButtonTapped:
+                state.draftStartDate = state.tripStartDate
+                state.draftEndDate = state.tripEndDate
+                state.isDatePickerPresented = true
+                return .none
+
+            case let .tripDateTapped(date):
+                let calendar = Calendar.autoupdatingCurrent
+                let selectedDate = calendar.startOfDay(for: date)
+                let today = calendar.startOfDay(for: Date())
+                guard selectedDate >= today else { return .none }
+
+                guard let draftStartDate = state.draftStartDate else {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = nil
+                    return .none
+                }
+
+                if state.draftEndDate != nil {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = nil
+                } else if selectedDate < draftStartDate {
+                    state.draftStartDate = selectedDate
+                    state.draftEndDate = draftStartDate
+                } else if selectedDate > draftStartDate {
+                    state.draftEndDate = selectedDate
+                }
+                return .none
+
+            case .tripDatePickerCloseButtonTapped:
+                state.draftStartDate = nil
+                state.draftEndDate = nil
+                state.isDatePickerPresented = false
+                return .none
+
+            case .tripDatePickerConfirmButtonTapped:
+                guard
+                    let draftStartDate = state.draftStartDate,
+                    let draftEndDate = state.draftEndDate,
+                    draftStartDate < draftEndDate
+                else { return .none }
+
+                state.tripStartDate = draftStartDate
+                state.tripEndDate = draftEndDate
+                state.draftStartDate = nil
+                state.draftEndDate = nil
+                state.isDatePickerPresented = false
+                return .none
+
+            case .saveButtonTapped:
+                guard state.isSaveEnabled else { return .none }
+                state.isConfirmationAlertPresented = true
+                return .none
+
+            case .confirmationCancelButtonTapped:
+                state.isConfirmationAlertPresented = false
+                return .none
+
+            case .confirmationConfirmButtonTapped:
+                guard state.isSaveEnabled, state.isConfirmationAlertPresented else { return .none }
+                state.isConfirmationAlertPresented = false
+                guard
+                    let startDate = state.tripStartDate,
+                    let endDate = state.tripEndDate,
+                    let transportation = state.transportationSelection
+                else { return .none }
+                state.isCreatingTrip = true
+                state.creationErrorMessage = nil
+                let request = TripCreationRequest(
+                    title: state.tripTitle,
+                    destinations: state.selectedCities,
+                    startDate: startDate,
+                    endDate: endDate,
+                    travelerCount: state.travelerCount,
+                    transportation: transportation.transportation.rawValue,
+                    maximumTravelMinutes: transportation.duration.rawValue
+                )
+                return .run { send in
+                    do {
+                        await send(.tripCreationResponse(try await tripClient.createTrip(request)))
+                    } catch {
+                        await send(.tripCreationFailed(error.localizedDescription))
+                    }
+                }
+
+            case let .tripCreationResponse(snapshot):
+                state.isCreatingTrip = false
+                state.waitingForParticipants = WaitingForParticipantsFeature.State(snapshot: snapshot)
+                state.isWaitingForParticipantsPresented = true
+                return .none
+
+            case let .tripCreationFailed(message):
+                state.isCreatingTrip = false
+                state.creationErrorMessage = message
+                return .none
+
+            case .creationErrorDismissed:
+                state.creationErrorMessage = nil
+                return .none
+
+            case .waitingForParticipantsDismissed:
+                state.isWaitingForParticipantsPresented = false
+                return .none
+
+            case .waitingForParticipants(.backButtonTapped):
+                state.isWaitingForParticipantsPresented = false
+                return .send(.delegate(.returnToUpcomingTrips))
+
+            case .waitingForParticipants(.delegate(.returnHome)):
+                state.isWaitingForParticipantsPresented = false
+                return .send(.delegate(.returnHome))
+
+            case .waitingForParticipants:
+                return .none
+
+            case .delegate:
+                return .none
+
+            case .travelerDecreaseButtonTapped:
+                guard state.travelerCount > 1 else { return .none }
+                state.travelerCount -= 1
+                return .none
+
+            case .travelerIncreaseButtonTapped:
+                guard state.travelerCount < State.maximumTravelerCount else { return .none }
+                state.travelerCount += 1
+                return .none
+
+            case .transportationCardTapped:
+                state.transportationSheet = TripSetUpTransportationFeature.State(
+                    selection: state.transportationSelection
+                )
+                state.isTransportationSheetPresented = true
+                return .none
+
+            case .transportationSheetDismissed,
+                 .transportationSheet(.delegate(.dismiss)):
+                state.isTransportationSheetPresented = false
+                return .none
+
+            case let .transportationSheet(.delegate(.completed(selection))):
+                state.transportationSelection = selection
+                state.isTransportationSheetPresented = false
+                return .none
+
+            case .transportationSheet:
+                return .none
+
+            case .backButtonTapped:
+                return .none
+            }
+        }
+        .ifLet(\.waitingForParticipants, action: \.waitingForParticipants) {
+            WaitingForParticipantsFeature()
+        }
+
+        Scope(state: \.transportationSheet, action: \.transportationSheet) {
+            TripSetUpTransportationFeature()
+        }
+    }
+}

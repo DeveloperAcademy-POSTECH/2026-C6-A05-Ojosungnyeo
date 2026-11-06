@@ -11,12 +11,14 @@ import Foundation
 struct TimeTableFeature: Reducer {
     enum Delegate: Equatable {
         case addPlaceRequested
+        case itineraryUpdated
     }
 
     @ObservableState
     struct State: Equatable {
         var selectedDay = TripDay.day1
         var tripMembers = TripMember.allCases
+        var currentTripMember: TripMember?
         var tripStartDate: Date? = nil
         var tripEndDate: Date? = nil
         var tripTitle: String?
@@ -30,6 +32,7 @@ struct TimeTableFeature: Reducer {
         var expandedCourseIDs: Set<TimeTableCourse.ID> = []
         var groups: [TimeTableGroup] = []
         var placements: [TimeTableSchedule] = []
+        var pendingItinerarySnapshot: TripItinerarySnapshot?
         var hasLoadedItinerary = false
         var isEditing = false
         var edit = TimeTableEditFeature.State()
@@ -90,6 +93,31 @@ struct TimeTableFeature: Reducer {
             return "\(first)일 ~ \(last)일 · \(nights)박 \(nights + 1)일"
         }
 
+        var routeHeaderTitle: String {
+            let destination = destinationName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let destinationText = destination.flatMap { $0.isEmpty ? nil : $0 } ?? ""
+            let dayCount: Int
+            if let tripStartDate, let tripEndDate {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = .current
+                dayCount = max(
+                    (calendar.dateComponents(
+                        [.day],
+                        from: calendar.startOfDay(for: tripStartDate),
+                        to: calendar.startOfDay(for: tripEndDate)
+                    ).day ?? 0) + 1,
+                    1
+                )
+            } else {
+                dayCount = availableDays.count
+            }
+            guard dayCount > 0 else { return destinationText.isEmpty ? "여행" : "\(destinationText) 여행" }
+            let duration = "\(max(dayCount - 1, 0))박 \(dayCount)일"
+            return destinationText.isEmpty
+                ? "\(duration) 여행"
+                : "\(duration) \(destinationText) 여행"
+        }
+
         var unplacedGroups: [TimeTableGroup] {
             let placedCourseIDs = Set((isEditing ? edit.draftPlacements : placements).map(\.courseID))
             return groups.filter { group in
@@ -148,6 +176,7 @@ struct TimeTableFeature: Reducer {
             coursesByID = [:]
             groups = []
             placements = []
+            pendingItinerarySnapshot = nil
             hasLoadedItinerary = false
             isEditing = false
             edit = TimeTableEditFeature.State()
@@ -239,6 +268,9 @@ struct TimeTableFeature: Reducer {
         case validateSelectedDay
         case onAppear
         case itineraryLoaded(TripItinerarySnapshot?)
+        case itineraryObserved(TripItinerarySnapshot?)
+        case tripContextLoaded(TripInvitationSnapshot)
+        case tripContextLoadFailed
         case itineraryLoadFailed
         case itinerarySaveSucceeded
         case itinerarySaveFailed(String)
@@ -263,20 +295,58 @@ struct TimeTableFeature: Reducer {
                 return .none
 
             case .onAppear:
-                guard !state.hasLoadedItinerary,
-                      let tripID = state.recommendationTripID,
+                guard let tripID = state.recommendationTripID,
                       !tripID.isEmpty else { return .none }
                 state.hasLoadedItinerary = true
-                return .run { send in
-                    do {
-                        await send(.itineraryLoaded(try await tripClient.fetchItinerary(tripID)))
-                    } catch {
-                        await send(.itineraryLoadFailed)
+                return .merge(
+                    .run { send in
+                        do {
+                            for try await snapshot in await tripClient.observeItinerary(tripID) {
+                                await send(.itineraryObserved(snapshot))
+                            }
+                        } catch {
+                            await send(.itineraryLoadFailed)
+                        }
+                    },
+                    .run { send in
+                        do {
+                            await send(.tripContextLoaded(try await tripClient.fetchInvitation(tripID)))
+                        } catch {
+                            await send(.tripContextLoadFailed)
+                        }
                     }
+                )
+                .cancellable(id: "time-table-itinerary-observation", cancelInFlight: true)
+
+            case let .itineraryObserved(snapshot):
+                return .send(.itineraryLoaded(snapshot))
+
+            case let .tripContextLoaded(snapshot):
+                state.tripTitle = snapshot.title
+                state.destinationName = snapshot.destinationName
+                state.tripStartDate = snapshot.startDate
+                state.tripEndDate = snapshot.endDate
+                let joinedParticipants = snapshot.participants.filter(\.hasJoined)
+                state.tripMembers = joinedParticipants.compactMap { participant in
+                    participant.avatarName
+                        .flatMap(ParticipantAvatar.init(rawValue:))
+                        .map(TripMember.init(avatar:))
                 }
+                state.currentTripMember = joinedParticipants.first(where: \.isCurrentUser)?
+                    .avatarName
+                    .flatMap(ParticipantAvatar.init(rawValue:))
+                    .map(TripMember.init(avatar:))
+                return .send(.delegate(.itineraryUpdated))
+
+            case .tripContextLoadFailed:
+                return .none
 
             case let .itineraryLoaded(snapshot):
                 guard let snapshot else { return .none }
+                guard !state.isEditing else {
+                    state.pendingItinerarySnapshot = snapshot
+                    return .none
+                }
                 state.coursesByID = Dictionary(uniqueKeysWithValues: snapshot.courses.map { course in
                     let value = TimeTableCourse(
                         id: course.id,
@@ -300,7 +370,7 @@ struct TimeTableFeature: Reducer {
                         branchGroupID: schedule.branchGroupID
                     )
                 }
-                return .none
+                return .send(.delegate(.itineraryUpdated))
 
             case .itineraryLoadFailed:
                 state.hasLoadedItinerary = false
@@ -308,6 +378,7 @@ struct TimeTableFeature: Reducer {
 
             case .itinerarySaveSucceeded:
                 state.placements = state.edit.draftPlacements
+                state.pendingItinerarySnapshot = nil
                 state.edit.isSaving = false
                 state.isEditing = false
                 state.edit = TimeTableEditFeature.State()
@@ -329,6 +400,7 @@ struct TimeTableFeature: Reducer {
                 return .send(.delegate(.addPlaceRequested))
 
             case .editButtonTapped:
+                state.pendingItinerarySnapshot = nil
                 state.edit = TimeTableEditFeature.State()
                 #if DEBUG
                 if state.isLocalPreview, state.recommendationTripID == nil,
@@ -433,9 +505,12 @@ struct TimeTableFeature: Reducer {
                 return .none
 
             case .edit(.backButtonTapped):
+                let pendingSnapshot = state.pendingItinerarySnapshot
+                state.pendingItinerarySnapshot = nil
                 state.isEditing = false
                 state.edit = TimeTableEditFeature.State()
-                return .none
+                guard let pendingSnapshot else { return .none }
+                return .send(.itineraryLoaded(pendingSnapshot))
 
             case .edit(.saveButtonTapped):
                 #if DEBUG
@@ -752,6 +827,7 @@ enum TripDay: String, CaseIterable, Equatable, Identifiable {
     case day2 = "DAY 2"
     case day3 = "DAY 3"
     case day4 = "DAY 4"
+    case day5 = "DAY 5"
 
     var id: Self { self }
 }

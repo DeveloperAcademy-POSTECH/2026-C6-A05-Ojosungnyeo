@@ -486,13 +486,7 @@ private struct TimeTableEditContent: View {
     }
 
     private func shouldDisplayMemberDots(for memberIDs: [String]) -> Bool {
-        let tripMemberIDs = Set(timeTableStore.tripMembers.map(\.rawValue))
-        let scheduleMemberIDs = Set(memberIDs)
-
-        return !tripMemberIDs.isEmpty
-            && !scheduleMemberIDs.isEmpty
-            && scheduleMemberIDs.isSubset(of: tripMemberIDs)
-            && scheduleMemberIDs != tripMemberIDs
+        !memberIDs.isEmpty
     }
 
     private func dragHandle(_ item: DraggedItem) -> some View {

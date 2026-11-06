@@ -469,7 +469,7 @@ struct TimeTableContent: View {
     private var tripHeader: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DDSpacing.small) {
-                Text("도쿄 여행을 살펴보게따")
+                Text(store.headerTitle)
                     .ddTypography(.title24)
                     .foregroundStyle(DDColor.textPrimary)
 
@@ -478,9 +478,11 @@ struct TimeTableContent: View {
                     .foregroundStyle(DDColor.textPrimary)
             }
 
-            Text("11월 22일 ~ 25일 · 3박 4일")
-                .ddTypography(.body16)
-                .foregroundStyle(DDColor.textSecondary)
+            if let tripDateText = store.tripDateText {
+                Text(tripDateText)
+                    .ddTypography(.body16)
+                    .foregroundStyle(DDColor.textSecondary)
+            }
         }
         .padding(.horizontal, DDSpacing.large)
     }
@@ -488,7 +490,7 @@ struct TimeTableContent: View {
     private var dayPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: DDSpacing.small) {
-                ForEach(TripDay.allCases) { day in
+                ForEach(store.availableDays) { day in
                     Button {
                         store.send(.daySelected(day))
                     } label: {

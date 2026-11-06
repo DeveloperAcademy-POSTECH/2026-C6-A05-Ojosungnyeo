@@ -15,6 +15,7 @@ struct TripClient: DependencyKey, Sendable {
     var deleteUpcomingTrip: @MainActor @Sendable (String) async throws -> Void
     var saveItinerary: @MainActor @Sendable (TripItinerarySaveRequest) async throws -> Void
     var fetchItinerary: @MainActor @Sendable (String) async throws -> TripItinerarySnapshot?
+    var observeItinerary: @MainActor @Sendable (String) -> AsyncThrowingStream<TripItinerarySnapshot?, Error>
 
     static let liveValue = Self(
         createTrip: { request in
@@ -37,6 +38,9 @@ struct TripClient: DependencyKey, Sendable {
         },
         fetchItinerary: { tripID in
             try await FirebaseTripService.fetchItinerary(tripID: tripID)
+        },
+        observeItinerary: { tripID in
+            FirebaseTripService.observeItinerary(tripID: tripID)
         }
     )
 
@@ -47,7 +51,12 @@ struct TripClient: DependencyKey, Sendable {
         fetchUpcomingTrips: { [] },
         deleteUpcomingTrip: { _ in },
         saveItinerary: { _ in },
-        fetchItinerary: { _ in nil }
+        fetchItinerary: { _ in nil },
+        observeItinerary: { _ in
+            AsyncThrowingStream { continuation in
+                continuation.finish()
+            }
+        }
     )
 }
 

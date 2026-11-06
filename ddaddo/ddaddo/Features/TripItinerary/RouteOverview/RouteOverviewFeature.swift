@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import CoreGraphics
+import Foundation
 
 struct RouteOverviewFeature: Reducer {
     @ObservableState
@@ -20,6 +21,8 @@ struct RouteOverviewFeature: Reducer {
         let places = RoutePlace.mockPlaces
         var memberOrder = TripMember.allCases
         var currentMember = TripMember.tae
+        var tripHeaderTitle = "여행"
+        var availableDays = TripDay.allCases
 
         private var currentStops: [RouteStop] {
             stopsByDay[selectedDay, default: []]

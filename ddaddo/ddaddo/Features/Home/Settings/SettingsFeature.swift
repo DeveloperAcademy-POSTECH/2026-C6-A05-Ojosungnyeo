@@ -17,7 +17,6 @@ struct SettingsFeature: Reducer {
         var screen = Screen.settings
         var nickname = ""
         var nicknameDraft = ""
-        var isNotificationEnabled = true
         var isSavingNickname = false
         var nicknameError: String?
         var hasAcknowledgedWithdrawal = false
@@ -34,7 +33,6 @@ struct SettingsFeature: Reducer {
         case backButtonTapped
         case nicknameEditTapped
         case accountManagementTapped
-        case notificationToggled(Bool)
         case nicknameChanged(String)
         case saveNicknameTapped
         case nicknameSaved(Result<Void, Error>)
@@ -90,9 +88,6 @@ struct SettingsFeature: Reducer {
                 return .none
             case .accountManagementTapped:
                 state.screen = .account
-                return .none
-            case let .notificationToggled(value):
-                state.isNotificationEnabled = value
                 return .none
             case let .nicknameChanged(value):
                 state.nicknameDraft = String(value.prefix(10))

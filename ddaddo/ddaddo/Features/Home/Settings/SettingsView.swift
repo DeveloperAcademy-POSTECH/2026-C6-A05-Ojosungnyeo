@@ -82,23 +82,6 @@ struct SettingsView: View {
             }
             .padding(.top, 16)
 
-            sectionTitle("앱 설정")
-                .padding(.top, 24)
-                .padding(.bottom, 4)
-            card {
-                HStack {
-                    rowText("알림 설정", "여행 초대와 일정 소식을 받아요")
-                    Spacer()
-                    DDToggle(
-                        isOn: Binding(
-                            get: { store.isNotificationEnabled },
-                            set: { store.send(.notificationToggled($0)) }
-                        ),
-                        accessibilityLabel: "알림 설정"
-                    )
-                }
-            }
-
             sectionTitle("계정")
                 .padding(.top, 24)
                 .padding(.bottom, 4)

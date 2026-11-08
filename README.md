@@ -41,7 +41,7 @@
 
 | Screen flow   |    Dependency call map |
 |:----------: | :----------: |
-| <img src = "https://github.com/user-attachments/assets/e7579a43-99e7-4117-8714-10702a99abcc" width ="700">  |  <img src = "https://github.com/user-attachments/assets/54b90602-fede-4898-b117-907ad120202a" width ="700">  |
+| <img src = "https://github.com/user-attachments/assets/e77874fc-aba0-4fee-8dc5-5c761e563b30" width ="700">  |  <img src = "https://github.com/user-attachments/assets/ce74c7bc-eef5-4b85-9b9b-24b221d36127" width ="645">  |
 
 # 👽 App Flow
 

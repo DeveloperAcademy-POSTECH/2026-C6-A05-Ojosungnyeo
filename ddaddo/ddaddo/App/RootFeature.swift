@@ -148,57 +148,62 @@ struct RootFeature: Reducer {
 
 struct RootView: View {
     let store: StoreOf<RootFeature>
+    @State private var isShowingSplash = true
 
     var body: some View {
-        Group {
-            switch store.authenticationStatus {
-            case .checking:
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    ProgressView()
-                        .tint(.white)
-                }
+        ZStack {
+            Group {
+                switch store.authenticationStatus {
+                case .checking:
+                    SplashView()
 
-            case .nicknameCheckFailed:
-                VStack(spacing: 20) {
-                    Text("닉네임 정보를 불러오지 못했어요.")
-                        .foregroundStyle(.white)
+                case .nicknameCheckFailed:
+                    VStack(spacing: 20) {
+                        Text("닉네임 정보를 불러오지 못했어요.")
+                            .foregroundStyle(.white)
 
-                    Button("다시 시도") {
-                        store.send(.nicknameStatusRetryButtonTapped)
+                        Button("다시 시도") {
+                            store.send(.nicknameStatusRetryButtonTapped)
+                        }
+                        .foregroundStyle(DDColor.actionPrimary)
                     }
-                    .foregroundStyle(DDColor.actionPrimary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.ignoresSafeArea())
+
+                case .authenticated:
+                    HomeView(
+                        store: store.scope(
+                            state: \.home,
+                            action: \.home
+                        )
+                    )
+
+                case .nicknameSetup:
+                    NicknameSetupView(
+                        store: store.scope(
+                            state: \.nicknameSetup,
+                            action: \.nicknameSetup
+                        )
+                    )
+
+                case .unauthenticated:
+                    LoginView(
+                        store: store.scope(
+                            state: \.login,
+                            action: \.login
+                        )
+                    )
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.ignoresSafeArea())
+            }
 
-            case .authenticated:
-                HomeView(
-                    store: store.scope(
-                        state: \.home,
-                        action: \.home
-                    )
-                )
-
-            case .nicknameSetup:
-                NicknameSetupView(
-                    store: store.scope(
-                        state: \.nicknameSetup,
-                        action: \.nicknameSetup
-                    )
-                )
-
-            case .unauthenticated:
-                LoginView(
-                    store: store.scope(
-                        state: \.login,
-                        action: \.login
-                    )
-                )
+            if isShowingSplash {
+                SplashView()
             }
         }
         .task {
             store.send(.onAppear)
+            try? await Task.sleep(for: .seconds(2))
+            isShowingSplash = false
         }
     }
 }

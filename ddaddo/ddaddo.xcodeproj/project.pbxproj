@@ -13,7 +13,6 @@
 		C30000013085064E0024DF57 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = C30000043085064E0024DF57 /* FirebaseCore */; };
 		C30000023085064E0024DF57 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C30000053085064E0024DF57 /* FirebaseAuth */; };
 		D40000013085064E0024DF57 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = D40000023085064E0024DF57 /* FirebaseFirestore */; };
-		E60000013085064E0024DF57 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = E60000023085064E0024DF57 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,7 +66,6 @@
 				C30000013085064E0024DF57 /* FirebaseCore in Frameworks */,
 				C30000023085064E0024DF57 /* FirebaseAuth in Frameworks */,
 				D40000013085064E0024DF57 /* FirebaseFirestore in Frameworks */,
-				E60000013085064E0024DF57 /* FirebaseMessaging in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -124,7 +122,6 @@
 				C30000043085064E0024DF57 /* FirebaseCore */,
 				C30000053085064E0024DF57 /* FirebaseAuth */,
 				D40000023085064E0024DF57 /* FirebaseFirestore */,
-				E60000023085064E0024DF57 /* FirebaseMessaging */,
 			);
 			productName = ddaddo;
 			productReference = A4082CA73085064D0024DF57 /* ddaddo.app */;
@@ -143,9 +140,6 @@
 					A4082CA63085064D0024DF57 = {
 						CreatedOnToolsVersion = 27.0;
 						SystemCapabilities = {
-							com.apple.Push = {
-								enabled = 1;
-							};
 							com.apple.SignInWithApple = {
 								enabled = 1;
 							};
@@ -502,11 +496,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
-		};
-		E60000023085064E0024DF57 /* FirebaseMessaging */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C30000033085064E0024DF57 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,4 +1,5 @@
-<img width="2000" alt="image" src="https://github.com/user-attachments/assets/f2169fb6-b86d-4f57-ae5e-f620a8f889f6" />
+<img width="20000" alt="썸네일" src="https://github.com/user-attachments/assets/fca05b05-aa73-486b-a9f0-f99c99461c1a" />
+
 
 
 # 👽 따또 개발 배경
@@ -29,6 +30,18 @@
 
 > 서로의 취향을 같게 만드는 대신, 다른 취향이 하나의 여행 안에서 공존하도록.
 따또가 당신의 즐거운 지구 여행을 책임집니다.
+
+
+# 👽 Project Design
+
+|  Architecture |
+| :-------------: | 
+| <img src = "https://github.com/user-attachments/assets/79e54aef-1efc-4929-877e-386b7c458976" width ="800">  |
+
+
+| Screen flow   |    Dependency call map |
+|:----------: | :----------: |
+| <img src = "https://github.com/user-attachments/assets/e77874fc-aba0-4fee-8dc5-5c761e563b30" width ="700">  |  <img src = "https://github.com/user-attachments/assets/404a5490-b8de-4b99-a58d-666136ca6e48" width ="645">  |
 
 # 👽 App Flow
 

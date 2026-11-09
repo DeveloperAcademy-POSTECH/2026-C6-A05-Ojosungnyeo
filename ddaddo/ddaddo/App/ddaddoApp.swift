@@ -7,66 +7,9 @@
 
 import SwiftUI
 import ComposableArchitecture
-import FirebaseAuth
-import FirebaseMessaging
-import UIKit
-import UserNotifications
-
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate,
-    MessagingDelegate {
-    private var authStateHandle: AuthStateDidChangeListenerHandle?
-
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
-        #if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-timeTableMock") || arguments.contains("-debugTimeTableEdit") {
-            return true
-        }
-        #endif
-        FirebaseService.configure()
-        Messaging.messaging().delegate = self
-        application.registerForRemoteNotifications()
-        authStateHandle = Auth.auth().addStateDidChangeListener { _, user in
-            guard user != nil else { return }
-            Messaging.messaging().register { _ in }
-        }
-        Task {
-            _ = await LocalNotificationService.requestAuthorization()
-        }
-        return true
-    }
-
-    func application(
-        _ application: UIApplication,
-        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
-    ) {
-        Messaging.messaging().apnsToken = deviceToken
-    }
-
-    func messaging(_ messaging: Messaging, didReceiveRegistration installationID: String?) {
-        guard let installationID else { return }
-        Task {
-            try? await FirebasePushNotificationService.saveRegistrationID(installationID)
-        }
-    }
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .sound])
-    }
-}
 
 @main
 struct ddaddoApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
     private let store: StoreOf<RootFeature>
     #if DEBUG
     private let debugTimeTableStore: StoreOf<TripItineraryFeature>

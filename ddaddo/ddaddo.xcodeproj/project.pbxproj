@@ -31,7 +31,7 @@
 		E50000023085064E0024DF57 /* Exceptions for "Config" folder in "ddaddo" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Secrets.xcconfig,
+				Secrets_Release.xcconfig,
 			);
 			target = A4082CA63085064D0024DF57 /* ddaddo */;
 		};
@@ -148,11 +148,12 @@
 				};
 			};
 			buildConfigurationList = A4082CA23085064D0024DF57 /* Build configuration list for PBXProject "ddaddo" */;
-			developmentRegion = en;
+			developmentRegion = ko;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				ko,
 			);
 			mainGroup = A4082C9E3085064D0024DF57;
 			minimizedProjectReferenceProxies = 1;
@@ -312,9 +313,10 @@
 		};
 		A4082CB33085064E0024DF57 /* Debug configuration for PBXNativeTarget "ddaddo" */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E50000013085064E0024DF57 /* Config/Secrets.xcconfig */;
+			baseConfigurationReferenceAnchor = A4466FF030938B6900D1648A /* Config */;
+			baseConfigurationReferenceRelativePath = Secrets_Debug.xcconfig;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = ddaddo/ddaddo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -330,7 +332,8 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ddaddo/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "따또";
+				INFOPLIST_KEY_CFBundleDisplayName = "따또Dev";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -342,10 +345,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sun.ddaddo;
+				PRODUCT_BUNDLE_IDENTIFIER = sun.ddaddo.dev;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Ojosungnyeo;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Ojosungnyeo Dev";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -362,7 +365,8 @@
 		};
 		A4082CB43085064E0024DF57 /* Release configuration for PBXNativeTarget "ddaddo" */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E50000013085064E0024DF57 /* Config/Secrets.xcconfig */;
+			baseConfigurationReferenceAnchor = A4466FF030938B6900D1648A /* Config */;
+			baseConfigurationReferenceRelativePath = Secrets_Release.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -380,7 +384,8 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ddaddo/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "따또";
+				INFOPLIST_KEY_CFBundleDisplayName = "따또Dev";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

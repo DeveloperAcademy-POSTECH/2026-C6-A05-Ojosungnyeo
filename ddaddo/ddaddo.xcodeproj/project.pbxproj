@@ -31,7 +31,9 @@
 		E50000023085064E0024DF57 /* Exceptions for "Config" folder in "ddaddo" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Secrets_Release.xcconfig,
+				"Debug/GoogleService-Info.plist",
+				"Release/GoogleService-Info.plist",
+				Release/Secrets.xcconfig,
 			);
 			target = A4082CA63085064D0024DF57 /* ddaddo */;
 		};
@@ -107,6 +109,7 @@
 				A4082CA33085064D0024DF57 /* Sources */,
 				A4082CA43085064D0024DF57 /* Frameworks */,
 				A4082CA53085064D0024DF57 /* Resources */,
+				E50000033085064E0024DF57 /* Copy Firebase Configuration */,
 			);
 			buildRules = (
 			);
@@ -180,6 +183,36 @@
 			);
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E50000033085064E0024DF57 /* Copy Firebase Configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			inputPaths = (
+				"$(PROJECT_DIR)/Config/$(CONFIGURATION)/GoogleService-Info.plist",
+			);
+			name = "Copy Firebase Configuration";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+			);
+			shellPath = /bin/sh;
+			shellScript = (
+				"set -e",
+				"",
+				"FIREBASE_CONFIG=\"${PROJECT_DIR}/Config/${CONFIGURATION}/GoogleService-Info.plist\"",
+				"DESTINATION=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"",
+				"",
+				"if [ ! -f \"${FIREBASE_CONFIG}\" ]; then",
+				"  echo \"error: Firebase configuration file not found: ${FIREBASE_CONFIG}\"",
+				"  exit 1",
+				"fi",
+				"",
+				"mkdir -p \"$(dirname \"${DESTINATION}\")\"",
+				"cp \"${FIREBASE_CONFIG}\" \"${DESTINATION}\"",
+				"",
+			);
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A4082CA33085064D0024DF57 /* Sources */ = {
@@ -314,7 +347,7 @@
 		A4082CB33085064E0024DF57 /* Debug configuration for PBXNativeTarget "ddaddo" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = A4466FF030938B6900D1648A /* Config */;
-			baseConfigurationReferenceRelativePath = Secrets_Debug.xcconfig;
+			baseConfigurationReferenceRelativePath = Debug/Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -366,7 +399,7 @@
 		A4082CB43085064E0024DF57 /* Release configuration for PBXNativeTarget "ddaddo" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = A4466FF030938B6900D1648A /* Config */;
-			baseConfigurationReferenceRelativePath = Secrets_Release.xcconfig;
+			baseConfigurationReferenceRelativePath = Release/Secrets.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

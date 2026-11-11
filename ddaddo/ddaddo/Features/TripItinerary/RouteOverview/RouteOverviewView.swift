@@ -26,7 +26,6 @@ struct RouteOverviewView: View {
                     dayPicker
                     Spacer(minLength: 0)
                 }
-                .padding(.top, 8)
 
                 itineraryPanel(
                     fullHeight: max(560, proxy.size.height - 143)
@@ -53,16 +52,9 @@ struct RouteOverviewView: View {
 
     private var tripNavigation: some View {
         ZStack {
-            Button {
+            DDBackButton {
                 onBack()
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
@@ -73,7 +65,7 @@ struct RouteOverviewView: View {
             }
         }
         .padding(.horizontal, DDSpacing.small)
-        .frame(height: 40)
+        .frame(height: 44)
     }
 
     private var dayPicker: some View {

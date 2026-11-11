@@ -201,23 +201,13 @@ struct PlaceGroupingDetailView: View {
             }
 
             HStack {
-                Button {
+                DDBackButton {
                     onBack()
-                } label: {
-                    ZStack(alignment: .topLeading) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 25, weight: .regular))
-                            .padding(.top, 4)
-                    }
-                    .frame(width: 44, height: 44, alignment: .topLeading)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
             }
-            .foregroundStyle(DDColor.textPrimary)
-            .padding(.horizontal, DDSpacing.large)
+            .padding(.horizontal, DDSpacing.small)
         }
         .frame(height: 51, alignment: .top)
     }

@@ -146,24 +146,13 @@ struct PlaceGroupingView: View {
             }
 
             HStack {
-                Button {
+                DDBackButton(accessibilityLabel: "예정된 여행으로 돌아가기") {
                     store.send(.backButtonTapped)
-                } label: {
-                    ZStack(alignment: .topLeading) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 25, weight: .regular))
-                            .padding(.top, 4)
-                    }
-                    .frame(width: 44, height: 44, alignment: .topLeading)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("예정된 여행으로 돌아가기")
 
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(DDColor.textPrimary)
-            .padding(.horizontal, DDSpacing.large)
+            .padding(.horizontal, DDSpacing.small)
         }
         .frame(height: 51, alignment: .top)
     }

@@ -182,18 +182,16 @@ struct UpcomingTripsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 0) {
-            headerButton(
-                systemName: "chevron.left",
-                accessibilityLabel: "홈으로 돌아가기",
-                action: { store.send(.backButtonTapped) }
-            )
+        HStack(spacing: DDSpacing.small) {
+            DDBackButton(accessibilityLabel: "홈으로 돌아가기") {
+                store.send(.backButtonTapped)
+            }
 
             Text("예정된 여행")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
 
-            Spacer(minLength: DDSpacing.small)
+            Spacer(minLength: 0)
 
             headerButton(
                 systemName: "plus",
@@ -201,7 +199,7 @@ struct UpcomingTripsView: View {
                 action: { store.send(.addTripButtonTapped) }
             )
         }
-        .frame(height: 52)
+        .frame(height: 44)
     }
 
     private func headerButton(

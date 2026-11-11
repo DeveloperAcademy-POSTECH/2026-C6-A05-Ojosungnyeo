@@ -14,7 +14,7 @@ struct TripSetUpView: View {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     header
-                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.horizontal, DDSpacing.small)
 
                     ScrollView {
                         VStack(spacing: 0) {
@@ -134,17 +134,9 @@ struct TripSetUpView: View {
 
     private var header: some View {
         HStack(spacing: DDSpacing.small) {
-            Button {
+            DDBackButton(accessibilityLabel: "뒤로 가기") {
                 store.send(.backButtonTapped)
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 23, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 24, height: 44)
-                    .contentShape(.rect)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
 
             Text("여행 정보 추가")
                 .ddTypography(.title24)
@@ -152,7 +144,7 @@ struct TripSetUpView: View {
 
             Spacer()
         }
-        .frame(height: 52)
+        .frame(height: 44)
     }
 
     private var tripSummary: some View {

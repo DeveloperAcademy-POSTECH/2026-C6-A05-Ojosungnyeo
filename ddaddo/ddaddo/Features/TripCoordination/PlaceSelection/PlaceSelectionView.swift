@@ -255,17 +255,10 @@ struct PlaceSelectionView: View {
     }
 
     private var placeSelectionNavigationBar: some View {
-        HStack(spacing: 13) {
-            Button {
+        HStack(alignment: .top, spacing: DDSpacing.small) {
+            DDBackButton(accessibilityLabel: "친구 초대 화면으로 돌아가기") {
                 store.send(.backButtonTapped)
-            } label: {
-                PlaceSelectionBackIcon()
-                    .frame(width: 24, height: 24)
-                    .frame(width: 24, height: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("친구 초대 화면으로 돌아가기")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
@@ -297,9 +290,9 @@ struct PlaceSelectionView: View {
                 maximumCount: store.maximumPlaceCount
             )
         }
-        .padding(.horizontal, DDSpacing.large)
+        .padding(.horizontal, DDSpacing.small)
         .frame(maxWidth: .infinity)
-        .frame(height: 62)
+        .frame(height: 62, alignment: .top)
     }
 
     private var searchField: some View {
@@ -442,22 +435,6 @@ private struct PlaceCountProgressView: View {
         .frame(width: 36, height: 36)
         .frame(width: 44, height: 44)
         .animation(.easeOut(duration: 0.2), value: count)
-    }
-}
-
-private struct PlaceSelectionBackIcon: View {
-    var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 17, y: 3))
-            path.addLine(to: CGPoint(x: 7, y: 12))
-            path.addLine(to: CGPoint(x: 17, y: 21))
-        }
-        .stroke(
-            DDColor.textPrimary,
-            style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
-        )
-        .frame(width: 24, height: 24)
-        .allowsHitTesting(false)
     }
 }
 

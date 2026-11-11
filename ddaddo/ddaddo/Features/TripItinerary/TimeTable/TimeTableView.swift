@@ -82,14 +82,9 @@ private struct TimeTableReadOnlyContent: View {
 
     private var navigationBar: some View {
         HStack {
-            Button(action: onBack) {
-                Image("DDTimeTableBack")
-                    .resizable()
-                    .frame(width: 20, height: 40)
-                    .frame(width: 44, height: 40, alignment: .leading)
-                    .contentShape(Rectangle())
+            DDBackButton {
+                onBack()
             }
-            .buttonStyle(.plain)
 
             Spacer()
 
@@ -101,9 +96,9 @@ private struct TimeTableReadOnlyContent: View {
                 .clipShape(.capsule)
                 .buttonStyle(.plain)
         }
-        .frame(height: 40)
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, 7)
+        .frame(height: 44)
+        .padding(.leading, DDSpacing.small)
+        .padding(.trailing, DDSpacing.large)
     }
 
     private var tripHeader: some View {
@@ -436,15 +431,9 @@ struct TimeTableContent: View {
 
     private var navigationBar: some View {
         HStack {
-            Button {
+            DDBackButton {
                 onBack()
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 44, height: 44)
             }
-            .buttonStyle(.plain)
 
             Spacer()
 

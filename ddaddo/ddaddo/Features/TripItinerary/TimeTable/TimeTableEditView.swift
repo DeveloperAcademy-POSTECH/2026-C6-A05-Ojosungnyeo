@@ -234,14 +234,9 @@ private struct TimeTableEditContent: View {
 
     private var navigationBar: some View {
         HStack {
-            Button { store.send(.backButtonTapped) } label: {
-                Image("DDTimeTableBack")
-                    .resizable()
-                    .frame(width: 20, height: 40)
-                    .frame(width: 44, height: 40, alignment: .leading)
-                    .contentShape(Rectangle())
+            DDBackButton {
+                store.send(.backButtonTapped)
             }
-            .buttonStyle(.plain)
 
             Spacer()
 
@@ -254,9 +249,9 @@ private struct TimeTableEditContent: View {
                 .disabled(store.isSaving)
                 .opacity(store.isSaving ? 0.5 : 1)
         }
-        .frame(height: 40)
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, 7)
+        .frame(height: 44)
+        .padding(.leading, DDSpacing.small)
+        .padding(.trailing, DDSpacing.large)
     }
 
     private var tripHeader: some View {

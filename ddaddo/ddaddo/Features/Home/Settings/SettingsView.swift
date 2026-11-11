@@ -228,12 +228,8 @@ struct SettingsView: View {
     }
 
     private func header(_ title: String) -> some View {
-        HStack(spacing: 10) {
-            navigationButton(
-                systemName: "chevron.left",
-                accessibilityLabel: "이전 화면으로 이동",
-                width: 10
-            ) {
+        HStack(spacing: DDSpacing.small) {
+            DDBackButton(accessibilityLabel: "이전 화면으로 이동") {
                 store.send(.backButtonTapped)
             }
             Text(title)
@@ -241,7 +237,8 @@ struct SettingsView: View {
             Spacer()
         }
         .foregroundStyle(DDColor.textPrimary)
-        .frame(height: 61)
+        .frame(height: 44)
+        .padding(.horizontal, -DDSpacing.large)
     }
     private func sectionTitle(_ title: String) -> some View { Text(title).ddTypography(.labelEmphasis14).frame(maxWidth: .infinity, alignment: .leading) }
     private func card<Content: View>(minHeight: CGFloat = 74, @ViewBuilder _ content: () -> Content) -> some View { content().padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) } }

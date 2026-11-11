@@ -94,17 +94,9 @@ struct WaitingForParticipantsView: View {
 
     private var header: some View {
         HStack(spacing: DDSpacing.small) {
-            Button {
+            DDBackButton(accessibilityLabel: "뒤로 가기") {
                 store.send(.backButtonTapped)
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 23, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 24, height: 35)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
 
             HStack(spacing: DDSpacing.xSmall) {
                 Text("친구를 기다리고 이따")
@@ -118,7 +110,8 @@ struct WaitingForParticipantsView: View {
 
             Spacer(minLength: DDSpacing.zero)
         }
-        .frame(height: 35)
+        .frame(height: 44)
+        .padding(.horizontal, -DDSpacing.small)
     }
 
     private var invitationCard: some View {

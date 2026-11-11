@@ -126,43 +126,25 @@ struct HomeView: View {
             store.send(.onAppear)
         }
         .preferredColorScheme(.dark)
-        .confirmationDialog(
-            "정말 탈퇴할까요?",
-            isPresented: Binding(
-                get: { store.isWithdrawalConfirmationPresented },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.withdrawalConfirmationDismissed)
-                    }
-                }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("탈퇴하기", role: .destructive) {
-                store.send(.withdrawalConfirmed)
+        .overlay {
+            if store.isWithdrawalConfirmationPresented {
+                DDAlertOverlay(
+                    title: "회원 탈퇴할까요?",
+                    message: "탈퇴하면 계정을 다시 복구하거나\n로그인할 수 없어요.",
+                    cancelTitle: "취소",
+                    confirmTitle: "탈퇴하기",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: { store.send(.withdrawalConfirmationDismissed) },
+                    onConfirm: { store.send(.withdrawalConfirmed) }
+                )
+            } else if let message = store.withdrawalErrorMessage {
+                DDAlertOverlay(
+                    title: "탈퇴할 수 없어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.withdrawalErrorDismissed) }
+                )
             }
-            Button("취소", role: .cancel) {
-                store.send(.withdrawalConfirmationDismissed)
-            }
-        } message: {
-            Text("계정을 삭제하면 다시 되돌릴 수 없어요.")
-        }
-        .alert(
-            "탈퇴할 수 없어요",
-            isPresented: Binding(
-                get: { store.withdrawalErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.withdrawalErrorDismissed)
-                    }
-                }
-            )
-        ) {
-            Button("확인") {
-                store.send(.withdrawalErrorDismissed)
-            }
-        } message: {
-            Text(store.withdrawalErrorMessage ?? "")
         }
     }
 

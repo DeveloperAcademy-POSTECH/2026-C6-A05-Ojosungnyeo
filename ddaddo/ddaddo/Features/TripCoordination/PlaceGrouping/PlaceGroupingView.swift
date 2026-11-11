@@ -55,13 +55,9 @@ struct PlaceGroupingView: View {
             }
 
             if store.isCriteriaChangeConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .zIndex(6)
-
-                DDConfirmationAlert(
-                    title: "알림",
-                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
+                DDAlertOverlay(
+                    title: "이동 수단을 변경할까요?",
+                    message: "변경하면 다시 분석해 추천 그룹이 달라져요.\n그래도 변경하시겠어요?",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
                     onCancel: {
@@ -71,7 +67,6 @@ struct PlaceGroupingView: View {
                         store.send(.criteriaChangeConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
                 .zIndex(7)
             }
         }

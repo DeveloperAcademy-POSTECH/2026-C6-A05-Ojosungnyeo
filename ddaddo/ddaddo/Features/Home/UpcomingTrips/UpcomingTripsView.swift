@@ -115,56 +115,54 @@ struct UpcomingTripsView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: store.isInviteCodeModalPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isWaitingForParticipantsPresented)
-        .allowsHitTesting(store.pendingDeletionTripID == nil)
+        .allowsHitTesting(
+            store.pendingDeletionTripID == nil
+                && store.joinErrorMessage == nil
+                && store.deletionErrorMessage == nil
+        )
         .overlay {
             if store.pendingDeletionTripID != nil {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "내 여행 목록에서 삭제하기",
-                        message: "예정된 여행을 진짜 삭제할까요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        onCancel: { store.send(.deleteCancelButtonTapped) },
-                        onConfirm: { store.send(.deleteConfirmButtonTapped) }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "여행을 삭제할까요?",
+                    message: "삭제한 여행은 예정된 여행 목록에서 사라져요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: { store.send(.deleteCancelButtonTapped) },
+                    onConfirm: { store.send(.deleteConfirmButtonTapped) }
+                )
+            } else if let message = store.joinErrorMessage {
+                DDAlertOverlay(
+                    title: joinAlertTitle(for: message),
+                    message: joinAlertMessage(for: message),
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.joinErrorDismissed) }
+                )
+            } else if let message = store.deletionErrorMessage {
+                DDAlertOverlay(
+                    title: "여행을 삭제하지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.deletionErrorDismissed) }
+                )
             }
         }
         .preferredColorScheme(.dark)
-        .alert(
-            "여행에 참여할 수 없어요",
-            isPresented: Binding(
-                get: { store.joinErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.joinErrorDismissed)
-                    }
-                }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.joinErrorDismissed)
-            }
-        } message: {
-            Text(store.joinErrorMessage ?? "")
+    }
+
+    private func joinAlertTitle(for message: String) -> String {
+        isCapacityError(message) ? "초대 인원이 모두 찼어요" : "여행에 참여할 수 없어요"
+    }
+
+    private func joinAlertMessage(for message: String) -> String {
+        if isCapacityError(message) {
+            return "이 여행은 정원이 가득 차 참여할 수 없어요.\n초대한 친구에게 확인해 주세요."
         }
-        .alert(
-            "여행을 삭제하지 못했어요",
-            isPresented: Binding(
-                get: { store.deletionErrorMessage != nil },
-                set: { if !$0 { store.send(.deletionErrorDismissed) } }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.deletionErrorDismissed)
-            }
-        } message: {
-            Text(store.deletionErrorMessage ?? "")
-        }
+        return message
+    }
+
+    private func isCapacityError(_ message: String) -> Bool {
+        message == TripServiceError.tripIsFull.errorDescription
     }
 
     private var emptyState: some View {

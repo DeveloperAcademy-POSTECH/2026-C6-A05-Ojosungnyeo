@@ -64,14 +64,9 @@ struct PlaceGroupingDetailView: View {
             }
 
             if store.isJoinConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(3)
-
-                DDConfirmationAlert(
-                    title: "합류하시겠어요?",
-                    message: "지금까지 담은 일정이 초기화돼요.\n그래도 합류하시겠어요?",
+                DDAlertOverlay(
+                    title: "합류할까요?",
+                    message: "합류하면 지금까지 담은 일정이 초기화돼요.\n그래도 합류하시겠어요?",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
                     onCancel: {
@@ -81,22 +76,17 @@ struct PlaceGroupingDetailView: View {
                         store.send(.joinConfirmationConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
+                .transition(.opacity)
                 .zIndex(4)
             }
 
             if store.isDeleteConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(5)
-
-                DDConfirmationAlert(
-                    title: "장소 삭제하기",
-                    message: "이 장소를 진짜 삭제할까요?",
+                DDAlertOverlay(
+                    title: "장소를 삭제할까요?",
+                    message: "삭제한 장소는 목록에서 사라져요.",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
-                    cancelColor: DDColor.actionPrimary,
+                    confirmColor: DDColor.alertDestructive,
                     onCancel: {
                         store.send(.deleteConfirmationCancelTapped)
                     },
@@ -104,7 +94,7 @@ struct PlaceGroupingDetailView: View {
                         store.send(.deleteConfirmationConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
+                .transition(.opacity)
                 .zIndex(6)
             }
 

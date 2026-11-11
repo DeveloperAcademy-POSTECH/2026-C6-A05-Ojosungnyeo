@@ -96,39 +96,27 @@ struct TripSetUpView: View {
                 .presentationBackground(DDColor.surfaceDefault)
             }
         }
-        .allowsHitTesting(!store.isConfirmationAlertPresented)
+        .allowsHitTesting(
+            !store.isConfirmationAlertPresented && store.creationErrorMessage == nil
+        )
         .overlay {
             if store.isConfirmationAlertPresented {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "친구를 초대할까요?",
-                        message: "여행 계획을 위한 모든 준비가 끝났어요.\n친구를 초대하러 가시겠어요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        onCancel: { store.send(.confirmationCancelButtonTapped) },
-                        onConfirm: { store.send(.confirmationConfirmButtonTapped) }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "친구를 초대할까요?",
+                    message: "여행 계획을 위한 모든 준비가 끝났어요.\n친구를 초대하러 가시겠어요?",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    onCancel: { store.send(.confirmationCancelButtonTapped) },
+                    onConfirm: { store.send(.confirmationConfirmButtonTapped) }
+                )
+            } else if let message = store.creationErrorMessage {
+                DDAlertOverlay(
+                    title: "여행을 만들지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.creationErrorDismissed) }
+                )
             }
-        }
-        .alert(
-            "여행을 만들지 못했어요",
-            isPresented: Binding(
-                get: { store.creationErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.creationErrorDismissed)
-                    }
-                }
-            )
-        ) {
-            Button("확인", role: .cancel) {}
-        } message: {
-            Text(store.creationErrorMessage ?? "잠시 후 다시 시도해 주세요.")
         }
     }
 

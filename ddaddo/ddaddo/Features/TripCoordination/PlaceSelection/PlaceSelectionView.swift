@@ -195,58 +195,42 @@ struct PlaceSelectionView: View {
             )
         }
         .allowsHitTesting(
-            store.completionAlert == nil && store.pendingDeletionPlaceID == nil
+            store.completionAlert == nil
+                && store.pendingDeletionPlaceID == nil
+                && store.placeSyncErrorMessage == nil
         )
         .overlay {
             if store.pendingDeletionPlaceID != nil {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "장소 삭제하기",
-                        message: "이 장소를 진짜 삭제할까요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        cancelColor: DDColor.actionPrimary,
-                        onCancel: {
-                            store.send(.deleteConfirmationCancelTapped)
-                        },
-                        onConfirm: {
-                            store.send(.deleteConfirmationConfirmTapped)
-                        }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "장소를 삭제할까요?",
+                    message: "삭제한 장소는 목록에서 사라져요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: {
+                        store.send(.deleteConfirmationCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.deleteConfirmationConfirmTapped)
+                    }
+                )
             } else if let alert = store.completionAlert {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: alert.title,
-                        message: store.completionAlertMessage,
-                        confirmTitle: "확인",
-                        onConfirm: {
-                            store.send(.completionAlertConfirmButtonTapped)
-                        }
-                    )
-                }
+                DDAlertOverlay(
+                    title: alert.title,
+                    message: store.completionAlertMessage,
+                    confirmTitle: "확인",
+                    onConfirm: {
+                        store.send(.completionAlertConfirmButtonTapped)
+                    }
+                )
+            } else if let message = store.placeSyncErrorMessage {
+                DDAlertOverlay(
+                    title: "장소를 서버에 저장하지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.placeSyncErrorDismissed) }
+                )
             }
-        }
-        .alert(
-            "장소를 서버에 저장하지 못했어요",
-            isPresented: Binding(
-                get: { store.placeSyncErrorMessage != nil },
-                set: { if !$0 { store.send(.placeSyncErrorDismissed) } }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.placeSyncErrorDismissed)
-            }
-        } message: {
-            Text(store.placeSyncErrorMessage ?? "")
         }
     }
 

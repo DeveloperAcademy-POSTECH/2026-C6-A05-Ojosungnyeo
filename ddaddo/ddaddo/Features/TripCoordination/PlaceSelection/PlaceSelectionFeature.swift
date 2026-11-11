@@ -163,9 +163,9 @@ struct PlaceSelectionFeature: Reducer {
         var completionAlertMessage: String {
             switch completionAlert {
             case .allMembersConfirmed:
-                return "\(participants.count)명 모두 장소핀을 확정했어요.\n이제 함께 갈 장소를 묶어볼까요?"
+                return "\(participants.count)명 모두 장소핀을 확정했어요.\n확정된 장소로 추천 그룹을 만들어 드릴게요."
             case .selectionTimeExpired:
-                return "지금까지 확정된 장소핀으로\n다음 그룹핑 단계를 시작해 볼까요?"
+                return "지금까지 확정된 장소핀으로\n추천 그룹을 만들어 드릴게요."
             case nil:
                 return ""
             }

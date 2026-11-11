@@ -15,11 +15,11 @@ struct HomeFeature: Reducer {
         func text(nickname: String) -> String {
             switch self {
             case .welcome:
-                "어서오세따. 저는 따또입니따.\n\(nickname)의 즐거운 지구 여행을 책임집니따."
+                "어서오세따. 저는 따또입니따.\n\(nickname) 의\n즐거운 지구 여행을 책임집니따."
             case .destination:
-                "\(nickname), 어디로 여행을 가볼까따?\n말만 해주세따. 제가 다 도와드리게따."
+                "\(nickname),\n어디로 여행을 가볼까따?\n말만 해주세따. 제가 다 도와드리게따."
             case .friends:
-                "친구와 함께 가는 여행이라니 즐겁게따.\n\(nickname), 내가 성심성의껏 도와주게따."
+                "친구와 함께 가는 여행이라니 즐겁게따.\n\(nickname),\n내가 성심성의껏 도와주게따."
             }
         }
 

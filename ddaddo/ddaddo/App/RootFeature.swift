@@ -108,6 +108,10 @@ struct RootFeature: Reducer {
                 return .none
 
             case .nicknameSetup(.delegate(.completed)):
+                let nickname = state.nicknameSetup.trimmedNickname
+                state.home.nickname = nickname
+                state.home.settings.nickname = nickname
+                state.home.settings.nicknameDraft = nickname
                 state.authenticationStatus = .authenticated
                 return .none
 

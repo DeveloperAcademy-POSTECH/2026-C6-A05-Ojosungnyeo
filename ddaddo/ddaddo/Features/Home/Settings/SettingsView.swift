@@ -11,6 +11,11 @@ import SwiftUI
 struct SettingsView: View {
     let store: StoreOf<SettingsFeature>
     @FocusState private var nicknameFocused: Bool
+    private let settingsCardBorder = Color(
+        red: 62.0 / 255.0,
+        green: 62.0 / 255.0,
+        blue: 62.0 / 255.0
+    )
 
     var body: some View {
         ZStack {
@@ -60,7 +65,7 @@ struct SettingsView: View {
     private var settings: some View {
         VStack(spacing: 0) {
             header("설정")
-            card(minHeight: 86) {
+            card(minHeight: 86, borderColor: settingsCardBorder) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(store.nickname.isEmpty ? "지구인" : store.nickname).ddTypography(.bodyEmphasis16)
@@ -74,12 +79,27 @@ struct SettingsView: View {
                         .background(DDColor.actionPrimary).clipShape(.capsule)
                 }
             }
-            .padding(.top, 16)
+            .padding(.top, 33)
 
-            sectionTitle("계정")
+            sectionTitle("앱 설정")
                 .padding(.top, 24)
                 .padding(.bottom, 4)
-            card {
+            card(borderColor: settingsCardBorder) {
+                HStack {
+                    rowText("알림 설정", "여행 초대와 일정 소식을 받아요")
+                    Spacer()
+                    notificationToggle
+                }
+            }
+
+            sectionTitle("계정")
+                .padding(.top, 20)
+                .padding(.bottom, 4)
+            card(
+                minHeight: 72,
+                cornerRadius: 16,
+                borderColor: settingsCardBorder
+            ) {
                 HStack {
                     rowText("계정 관리", "로그인과 회원 탈퇴를 관리해요")
                     Spacer()
@@ -234,9 +254,43 @@ struct SettingsView: View {
         .frame(height: 44)
         .padding(.horizontal, -DDSpacing.large)
     }
-    private func sectionTitle(_ title: String) -> some View { Text(title).ddTypography(.labelEmphasis14).frame(maxWidth: .infinity, alignment: .leading) }
-    private func card<Content: View>(minHeight: CGFloat = 74, @ViewBuilder _ content: () -> Content) -> some View { content().padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) } }
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .ddTypography(.labelEmphasis14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 24, alignment: .topLeading)
+    }
+    private func card<Content: View>(
+        minHeight: CGFloat = 74,
+        cornerRadius: CGFloat = 18,
+        borderColor: Color = DDColor.borderDefault,
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        content()
+            .padding(.leading, 16)
+            .padding(.trailing, 12)
+            .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
+            .background(DDColor.surfaceElevated)
+            .clipShape(.rect(cornerRadius: cornerRadius))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(borderColor, lineWidth: 1)
+            }
+    }
     private func rowText(_ title: String, _ subtitle: String) -> some View { VStack(alignment: .leading, spacing: 4) { Text(title).ddTypography(.bodyEmphasis16); Text(subtitle).ddTypography(.caption12).foregroundStyle(DDColor.textSecondary) } }
+    private var notificationToggle: some View {
+        Toggle(
+            "알림 설정",
+            isOn: Binding(
+                get: { store.isNotificationsEnabled },
+                set: { store.send(.notificationSettingChanged($0)) }
+            )
+        )
+        .labelsHidden()
+        .toggleStyle(DDCompactToggleStyle())
+        .disabled(store.isNotificationSettingLoading)
+        .accessibilityLabel("알림 설정")
+    }
     private func accountAction(
         _ title: String,
         _ subtitle: String,
@@ -286,4 +340,47 @@ struct SettingsView: View {
     }
     private func checklist(_ text: String) -> some View { Text("•  \(text)").ddTypography(.body16).tracking(0).frame(height: 24) }
     private var nicknameSaveEnabled: Bool { let value = store.nicknameDraft.trimmingCharacters(in: .whitespacesAndNewlines); return (2...10).contains(value.count) && value != store.nickname && !store.isSavingNickname }
+}
+
+private struct DDCompactToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            ZStack {
+                Capsule()
+                    .fill(
+                        configuration.isOn
+                            ? DDColor.actionPrimary
+                            : DDColor.surfaceControl
+                    )
+
+                Circle()
+                    .fill(
+                        configuration.isOn
+                            ? DDColor.surfaceDefault
+                            : DDColor.textSecondary
+                    )
+                    .frame(width: 22, height: 22)
+                    .offset(x: configuration.isOn ? 8 : -8)
+            }
+            .frame(width: 42, height: 26)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+#Preview("설정") {
+    SettingsView(
+        store: Store(
+            initialState: SettingsFeature.State(
+                nickname: "하르딩",
+                nicknameDraft: "하르딩"
+            )
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
 }

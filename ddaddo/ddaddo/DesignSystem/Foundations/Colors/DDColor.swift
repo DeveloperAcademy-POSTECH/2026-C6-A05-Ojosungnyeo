@@ -30,6 +30,11 @@ enum DDColor {
     static let alertSurface = Color("DDAlertSurface")
     static let alertSecondary = Color("DDAlertSecondary")
     static let alertDestructive = Color("DDAlertDestructive")
+    static let alertSeparator = Color(
+        red: 72 / 255,
+        green: 72 / 255,
+        blue: 72 / 255
+    )
     static let avatarBackground = Color("DDAvatarBackground")
     static let nicknameAvatarBackground = Color("DDNicknameAvatarBackground")
 }

@@ -5,6 +5,30 @@
 
 import SwiftUI
 
+struct DDAlertSeparator: View {
+    enum Orientation {
+        case horizontal
+        case vertical
+    }
+
+    @Environment(\.displayScale) private var displayScale
+
+    let orientation: Orientation
+
+    var body: some View {
+        Rectangle()
+            .fill(DDColor.alertSeparator)
+            .frame(
+                width: orientation == .vertical ? thickness : nil,
+                height: orientation == .horizontal ? thickness : nil
+            )
+    }
+
+    private var thickness: CGFloat {
+        1 / displayScale
+    }
+}
+
 struct DDConfirmationAlert: View {
     let title: String
     let message: String
@@ -55,7 +79,7 @@ struct DDConfirmationAlert: View {
             .padding(.horizontal, 20)
             .padding(.vertical, DDSpacing.xLarge)
 
-            Color.white.frame(height: 0.5)
+            DDAlertSeparator(orientation: .horizontal)
 
             if let cancelTitle, let onCancel {
                 HStack(spacing: DDSpacing.zero) {
@@ -65,7 +89,7 @@ struct DDConfirmationAlert: View {
                         action: onCancel
                     )
 
-                    Color.white.frame(width: 0.5)
+                    DDAlertSeparator(orientation: .vertical)
 
                     actionButton(title: confirmTitle, color: confirmColor, action: onConfirm)
                 }
@@ -94,6 +118,7 @@ struct DDConfirmationAlert: View {
         }
         .buttonStyle(.plain)
     }
+
 }
 
 struct DDAlertOverlay: View {

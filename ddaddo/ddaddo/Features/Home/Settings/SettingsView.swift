@@ -122,7 +122,7 @@ struct SettingsView: View {
                 Text("계정").ddTypography(.labelEmphasis14).foregroundStyle(DDColor.actionPrimary)
                 Text("어떻게 불러드릴까따?").ddTypography(.title24).foregroundStyle(DDColor.textPrimary)
                 Text("친구들에게 표시되는 이름을 바꿔요.").ddTypography(.label14).foregroundStyle(DDColor.textSecondary)
-            }.padding(.top, 2)
+            }.padding(.top, 19)
             Text("닉네임")
                 .ddTypography(.label14)
                 .foregroundStyle(DDColor.textTertiary)
@@ -130,7 +130,9 @@ struct SettingsView: View {
                 .padding(.bottom, 12)
             HStack {
                 TextField("닉네임", text: Binding(get: { store.nicknameDraft }, set: { store.send(.nicknameChanged($0)) }))
-                    .ddTypography(.bodyEmphasis16).focused($nicknameFocused)
+                    .ddTypography(.bodyEmphasis16)
+                    .foregroundStyle(store.nicknameError == nil ? DDColor.textPrimary : DDColor.statusError)
+                    .focused($nicknameFocused)
                 Text("\(store.nicknameDraft.count)/10").ddTypography(.caption12).foregroundStyle(DDColor.textTertiary)
             }
             .padding(.horizontal, 16).frame(height: 56).background(DDColor.surfaceElevated)
@@ -139,7 +141,14 @@ struct SettingsView: View {
             Text(store.nicknameError ?? "2~10자로 입력해 주세요.")
                 .ddTypography(.caption12).foregroundStyle(store.nicknameError == nil ? DDColor.textSecondary : DDColor.statusError).padding(.top, 12)
             Spacer()
-            DDCTAButton(title: store.isSavingNickname ? "저장 중..." : "저장하기", isEnabled: nicknameSaveEnabled) { store.send(.saveNicknameTapped) }
+            DDCTAButton(
+                title: store.isSavingNickname ? "저장 중..." : "저장하기",
+                isEnabled: nicknameSaveEnabled,
+                disabledBackgroundColor: DDColor.surfaceControl,
+                disabledForegroundColor: DDColor.textTertiary
+            ) {
+                store.send(.saveNicknameTapped)
+            }
                 .padding(.bottom, 11)
         }.padding(.horizontal, 24)
     }
@@ -427,6 +436,43 @@ private struct DDCompactToggleStyle: ToggleStyle {
                     nicknameDraft: "하르딩"
                 )
                 state.screen = .complete
+                return state
+            }()
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}
+
+#Preview("닉네임 변경") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "하르딩",
+                    nicknameDraft: "하르딩"
+                )
+                state.screen = .nickname
+                return state
+            }()
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}
+
+#Preview("닉네임 변경 · 중복") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "하르딩",
+                    nicknameDraft: "테이",
+                    nicknameError: "중복된 닉네임입니다. 다른 닉네임을 입력해 주세요."
+                )
+                state.screen = .nickname
                 return state
             }()
         ) {

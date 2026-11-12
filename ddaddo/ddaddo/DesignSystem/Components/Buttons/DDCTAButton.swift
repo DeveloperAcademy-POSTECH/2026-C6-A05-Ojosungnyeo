@@ -22,6 +22,8 @@ struct DDCTAButton: View {
     var style: Style = .primary
     var layout: Layout = .full
     var isEnabled = true
+    var disabledBackgroundColor: Color?
+    var disabledForegroundColor: Color?
     let action: () -> Void
 
     var body: some View {
@@ -37,18 +39,26 @@ struct DDCTAButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.4)
+        .opacity(isEnabled || disabledBackgroundColor != nil ? 1 : 0.4)
     }
 
     private var backgroundColor: Color {
-        switch style {
+        if !isEnabled, let disabledBackgroundColor {
+            return disabledBackgroundColor
+        }
+
+        return switch style {
         case .primary: DDColor.actionPrimary
         case .secondary: DDColor.actionSecondary
         }
     }
 
     private var foregroundColor: Color {
-        switch style {
+        if !isEnabled, let disabledForegroundColor {
+            return disabledForegroundColor
+        }
+
+        return switch style {
         case .primary: DDColor.textOnPrimary
         case .secondary: DDColor.textPrimary
         }

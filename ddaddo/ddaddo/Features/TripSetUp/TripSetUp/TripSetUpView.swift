@@ -140,13 +140,16 @@ struct TripSetUpView: View {
             Text(store.tripTitle)
                 .ddTypography(.heading20)
                 .foregroundStyle(DDColor.textPrimary)
+                .frame(height: 30, alignment: .topLeading)
 
             Text(store.destinationSummary)
                 .ddTypography(.caption12)
                 .foregroundStyle(DDColor.textSecondary)
+                .frame(height: 18, alignment: .topLeading)
         }
-        .padding(.top, 3)
-        .frame(maxWidth: .infinity, minHeight: 57, alignment: .topLeading)
+        .frame(height: 52, alignment: .topLeading)
+        .padding(.top, DDSpacing.small)
+        .frame(maxWidth: .infinity, minHeight: 68, maxHeight: 68, alignment: .topLeading)
     }
 
     private var setUpCards: some View {
@@ -166,7 +169,7 @@ struct TripSetUpView: View {
                 title: "이동 수단",
                 detail: store.transportationSummary,
                 detailColor: DDColor.actionPrimary,
-                height: 95
+                height: 83
             ) {
                 store.send(.transportationCardTapped)
             }
@@ -174,10 +177,11 @@ struct TripSetUpView: View {
     }
 
     private var travelerCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("여행 인원")
                 .ddTypography(.heading18)
                 .foregroundStyle(DDColor.textPrimary)
+                .frame(height: 24, alignment: .leading)
 
             HStack(spacing: DDSpacing.small) {
                 Button {
@@ -196,7 +200,7 @@ struct TripSetUpView: View {
                 Text("\(store.travelerCount)명")
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.actionPrimary)
-                    .frame(width: 64)
+                    .frame(width: 64, height: 20)
 
                 Button {
                     store.send(.travelerIncreaseButtonTapped)
@@ -212,8 +216,10 @@ struct TripSetUpView: View {
                 .accessibilityLabel("여행 인원 늘리기")
             }
         }
-        .padding(DDSpacing.large)
-        .frame(maxWidth: .infinity, minHeight: 95, alignment: .leading)
+        .padding(.leading, 16.5)
+        .padding(.trailing, 15.5)
+        .padding(.top, 14.5)
+        .frame(maxWidth: .infinity, minHeight: 95, maxHeight: 95, alignment: .topLeading)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(cornerRadius: 20))
         .overlay {
@@ -250,27 +256,31 @@ struct TripSetUpView: View {
     ) -> some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: DDSpacing.small) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text(title)
                         .ddTypography(.heading18)
                         .foregroundStyle(DDColor.textPrimary)
+                        .frame(height: 24, alignment: .leading)
 
                     if let detail {
                         Text(detail)
                             .ddTypography(.label14)
                             .foregroundStyle(detailColor)
+                            .frame(height: 20, alignment: .leading)
                     }
                 }
+                .padding(.top, 14.5)
 
                 Spacer(minLength: 0)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 23, weight: .regular))
                     .foregroundStyle(DDColor.textPrimary)
-                    .frame(height: 50)
+                    .frame(width: 24, height: 24)
+                    .frame(maxHeight: .infinity, alignment: .center)
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, 14)
+            .padding(.leading, 16.5)
+            .padding(.trailing, 15.5)
             .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .top)
             .background(DDColor.surfaceElevated)
             .clipShape(.rect(cornerRadius: 20))
@@ -284,10 +294,21 @@ struct TripSetUpView: View {
     }
 }
 
-#Preview {
+#Preview("TripSetUpView_AddTravel_2") {
     TripSetUpView(
-        store: Store(initialState: TripSetUpFeature.State()) {
+        store: Store(initialState: TripSetUpFeature.State(selectedCities: [.previewTokyo])) {
             TripSetUpFeature()
         }
+    )
+}
+
+private extension TripDestination {
+    static let previewTokyo = TripDestination(
+        id: "preview-tokyo",
+        country: "일본",
+        name: "도쿄",
+        region: .asia,
+        thumbnailName: "",
+        sortOrder: 0
     )
 }

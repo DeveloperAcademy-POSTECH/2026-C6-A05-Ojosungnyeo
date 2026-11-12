@@ -74,37 +74,23 @@ struct WaitingForParticipantsView: View {
         .allowsHitTesting(!store.isMapConfirmationPresented)
         .overlay {
             if store.isMapConfirmationPresented {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "먼저 여행 준비하기",
-                        message: "지도에 핀을 찍으러 이동하시겠어요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        onCancel: { store.send(.mapConfirmationCancelButtonTapped) },
-                        onConfirm: { store.send(.mapConfirmationConfirmButtonTapped) }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "먼저 여행을 준비할까요?",
+                    message: "지도에서 가고 싶은 장소를 선택해 주세요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    onCancel: { store.send(.mapConfirmationCancelButtonTapped) },
+                    onConfirm: { store.send(.mapConfirmationConfirmButtonTapped) }
+                )
             }
         }
     }
 
     private var header: some View {
         HStack(spacing: DDSpacing.small) {
-            Button {
+            DDBackButton(accessibilityLabel: "뒤로 가기") {
                 store.send(.backButtonTapped)
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 23, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 24, height: 35)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
 
             HStack(spacing: DDSpacing.xSmall) {
                 Text("친구를 기다리고 이따")
@@ -118,7 +104,8 @@ struct WaitingForParticipantsView: View {
 
             Spacer(minLength: DDSpacing.zero)
         }
-        .frame(height: 35)
+        .frame(height: 44)
+        .padding(.horizontal, -DDSpacing.small)
     }
 
     private var invitationCard: some View {

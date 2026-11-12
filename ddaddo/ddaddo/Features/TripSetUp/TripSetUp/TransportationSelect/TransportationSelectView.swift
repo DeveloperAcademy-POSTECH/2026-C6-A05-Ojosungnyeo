@@ -47,19 +47,13 @@ struct TransportationSelectView: View {
             }
 
             HStack {
-                Button {
+                DDBackButton {
                     store.send(.backButtonTapped)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 25, weight: .regular))
-                        .frame(width: 44, height: 44, alignment: .leading)
-                        .contentShape(.rect)
                 }
 
                 Spacer()
             }
-            .foregroundStyle(DDColor.textPrimary)
-            .padding(.horizontal, DDSpacing.large)
+            .padding(.horizontal, DDSpacing.small)
         }
         .frame(height: 51, alignment: .top)
     }

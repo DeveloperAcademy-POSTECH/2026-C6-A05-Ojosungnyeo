@@ -13,7 +13,7 @@ struct TripSearchView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 header
-                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.horizontal, DDSpacing.small)
 
                 searchField
                     .padding(.horizontal, DDSpacing.large)
@@ -54,17 +54,9 @@ struct TripSearchView: View {
 
     private var header: some View {
         HStack(spacing: DDSpacing.small) {
-            Button {
+            DDBackButton(accessibilityLabel: "뒤로 가기") {
                 store.send(.backButtonTapped)
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 23, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 24, height: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
 
             Text("여행지 검색")
                 .ddTypography(.title24)
@@ -72,7 +64,7 @@ struct TripSearchView: View {
 
             Spacer()
         }
-        .frame(height: 52)
+        .frame(height: 44)
     }
 
     private var searchField: some View {

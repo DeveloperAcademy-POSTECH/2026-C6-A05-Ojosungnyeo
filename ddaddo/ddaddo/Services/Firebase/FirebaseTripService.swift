@@ -626,7 +626,7 @@ enum TripServiceError: LocalizedError {
         case .firebaseNotConfigured: "Firebase 설정을 확인해 주세요."
         case .unauthenticated: "로그인이 필요합니다."
         case .tripNotFound: "여행 정보를 찾을 수 없습니다."
-        case .invalidInviteCode: "유효하지 않은 초대 코드입니다."
+        case .invalidInviteCode: "초대 코드가 유효하지 않아요."
         case .expiredInviteCode: "초대 코드의 유효 기간이 지났습니다."
         case .tripIsFull: "이미 모든 친구가 참여한 여행입니다."
         case .inviteCodeGenerationFailed: "초대 코드를 만들지 못했습니다. 다시 시도해 주세요."

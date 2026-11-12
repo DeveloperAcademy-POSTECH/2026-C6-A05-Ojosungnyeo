@@ -25,8 +25,7 @@ struct SettingsView: View {
             }
 
             if store.isLogoutAlertPresented {
-                confirmationScrim
-                DDConfirmationAlert(
+                DDAlertOverlay(
                     title: "로그아웃할까요?",
                     message: "로그아웃하면 로그인 화면으로 이동해요.",
                     cancelTitle: "취소",
@@ -35,32 +34,27 @@ struct SettingsView: View {
                     onConfirm: { store.send(.logoutConfirmed) }
                 )
             } else if store.isWithdrawalAlertPresented {
-                confirmationScrim
-                DDConfirmationAlert(
-                    title: "정말 탈퇴할까요?",
-                    message: "탈퇴 후에는 이 계정으로 로그인할 수 없어요.",
+                DDAlertOverlay(
+                    title: "회원 탈퇴할까요?",
+                    message: "탈퇴하면 계정을 다시 복구하거나\n로그인할 수 없어요.",
                     cancelTitle: "돌아가기",
                     confirmTitle: "탈퇴하기",
-                    confirmColor: DDColor.statusError,
+                    confirmColor: DDColor.alertDestructive,
                     onCancel: { store.send(.withdrawalAlertDismissed) },
                     onConfirm: { store.send(.withdrawalConfirmed) }
+                )
+            } else if let message = store.errorMessage {
+                DDAlertOverlay(
+                    title: "요청을 완료하지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.errorDismissed) }
                 )
             }
         }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .task { store.send(.onAppear) }
-        .alert("요청을 완료하지 못했어요", isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.send(.errorDismissed) } })) {
-            Button("확인") { store.send(.errorDismissed) }
-        } message: { Text(store.errorMessage ?? "") }
-    }
-
-    private var confirmationScrim: some View {
-        Color.black
-            .opacity(0.62)
-            .ignoresSafeArea()
-            .contentShape(Rectangle())
-            .accessibilityHidden(true)
     }
 
     private var settings: some View {
@@ -228,12 +222,8 @@ struct SettingsView: View {
     }
 
     private func header(_ title: String) -> some View {
-        HStack(spacing: 10) {
-            navigationButton(
-                systemName: "chevron.left",
-                accessibilityLabel: "이전 화면으로 이동",
-                width: 10
-            ) {
+        HStack(spacing: DDSpacing.small) {
+            DDBackButton(accessibilityLabel: "이전 화면으로 이동") {
                 store.send(.backButtonTapped)
             }
             Text(title)
@@ -241,7 +231,8 @@ struct SettingsView: View {
             Spacer()
         }
         .foregroundStyle(DDColor.textPrimary)
-        .frame(height: 61)
+        .frame(height: 44)
+        .padding(.horizontal, -DDSpacing.large)
     }
     private func sectionTitle(_ title: String) -> some View { Text(title).ddTypography(.labelEmphasis14).frame(maxWidth: .infinity, alignment: .leading) }
     private func card<Content: View>(minHeight: CGFloat = 74, @ViewBuilder _ content: () -> Content) -> some View { content().padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18)).overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) } }

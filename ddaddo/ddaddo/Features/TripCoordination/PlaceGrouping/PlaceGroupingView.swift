@@ -55,13 +55,9 @@ struct PlaceGroupingView: View {
             }
 
             if store.isCriteriaChangeConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .zIndex(6)
-
-                DDConfirmationAlert(
-                    title: "알림",
-                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
+                DDAlertOverlay(
+                    title: "이동 수단을 변경할까요?",
+                    message: "변경하면 다시 분석해 추천 그룹이 달라져요.\n그래도 변경하시겠어요?",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
                     onCancel: {
@@ -71,7 +67,6 @@ struct PlaceGroupingView: View {
                         store.send(.criteriaChangeConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
                 .zIndex(7)
             }
         }
@@ -146,24 +141,13 @@ struct PlaceGroupingView: View {
             }
 
             HStack {
-                Button {
+                DDBackButton(accessibilityLabel: "예정된 여행으로 돌아가기") {
                     store.send(.backButtonTapped)
-                } label: {
-                    ZStack(alignment: .topLeading) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 25, weight: .regular))
-                            .padding(.top, 4)
-                    }
-                    .frame(width: 44, height: 44, alignment: .topLeading)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("예정된 여행으로 돌아가기")
 
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(DDColor.textPrimary)
-            .padding(.horizontal, DDSpacing.large)
+            .padding(.horizontal, DDSpacing.small)
         }
         .frame(height: 51, alignment: .top)
     }

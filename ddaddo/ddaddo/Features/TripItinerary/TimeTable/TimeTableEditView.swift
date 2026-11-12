@@ -55,31 +55,27 @@ struct TimeTableEditView: View {
             .presentationCornerRadius(28)
             .presentationBackground(DDColor.surfaceDefault)
         }
-        .alert("일정을 저장할 수 없어요", isPresented: Binding(
-            get: { store.isSaveUnavailableAlertPresented },
-            set: { if !$0 { store.send(.saveUnavailableAlertDismissed) } }
-        )) {
-            Button("확인") { store.send(.saveUnavailableAlertDismissed) }
-        } message: {
-            Text(store.saveErrorMessage)
-        }
-        .allowsHitTesting(store.pendingDeletion == nil)
+        .allowsHitTesting(
+            store.pendingDeletion == nil && !store.isSaveUnavailableAlertPresented
+        )
         .overlay {
             if store.pendingDeletion != nil {
-                ZStack {
-                    Color.black.opacity(0.55).ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "일정 삭제하기",
-                        message: "이 일정을 진짜 삭제할까요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        cancelColor: DDColor.actionPrimary,
-                        confirmColor: DDColor.actionPrimary,
-                        onCancel: { store.send(.deletionCancelled) },
-                        onConfirm: { store.send(.deletionConfirmed) }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "일정을 삭제할까요?",
+                    message: "삭제한 일정은 여행 일정에서 사라져요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: { store.send(.deletionCancelled) },
+                    onConfirm: { store.send(.deletionConfirmed) }
+                )
+            } else if store.isSaveUnavailableAlertPresented {
+                DDAlertOverlay(
+                    title: "일정을 저장할 수 없어요",
+                    message: store.saveErrorMessage,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.saveUnavailableAlertDismissed) }
+                )
             }
         }
     }
@@ -234,14 +230,9 @@ private struct TimeTableEditContent: View {
 
     private var navigationBar: some View {
         HStack {
-            Button { store.send(.backButtonTapped) } label: {
-                Image("DDTimeTableBack")
-                    .resizable()
-                    .frame(width: 20, height: 40)
-                    .frame(width: 44, height: 40, alignment: .leading)
-                    .contentShape(Rectangle())
+            DDBackButton {
+                store.send(.backButtonTapped)
             }
-            .buttonStyle(.plain)
 
             Spacer()
 
@@ -254,9 +245,9 @@ private struct TimeTableEditContent: View {
                 .disabled(store.isSaving)
                 .opacity(store.isSaving ? 0.5 : 1)
         }
-        .frame(height: 40)
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, 7)
+        .frame(height: 44)
+        .padding(.leading, DDSpacing.small)
+        .padding(.trailing, DDSpacing.large)
     }
 
     private var tripHeader: some View {

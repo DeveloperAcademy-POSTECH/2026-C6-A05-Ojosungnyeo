@@ -43,19 +43,13 @@ struct WaitingForConfirmationView: View {
             }
 
             HStack {
-                Button {
+                DDBackButton {
                     store.send(.backButtonTapped)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 24, weight: .regular))
-                        .foregroundStyle(DDColor.textPrimary)
-                        .frame(width: 44, height: 44, alignment: .leading)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
 
                 Spacer(minLength: 0)
             }
+            .padding(.horizontal, -DDSpacing.small)
         }
         .frame(height: 51, alignment: .top)
     }

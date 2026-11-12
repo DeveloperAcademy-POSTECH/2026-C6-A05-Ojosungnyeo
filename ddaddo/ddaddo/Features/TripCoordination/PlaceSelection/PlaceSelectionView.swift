@@ -195,58 +195,42 @@ struct PlaceSelectionView: View {
             )
         }
         .allowsHitTesting(
-            store.completionAlert == nil && store.pendingDeletionPlaceID == nil
+            store.completionAlert == nil
+                && store.pendingDeletionPlaceID == nil
+                && store.placeSyncErrorMessage == nil
         )
         .overlay {
             if store.pendingDeletionPlaceID != nil {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "장소 삭제하기",
-                        message: "이 장소를 진짜 삭제할까요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        cancelColor: DDColor.actionPrimary,
-                        onCancel: {
-                            store.send(.deleteConfirmationCancelTapped)
-                        },
-                        onConfirm: {
-                            store.send(.deleteConfirmationConfirmTapped)
-                        }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "장소를 삭제할까요?",
+                    message: "삭제한 장소는 목록에서 사라져요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: {
+                        store.send(.deleteConfirmationCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.deleteConfirmationConfirmTapped)
+                    }
+                )
             } else if let alert = store.completionAlert {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: alert.title,
-                        message: store.completionAlertMessage,
-                        confirmTitle: "확인",
-                        onConfirm: {
-                            store.send(.completionAlertConfirmButtonTapped)
-                        }
-                    )
-                }
+                DDAlertOverlay(
+                    title: alert.title,
+                    message: store.completionAlertMessage,
+                    confirmTitle: "확인",
+                    onConfirm: {
+                        store.send(.completionAlertConfirmButtonTapped)
+                    }
+                )
+            } else if let message = store.placeSyncErrorMessage {
+                DDAlertOverlay(
+                    title: "장소를 서버에 저장하지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.placeSyncErrorDismissed) }
+                )
             }
-        }
-        .alert(
-            "장소를 서버에 저장하지 못했어요",
-            isPresented: Binding(
-                get: { store.placeSyncErrorMessage != nil },
-                set: { if !$0 { store.send(.placeSyncErrorDismissed) } }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.placeSyncErrorDismissed)
-            }
-        } message: {
-            Text(store.placeSyncErrorMessage ?? "")
         }
     }
 
@@ -255,17 +239,10 @@ struct PlaceSelectionView: View {
     }
 
     private var placeSelectionNavigationBar: some View {
-        HStack(spacing: 13) {
-            Button {
+        HStack(alignment: .top, spacing: DDSpacing.small) {
+            DDBackButton(accessibilityLabel: "친구 초대 화면으로 돌아가기") {
                 store.send(.backButtonTapped)
-            } label: {
-                PlaceSelectionBackIcon()
-                    .frame(width: 24, height: 24)
-                    .frame(width: 24, height: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("친구 초대 화면으로 돌아가기")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
@@ -297,9 +274,9 @@ struct PlaceSelectionView: View {
                 maximumCount: store.maximumPlaceCount
             )
         }
-        .padding(.horizontal, DDSpacing.large)
+        .padding(.horizontal, DDSpacing.small)
         .frame(maxWidth: .infinity)
-        .frame(height: 62)
+        .frame(height: 62, alignment: .top)
     }
 
     private var searchField: some View {
@@ -442,22 +419,6 @@ private struct PlaceCountProgressView: View {
         .frame(width: 36, height: 36)
         .frame(width: 44, height: 44)
         .animation(.easeOut(duration: 0.2), value: count)
-    }
-}
-
-private struct PlaceSelectionBackIcon: View {
-    var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 17, y: 3))
-            path.addLine(to: CGPoint(x: 7, y: 12))
-            path.addLine(to: CGPoint(x: 17, y: 21))
-        }
-        .stroke(
-            DDColor.textPrimary,
-            style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
-        )
-        .frame(width: 24, height: 24)
-        .allowsHitTesting(false)
     }
 }
 

@@ -105,6 +105,7 @@ struct UpcomingTripsView: View {
                         }
                     )
                 }
+                .ignoresSafeArea()
                 .transition(.opacity)
             }
 

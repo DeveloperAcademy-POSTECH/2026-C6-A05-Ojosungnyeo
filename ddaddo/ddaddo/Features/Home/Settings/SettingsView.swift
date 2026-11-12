@@ -203,12 +203,12 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 checklist("프로필과 계정 정보")
                 Divider()
-                    .overlay(DDColor.borderDefault)
+                    .overlay(settingsCardBorder)
                     .padding(.top, 11)
                 checklist("저장한 여행 정보")
                     .padding(.top, 16)
                 Divider()
-                    .overlay(DDColor.borderDefault)
+                    .overlay(settingsCardBorder)
                     .padding(.top, 11)
                 checklist("진행 중인 여행 참여 상태")
                     .padding(.top, 16)
@@ -224,7 +224,10 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
             .background(DDColor.surfaceElevated)
             .clipShape(.rect(cornerRadius: 18))
-            .overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(settingsCardBorder, lineWidth: 1)
+            }
             .padding(.top, 21)
             Button { store.send(.withdrawalAcknowledgementToggled) } label: {
                 HStack(spacing: 12) {
@@ -238,8 +241,8 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .padding(.top, 28)
             Spacer()
-            DDCTAButton(title: store.isWithdrawing ? "탈퇴 처리 중..." : "탈퇴 진행", isEnabled: store.hasAcknowledgedWithdrawal && !store.isWithdrawing) { store.send(.withdrawalProceedTapped) }
-            Button("취소") { store.send(.withdrawalCancelTapped) }.ddTypography(.labelEmphasis14).foregroundStyle(DDColor.textSecondary).frame(maxWidth: .infinity).padding(.vertical, 12)
+            withdrawalProceedButton
+                .padding(.bottom, 11)
         }.padding(.horizontal, 24)
     }
 
@@ -342,7 +345,7 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 5)
                 .fill(store.hasAcknowledgedWithdrawal ? DDColor.actionPrimary : DDColor.surfaceElevated)
             RoundedRectangle(cornerRadius: 5)
-                .stroke(store.hasAcknowledgedWithdrawal ? DDColor.actionPrimary : DDColor.borderDefault)
+                .stroke(store.hasAcknowledgedWithdrawal ? DDColor.actionPrimary : settingsCardBorder)
             if store.hasAcknowledgedWithdrawal {
                 Image(systemName: "checkmark")
                     .font(.system(size: 12, weight: .bold))
@@ -350,6 +353,23 @@ struct SettingsView: View {
             }
         }
         .frame(width: 22, height: 22)
+    }
+    private var withdrawalProceedButton: some View {
+        let isEnabled = store.hasAcknowledgedWithdrawal && !store.isWithdrawing
+
+        return Button {
+            store.send(.withdrawalProceedTapped)
+        } label: {
+            Text(store.isWithdrawing ? "탈퇴 처리 중..." : "탈퇴 진행")
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(isEnabled ? DDColor.textOnPrimary : DDColor.textTertiary)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 56)
+                .background(isEnabled ? DDColor.actionPrimary : DDColor.surfaceControl)
+                .clipShape(.rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
     }
     private func checklist(_ text: String) -> some View { Text("•  \(text)").ddTypography(.body16).tracking(0).frame(height: 24) }
     private var nicknameSaveEnabled: Bool { let value = store.nicknameDraft.trimmingCharacters(in: .whitespacesAndNewlines); return (2...10).contains(value.count) && value != store.nickname && !store.isSavingNickname }

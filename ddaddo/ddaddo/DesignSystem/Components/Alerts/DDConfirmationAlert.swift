@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct DDConfirmationAlert: View {
+    @Environment(\.displayScale) private var displayScale
+
     let title: String
     let message: String
     let cancelTitle: String?
@@ -55,7 +57,7 @@ struct DDConfirmationAlert: View {
             .padding(.horizontal, 20)
             .padding(.vertical, DDSpacing.xLarge)
 
-            Color.white.frame(height: 0.5)
+            separator.frame(height: separatorThickness)
 
             if let cancelTitle, let onCancel {
                 HStack(spacing: DDSpacing.zero) {
@@ -65,7 +67,7 @@ struct DDConfirmationAlert: View {
                         action: onCancel
                     )
 
-                    Color.white.frame(width: 0.5)
+                    separator.frame(width: separatorThickness)
 
                     actionButton(title: confirmTitle, color: confirmColor, action: onConfirm)
                 }
@@ -93,6 +95,14 @@ struct DDConfirmationAlert: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var separator: Color {
+        .white.opacity(0.5)
+    }
+
+    private var separatorThickness: CGFloat {
+        1 / displayScale
     }
 }
 

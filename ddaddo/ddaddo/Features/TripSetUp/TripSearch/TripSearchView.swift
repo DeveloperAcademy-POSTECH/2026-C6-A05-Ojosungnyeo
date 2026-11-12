@@ -125,21 +125,25 @@ struct TripSearchView: View {
                 .padding(.horizontal, DDSpacing.large)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: DDSpacing.medium) {
+                    LazyVStack(alignment: .leading, spacing: DDSpacing.xLarge) {
                         ForEach(groupedCities) { group in
-                            Text(group.country)
-                                .ddTypography(.caption12)
-                                .foregroundStyle(DDColor.textSecondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: DDSpacing.medium) {
+                                Text(group.country)
+                                    .ddTypography(.caption12)
+                                    .foregroundStyle(DDColor.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                            ForEach(group.cities) { city in
-                                Button {
-                                    store.send(.cityTapped(city.id))
-                                } label: {
-                                    cityRow(city)
+                                LazyVStack(spacing: 5) {
+                                    ForEach(group.cities) { city in
+                                        Button {
+                                            store.send(.cityTapped(city.id))
+                                        } label: {
+                                            cityRow(city)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
+                                    }
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
                             }
                         }
                     }
@@ -152,7 +156,7 @@ struct TripSearchView: View {
     }
 
     private var selectionArea: some View {
-        VStack(alignment: .leading, spacing: DDSpacing.medium) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("선택한 여행지 \(store.selectedCities.count)")
                 .ddTypography(.captionEmphasis12)
                 .foregroundStyle(DDColor.textSecondary)
@@ -165,12 +169,14 @@ struct TripSearchView: View {
                 }
             }
             .frame(height: 32)
+            .padding(.top, DDSpacing.medium)
 
             DDCTAButton(
                 title: "\(store.selectedCities.count)개 도시로 여행 만들기",
                 isEnabled: !store.selectedCities.isEmpty,
                 action: { store.send(.nextButtonTapped) }
             )
+            .padding(.top, 17)
         }
         .padding(.horizontal, DDSpacing.large)
         .padding(.top, 5)

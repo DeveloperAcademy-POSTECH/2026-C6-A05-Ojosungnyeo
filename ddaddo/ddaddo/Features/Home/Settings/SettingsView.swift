@@ -417,3 +417,21 @@ private struct DDCompactToggleStyle: ToggleStyle {
         }
     )
 }
+
+#Preview("탈퇴 완료") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "하르딩",
+                    nicknameDraft: "하르딩"
+                )
+                state.screen = .complete
+                return state
+            }()
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}

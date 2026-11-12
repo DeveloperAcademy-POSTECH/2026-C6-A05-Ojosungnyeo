@@ -74,6 +74,7 @@ struct RootFeature: Reducer {
                     if state.isCompletingWithdrawal { return .none }
                     state.authenticatedUserID = nil
                     state.authenticationStatus = .unauthenticated
+                    state.home = HomeFeature.State()
                     return .none
                 }
 

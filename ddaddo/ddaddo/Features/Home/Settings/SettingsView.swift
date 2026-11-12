@@ -148,9 +148,13 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             header("계정 관리")
             sectionTitle("로그인 정보")
-                .padding(.top, 24)
+                .padding(.top, 39)
                 .padding(.bottom, 4)
-            card(minHeight: 78) {
+            card(
+                minHeight: 78,
+                cornerRadius: 16,
+                borderColor: settingsCardBorder
+            ) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Apple로 로그인")
                         .ddTypography(.bodyEmphasis16)
@@ -161,14 +165,23 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             sectionTitle("계정 작업")
-                .padding(.top, 24)
+                .padding(.top, 20)
                 .padding(.bottom, 4)
-            VStack(spacing: 0) {
+            VStack(spacing: 16) {
                 accountAction("로그아웃", "로그아웃 후 로그인 화면으로 이동해요", color: DDColor.textPrimary) { store.send(.logoutTapped) }
-                Divider().overlay(DDColor.borderDefault)
+                Rectangle()
+                    .fill(settingsCardBorder)
+                    .frame(height: 1)
                 accountAction("회원 탈퇴", "계정 이용을 종료하고 정보를 정리해요", color: DDColor.statusError) { store.send(.withdrawalTapped) }
-            }.padding(.horizontal, 16).background(DDColor.surfaceElevated).clipShape(.rect(cornerRadius: 18))
-                .overlay { RoundedRectangle(cornerRadius: 18).stroke(DDColor.borderDefault) }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 155)
+            .background(DDColor.surfaceElevated)
+            .clipShape(.rect(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(settingsCardBorder, lineWidth: 1)
+            }
             Spacer()
         }.padding(.horizontal, 24)
     }
@@ -308,7 +321,7 @@ struct SettingsView: View {
             )
             .foregroundStyle(DDColor.textPrimary)
         }
-        .frame(height: 76)
+        .frame(height: 44)
     }
     private func navigationButton(
         systemName: String,

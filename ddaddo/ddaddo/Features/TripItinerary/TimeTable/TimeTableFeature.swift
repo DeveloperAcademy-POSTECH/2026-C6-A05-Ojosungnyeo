@@ -362,6 +362,20 @@ struct TimeTableFeature: Reducer {
                     state.pendingItinerarySnapshot = snapshot
                     return .none
                 }
+                state.recommendations = snapshot.recommendations.map {
+                    TimeTableRecommendation(
+                        id: $0.id,
+                        groupID: $0.groupID,
+                        placeID: $0.placeID,
+                        placeName: $0.placeName,
+                        category: $0.category,
+                        groupCategories: $0.groupCategories,
+                        memberIDs: $0.memberIDs,
+                        placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
                 state.coursesByID = Dictionary(uniqueKeysWithValues: snapshot.courses.map { course in
                     let value = TimeTableCourse(
                         id: course.id,

@@ -488,7 +488,8 @@ enum FirebaseTripService {
                 "updatedBy": userID,
                 "updatedAt": FieldValue.serverTimestamp()
             ],
-            forDocument: tripReference.collection("itinerary").document("current")
+            forDocument: tripReference.collection("itinerary").document("current"),
+            merge: true
         )
         batch.setData(
             [
@@ -499,6 +500,54 @@ enum FirebaseTripService {
             merge: true
         )
         try await batch.commit()
+    }
+
+    static func saveRecommendations(
+        tripID: String,
+        recommendations: [TripRecommendationSnapshot]
+    ) async throws {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard let userID = Auth.auth().currentUser?.uid else {
+            throw TripServiceError.unauthenticated
+        }
+
+        let tripReference = Firestore.firestore().collection("trips").document(tripID)
+        let participant = try await tripReference
+            .collection("participants")
+            .document(userID)
+            .getDocument()
+        guard participant.exists,
+              participant.get("status") as? String == "joined" else {
+            throw TripServiceError.notTripParticipant
+        }
+
+        let values: [[String: Any]] = recommendations.map {
+            [
+                "id": $0.id,
+                "groupID": $0.groupID,
+                "placeID": $0.placeID,
+                "placeName": $0.placeName,
+                "category": $0.category,
+                "groupCategories": $0.groupCategories,
+                "memberIDs": $0.memberIDs,
+                "placeOwnerMemberIDs": $0.placeOwnerMemberIDs,
+                "latitude": $0.latitude,
+                "longitude": $0.longitude
+            ]
+        }
+        try await tripReference
+            .collection("itinerary")
+            .document("current")
+            .setData(
+                [
+                    "recommendations": values,
+                    "recommendationsUpdatedBy": userID,
+                    "recommendationsUpdatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
     }
 
     static func fetchItinerary(tripID: String) async throws -> TripItinerarySnapshot? {
@@ -596,7 +645,33 @@ enum FirebaseTripService {
                 branchGroupID: data["branchGroupID"] as? Int
             )
         }
-        return TripItinerarySnapshot(courses: courses, schedules: schedules)
+        let recommendations: [TripRecommendationSnapshot] =
+            (document.get("recommendations") as? [[String: Any]] ?? []).compactMap { data in
+                guard let id = data["id"] as? String,
+                      let groupID = data["groupID"] as? String,
+                      let placeID = data["placeID"] as? String,
+                      let placeName = data["placeName"] as? String,
+                      let latitude = data["latitude"] as? Double,
+                      let longitude = data["longitude"] as? Double
+                else { return nil }
+                return TripRecommendationSnapshot(
+                    id: id,
+                    groupID: groupID,
+                    placeID: placeID,
+                    placeName: placeName,
+                    category: data["category"] as? String ?? "",
+                    groupCategories: data["groupCategories"] as? [String] ?? [],
+                    memberIDs: data["memberIDs"] as? [String] ?? [],
+                    placeOwnerMemberIDs: data["placeOwnerMemberIDs"] as? [String] ?? [],
+                    latitude: latitude,
+                    longitude: longitude
+                )
+            }
+        return TripItinerarySnapshot(
+            courses: courses,
+            schedules: schedules,
+            recommendations: recommendations
+        )
     }
 
     private static func makeInviteURL(code: String, expiresAt: Date) -> URL {

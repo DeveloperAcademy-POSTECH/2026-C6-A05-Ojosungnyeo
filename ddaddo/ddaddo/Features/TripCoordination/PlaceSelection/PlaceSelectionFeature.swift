@@ -218,6 +218,7 @@ struct PlaceSelectionFeature: Reducer {
 
         var canAddSelectedPlace: Bool {
             selectedPlace != nil
+                && !isPlaceDetailsLoading
                 && isViewingCurrentUser
                 && !isSelectedPlaceAlreadyAdded
                 && memberPlaces[currentMember, default: []].count < maximumPlaceCount

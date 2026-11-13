@@ -1,0 +1,92 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDevelopmentSeedOperator() {
+      return isSignedIn()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.nicknameKey in [
+          "c9dd15f227d8e64d2c71f96da03a19dc95054c7910986696a212a10f60f47a75",
+          "a7d1dce39fac951b2b82a3a31b33530b1e6f238c5accecc45d1a1b2fde25418d",
+          "7646cd9a72f31acbe7c2b25674f4bcda614d89d002727194ceae4fe18027e257",
+          "fe434f9eaba3fe1f6c20b87c550d10202f772ff4b49513dae4ed05e3bbe87e98"
+        ];
+    }
+
+    function isDevelopmentSeedMember() {
+      return resource.data.nicknameKey in [
+        "c9dd15f227d8e64d2c71f96da03a19dc95054c7910986696a212a10f60f47a75",
+        "a7d1dce39fac951b2b82a3a31b33530b1e6f238c5accecc45d1a1b2fde25418d",
+        "7646cd9a72f31acbe7c2b25674f4bcda614d89d002727194ceae4fe18027e257",
+        "fe434f9eaba3fe1f6c20b87c550d10202f772ff4b49513dae4ed05e3bbe87e98"
+      ];
+    }
+
+    match /users/{userId} {
+      allow read, create, update, delete:
+        if isSignedIn() && request.auth.uid == userId;
+
+      allow read:
+        if isDevelopmentSeedOperator()
+        && isDevelopmentSeedMember();
+
+      allow update:
+        if isDevelopmentSeedOperator()
+        && isDevelopmentSeedMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "avatarName",
+          "joinedTripIDs",
+          "dismissedTripIDs",
+          "updatedAt"
+        ]);
+    }
+
+    match /nicknames/{nicknameKey} {
+      allow read: if isSignedIn();
+
+      allow create:
+        if isSignedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update:
+        if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete:
+        if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    match /destinations/{destinationId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /trips/{tripId} {
+      allow read, create, update, delete: if isSignedIn();
+
+      match /participants/{participantId} {
+        allow read, create, update, delete: if isSignedIn();
+
+        match /places/{placeId} {
+          allow read, create, update, delete: if isSignedIn();
+        }
+      }
+
+      match /itinerary/{documentId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /inviteCodes/{inviteCode} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+  }
+}
+

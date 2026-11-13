@@ -152,6 +152,13 @@ struct UpcomingTripsView: View {
                     confirmTitle: "확인",
                     onConfirm: { store.send(.deletionErrorDismissed) }
                 )
+            } else if let message = store.resetDevelopmentDataMessage {
+                DDAlertOverlay(
+                    title: "Dev 목데이터",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.resetDevelopmentDataMessageDismissed) }
+                )
             }
         }
         .preferredColorScheme(.dark)
@@ -197,6 +204,26 @@ struct UpcomingTripsView: View {
                 .foregroundStyle(DDColor.textPrimary)
 
             Spacer(minLength: 0)
+
+            #if DEBUG
+            Button {
+                store.send(.resetDevelopmentDataButtonTapped)
+            } label: {
+                if store.isResettingDevelopmentData {
+                    ProgressView()
+                        .tint(DDColor.actionPrimary)
+                        .frame(width: 44, height: 44)
+                } else {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(DDColor.actionPrimary)
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(store.isResettingDevelopmentData)
+            .accessibilityLabel("Dev 목데이터 초기화")
+            #endif
 
             headerButton(
                 systemName: "plus",

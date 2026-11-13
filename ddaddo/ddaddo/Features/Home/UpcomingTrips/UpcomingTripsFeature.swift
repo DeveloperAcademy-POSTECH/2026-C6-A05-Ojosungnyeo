@@ -44,6 +44,8 @@ struct UpcomingTripsFeature: Reducer {
         var pendingDeletionTripID: Trip.ID?
         var isDeletingTrip = false
         var deletionErrorMessage: String?
+        var isResettingDevelopmentData = false
+        var resetDevelopmentDataMessage: String?
         var waitingForParticipants: WaitingForParticipantsFeature.State?
         var isWaitingForParticipantsPresented = false
         var pendingTripProgress: UpcomingTripSnapshot.Progress?
@@ -73,6 +75,9 @@ struct UpcomingTripsFeature: Reducer {
         case deleteConfirmButtonTapped
         case deleteTripResponse(Trip.ID, Result<Void, Error>)
         case deletionErrorDismissed
+        case resetDevelopmentDataButtonTapped
+        case resetDevelopmentDataResponse(Result<Void, Error>)
+        case resetDevelopmentDataMessageDismissed
         case waitingForParticipantsDismissed
         case waitingForParticipants(WaitingForParticipantsFeature.Action)
         case tripInvitationResponse(Result<TripInvitationSnapshot, Error>)
@@ -201,6 +206,33 @@ struct UpcomingTripsFeature: Reducer {
 
             case .deletionErrorDismissed:
                 state.deletionErrorMessage = nil
+                return .none
+
+            case .resetDevelopmentDataButtonTapped:
+                guard !state.isResettingDevelopmentData else { return .none }
+                state.isResettingDevelopmentData = true
+                state.resetDevelopmentDataMessage = nil
+                return .run { send in
+                    await send(
+                        .resetDevelopmentDataResponse(
+                            Result { try await tripClient.resetDevelopmentMockTrips() }
+                        )
+                    )
+                }
+
+            case .resetDevelopmentDataResponse(.success):
+                state.isResettingDevelopmentData = false
+                state.resetDevelopmentDataMessage = "Dev 목데이터를 초기 상태로 되돌렸어요."
+                state.isLoadingTrips = true
+                return fetchUpcomingTripsEffect()
+
+            case let .resetDevelopmentDataResponse(.failure(error)):
+                state.isResettingDevelopmentData = false
+                state.resetDevelopmentDataMessage = error.localizedDescription
+                return .none
+
+            case .resetDevelopmentDataMessageDismissed:
+                state.resetDevelopmentDataMessage = nil
                 return .none
 
             case .waitingForParticipantsDismissed,

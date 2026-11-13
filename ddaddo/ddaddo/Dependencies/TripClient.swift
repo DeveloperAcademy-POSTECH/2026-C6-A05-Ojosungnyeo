@@ -13,6 +13,7 @@ struct TripClient: DependencyKey, Sendable {
     var joinTrip: @MainActor @Sendable (String) async throws -> TripInvitationSnapshot
     var fetchUpcomingTrips: @MainActor @Sendable () async throws -> [UpcomingTripSnapshot]
     var deleteUpcomingTrip: @MainActor @Sendable (String) async throws -> Void
+    var resetDevelopmentMockTrips: @MainActor @Sendable () async throws -> Void
     var saveItinerary: @MainActor @Sendable (TripItinerarySaveRequest) async throws -> Void
     var fetchItinerary: @MainActor @Sendable (String) async throws -> TripItinerarySnapshot?
     var observeItinerary: @MainActor @Sendable (String) -> AsyncThrowingStream<TripItinerarySnapshot?, Error>
@@ -33,6 +34,11 @@ struct TripClient: DependencyKey, Sendable {
         deleteUpcomingTrip: { tripID in
             try await FirebaseTripService.deleteUpcomingTrip(tripID: tripID)
         },
+        resetDevelopmentMockTrips: {
+            #if DEBUG
+            try await DevelopmentMockTripService.reset()
+            #endif
+        },
         saveItinerary: { request in
             try await FirebaseTripService.saveItinerary(request)
         },
@@ -50,6 +56,7 @@ struct TripClient: DependencyKey, Sendable {
         joinTrip: { _ in throw CancellationError() },
         fetchUpcomingTrips: { [] },
         deleteUpcomingTrip: { _ in },
+        resetDevelopmentMockTrips: {},
         saveItinerary: { _ in },
         fetchItinerary: { _ in nil },
         observeItinerary: { _ in

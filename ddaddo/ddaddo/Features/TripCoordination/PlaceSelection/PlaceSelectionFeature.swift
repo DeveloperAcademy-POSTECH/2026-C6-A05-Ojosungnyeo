@@ -258,8 +258,7 @@ struct PlaceSelectionFeature: Reducer {
         var timerText: String {
             let hours = remainingSeconds / 3_600
             let minutes = remainingSeconds % 3_600 / 60
-            let seconds = remainingSeconds % 60
-            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+            return String(format: "%02d:%02d", hours, minutes)
         }
 
         private static let mockParticipants: [Participant] = [

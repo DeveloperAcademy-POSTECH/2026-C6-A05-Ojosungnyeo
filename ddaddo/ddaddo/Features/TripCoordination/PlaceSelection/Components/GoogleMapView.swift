@@ -120,7 +120,7 @@ struct GoogleMapView: UIViewRepresentable {
             signature = "\(selectedCoordinate.latitude),\(selectedCoordinate.longitude)"
         } else if !placeGroups.isEmpty {
             signature = placeGroups.map { group in
-                "\(group.id):\(group.places.map(\.id).joined(separator: ","))"
+                "\(group.id):\(group.name):\(group.places.map(\.id).joined(separator: ","))"
             }.joined(separator: "|")
         } else {
             signature = "numbered:\(showsPinnedPlaceNumbers):"
@@ -251,11 +251,53 @@ struct GoogleMapView: UIViewRepresentable {
         radius: CLLocationDistance,
         to mapView: GMSMapView
     ) {
-        let label = UILabel(frame: CGRect(x: 0, y: 0, width: 56, height: 20))
+        let label = UILabel()
         label.font = UIFont(name: "Pretendard-SemiBold", size: 14)
-        label.text = title
+        func textWidth(_ text: String) -> CGFloat {
+            (text as NSString).size(withAttributes: [.font: label.font as Any]).width
+        }
+
+        let characters = Array(title)
+        let lines: [String]
+        if characters.count <= 5 {
+            lines = [title]
+        } else {
+            var bestLines: [String]?
+            var smallestWidthDifference = CGFloat.infinity
+            for index in characters.indices where characters[index].isWhitespace {
+                let first = String(characters[..<index])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let second = String(characters[(index + 1)...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !first.isEmpty, !second.isEmpty else { continue }
+
+                let widthDifference = abs(textWidth(first) - textWidth(second))
+                if widthDifference < smallestWidthDifference {
+                    smallestWidthDifference = widthDifference
+                    bestLines = [first, second]
+                }
+            }
+
+            if let bestLines {
+                lines = bestLines
+            } else {
+                let midpoint = (characters.count + 1) / 2
+                lines = [String(characters[..<midpoint]), String(characters[midpoint...])]
+            }
+        }
+
+        label.numberOfLines = lines.count
+        label.lineBreakMode = .byWordWrapping
+        label.text = lines.joined(separator: "\n")
         label.textAlignment = .center
         label.textColor = UIColor(red: 242 / 255, green: 255 / 255, blue: 96 / 255, alpha: 1)
+        let lineWidth = lines.map(textWidth).max() ?? 0
+        label.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: max(56, ceil(lineWidth) + 8),
+            height: max(20, ceil(label.font.lineHeight * CGFloat(lines.count)))
+        )
 
         let marker = GMSMarker(
             position: CLLocationCoordinate2D(

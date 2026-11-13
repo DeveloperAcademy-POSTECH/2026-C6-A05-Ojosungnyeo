@@ -7,9 +7,22 @@
 
 import ComposableArchitecture
 import SwiftUI
+import UIKit
+
+private func placeGroupingWindowBottomSafeAreaInset() -> CGFloat {
+    UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .filter { $0.activationState == .foregroundActive }
+        .flatMap(\.windows)
+        .first(where: \.isKeyWindow)?
+        .safeAreaInsets.bottom ?? 0
+}
 
 struct PlaceGroupingView: View {
     let store: StoreOf<PlaceGroupingFeature>
+    @State private var sheetDragTranslation: CGFloat = 0
+    @State private var isBottomSheetExpanded = true
+    @State private var bottomSafeAreaInset = placeGroupingWindowBottomSafeAreaInset()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -69,6 +82,17 @@ struct PlaceGroupingView: View {
                 )
                 .zIndex(7)
             }
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: PlaceGroupingBottomSafeAreaInsetKey.self,
+                    value: geometry.safeAreaInsets.bottom
+                )
+            }
+        }
+        .onPreferenceChange(PlaceGroupingBottomSafeAreaInsetKey.self) {
+            bottomSafeAreaInset = max($0, placeGroupingWindowBottomSafeAreaInset())
         }
         .animation(
             .easeInOut(duration: 0.3),
@@ -193,22 +217,24 @@ struct PlaceGroupingView: View {
                 .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, 14)
 
-            if store.selectedTab == .preferences {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(store.members) { member in
-                            memberCard(member)
+            if isBottomSheetExpanded {
+                if store.selectedTab == .preferences {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(store.members) { member in
+                                memberCard(member)
+                            }
                         }
+                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.bottom, 34)
                     }
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.bottom, 34)
+                    .scrollIndicators(.hidden)
+                } else {
+                    recommendedGroups
                 }
-                .scrollIndicators(.hidden)
-            } else {
-                recommendedGroups
             }
         }
-        .frame(height: 413, alignment: .top)
+        .frame(height: currentSheetHeight, alignment: .top)
         .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
         .overlay(alignment: .top) {
@@ -217,12 +243,43 @@ struct PlaceGroupingView: View {
                     Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
                     lineWidth: 1
                 )
-                .frame(height: 535)
+                .frame(height: currentSheetHeight + 120)
+                .allowsHitTesting(false)
         }
         .ddFillBottomSheetToScreenEdge(
             color: Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)
         )
         .ignoresSafeArea(edges: .bottom)
+        .overlay(alignment: .top) {
+            Color.clear
+                .contentShape(.rect)
+                .frame(height: 35)
+                .gesture(sheetDragGesture)
+        }
+    }
+
+    private var collapsedSheetHeight: CGFloat {
+        93 + bottomSafeAreaInset
+    }
+
+    private var currentSheetHeight: CGFloat {
+        let restingHeight: CGFloat = isBottomSheetExpanded ? 413 : collapsedSheetHeight
+        return min(413, max(collapsedSheetHeight, restingHeight - sheetDragTranslation))
+    }
+
+    private var sheetDragGesture: some Gesture {
+        DragGesture(minimumDistance: 5)
+            .onChanged { value in
+                sheetDragTranslation = value.translation.height
+            }
+            .onEnded { value in
+                let restingHeight: CGFloat = isBottomSheetExpanded ? 413 : collapsedSheetHeight
+                let releasedHeight = restingHeight - value.translation.height
+                withAnimation(.easeOut(duration: 0.22)) {
+                    isBottomSheetExpanded = releasedHeight > (413 + collapsedSheetHeight) / 2
+                    sheetDragTranslation = 0
+                }
+            }
     }
 
     private var tabSelector: some View {
@@ -357,6 +414,15 @@ struct PlaceGroupingView: View {
         .padding(.horizontal, DDSpacing.large)
     }
 }
+
+private struct PlaceGroupingBottomSafeAreaInsetKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 #Preview {
     PlaceGroupingView(
         store: Store(initialState: PlaceGroupingFeature.State()) {

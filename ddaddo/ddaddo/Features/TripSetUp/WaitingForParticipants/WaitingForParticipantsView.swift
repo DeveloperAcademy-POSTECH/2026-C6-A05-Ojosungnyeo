@@ -19,6 +19,7 @@ struct WaitingForParticipantsView: View {
                     .foregroundStyle(DDColor.textSecondary)
                     .lineSpacing(2)
                     .padding(.top, DDSpacing.small)
+                    .offset(y: -5)
 
                 invitationCard
                     .padding(.top, DDSpacing.xxLarge + DDSpacing.large)

@@ -24,8 +24,14 @@ struct UpcomingTripsView: View {
                     .padding(.bottom, 8)
 
                 if store.trips.isEmpty && !store.isLoadingTrips {
-                    emptyState
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    GeometryReader { proxy in
+                        emptyState
+                            .frame(
+                                width: proxy.size.width,
+                                height: proxy.size.height,
+                                alignment: .center
+                            )
+                    }
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 15) {
@@ -99,6 +105,7 @@ struct UpcomingTripsView: View {
                         }
                     )
                 }
+                .ignoresSafeArea()
                 .transition(.opacity)
             }
 
@@ -324,9 +331,8 @@ private struct UpcomingTripsBroadcastBanner: View {
                     let bannerScale = proxy.size.width / 370
 
                     Text(message)
-                        .ddTypography(.captionEmphasis12)
-                        .tracking(0.6)
-                        .lineSpacing(2)
+                        .ddTypography(.labelEmphasis14)
+                        .lineSpacing(3)
                         .foregroundStyle(DDColor.textOnPrimary)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
@@ -335,10 +341,9 @@ private struct UpcomingTripsBroadcastBanner: View {
                             height: 40 * bannerScale,
                             alignment: .leading
                         )
-                        .background(Color.white)
                         .position(
-                            x: proxy.size.width * 0.744,
-                            y: proxy.size.height * 0.32
+                            x: proxy.size.width * 0.743,
+                            y: proxy.size.height * 0.315
                         )
                 }
             }
@@ -449,9 +454,17 @@ private struct UpcomingTripTicketCard: View {
     }
 }
 
-#Preview {
+#Preview("여행 목록") {
     UpcomingTripsView(
         store: Store(initialState: UpcomingTripsPreviewData.state) {
+            UpcomingTripsFeature()
+        }
+    )
+}
+
+#Preview("예정된 여행 없음") {
+    UpcomingTripsView(
+        store: Store(initialState: UpcomingTripsFeature.State()) {
             UpcomingTripsFeature()
         }
     )

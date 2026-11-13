@@ -213,19 +213,16 @@ struct HomeView: View {
         return VStack(alignment: .center, spacing: 0) {
             switch store.mascotMessage {
             case .welcome:
+                messageLine("\(nickname),", color: nicknameColor)
                 messageLine("어서오세따. 저는 따또입니따.", color: bodyColor)
-                (Text(nickname).foregroundColor(nicknameColor)
-                    + Text(" 의").foregroundColor(bodyColor))
-                    .lineLimit(1)
-                    .frame(height: 24)
                 messageLine("즐거운 지구 여행을 책임집니따.", color: bodyColor)
             case .destination:
                 messageLine("\(nickname),", color: nicknameColor)
                 messageLine("어디로 여행을 가볼까따?", color: bodyColor)
                 messageLine("말만 해주세따. 제가 다 도와드리게따.", color: bodyColor)
             case .friends:
-                messageLine("친구와 함께 가는 여행이라니 즐겁게따.", color: bodyColor)
                 messageLine("\(nickname),", color: nicknameColor)
+                messageLine("친구와 함께 가는 여행이라니 즐겁게따.", color: bodyColor)
                 messageLine("내가 성심성의껏 도와주게따.", color: bodyColor)
             }
         }

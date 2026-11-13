@@ -74,6 +74,7 @@ struct RootFeature: Reducer {
                     if state.isCompletingWithdrawal { return .none }
                     state.authenticatedUserID = nil
                     state.authenticationStatus = .unauthenticated
+                    state.home = HomeFeature.State()
                     return .none
                 }
 
@@ -107,6 +108,10 @@ struct RootFeature: Reducer {
                 return .none
 
             case .nicknameSetup(.delegate(.completed)):
+                let nickname = state.nicknameSetup.trimmedNickname
+                state.home.nickname = nickname
+                state.home.settings.nickname = nickname
+                state.home.settings.nicknameDraft = nickname
                 state.authenticationStatus = .authenticated
                 return .none
 

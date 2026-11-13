@@ -76,7 +76,7 @@ enum DevelopmentMockTripService {
 
         let batch = database.batch()
         let allTripIDs = trips.map(\.id)
-        let expiresAt = makeDate(year: 2030, month: 12, day: 31)
+        let expiresAt = Date().addingTimeInterval(72 * 60 * 60)
 
         for trip in trips {
             let tripReference = database.collection("trips").document(trip.id)
@@ -130,7 +130,7 @@ enum DevelopmentMockTripService {
                         "role": index == 0 ? "owner" : "member",
                         "status": "joined",
                         "selectedPlaces": places,
-                        "placeSelectionConfirmed": true,
+                        "placeSelectionConfirmed": false,
                         "groupingConfirmed": false,
                         "confirmedGroupIDs": [],
                         "joinedGroupIDs": [],

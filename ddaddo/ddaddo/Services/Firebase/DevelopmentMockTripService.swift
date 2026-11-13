@@ -319,7 +319,7 @@ private enum DevelopmentMockTripError: LocalizedError {
 
 private extension DevelopmentMockTripService {
     private static var mockTrips: [Trip] {
-        [tokyo, shanghai, newYork, paris, sydney]
+        [tokyo, shanghai, newYork, paris, sydney, vancouver]
     }
 
     private static func places(_ values: [(String, String, String)]) -> [Place] {
@@ -334,7 +334,7 @@ private extension DevelopmentMockTripService {
         destination: "도쿄",
         startDate: makeDate(year: 2026, month: 11, day: 24),
         endDate: makeDate(year: 2026, month: 11, day: 27),
-        transportation: "지하철",
+        transportation: Transportation.publicTransit.rawValue,
         maximumTravelMinutes: 30,
         memberPlaces: [
             places([
@@ -372,7 +372,7 @@ private extension DevelopmentMockTripService {
         destination: "상하이",
         startDate: makeDate(year: 2026, month: 12, day: 3),
         endDate: makeDate(year: 2026, month: 12, day: 6),
-        transportation: "지하철",
+        transportation: Transportation.publicTransit.rawValue,
         maximumTravelMinutes: 15,
         memberPlaces: [
             places([
@@ -406,7 +406,7 @@ private extension DevelopmentMockTripService {
         destination: "뉴욕",
         startDate: makeDate(year: 2027, month: 4, day: 12),
         endDate: makeDate(year: 2027, month: 4, day: 18),
-        transportation: "지하철",
+        transportation: Transportation.publicTransit.rawValue,
         maximumTravelMinutes: 60,
         memberPlaces: [
             places([
@@ -432,7 +432,7 @@ private extension DevelopmentMockTripService {
         destination: "파리",
         startDate: makeDate(year: 2027, month: 5, day: 10),
         endDate: makeDate(year: 2027, month: 5, day: 16),
-        transportation: "지하철",
+        transportation: Transportation.publicTransit.rawValue,
         maximumTravelMinutes: 60,
         memberPlaces: [
             places([
@@ -474,7 +474,7 @@ private extension DevelopmentMockTripService {
         destination: "시드니",
         startDate: makeDate(year: 2027, month: 3, day: 16),
         endDate: makeDate(year: 2027, month: 3, day: 21),
-        transportation: "자동차",
+        transportation: Transportation.car.rawValue,
         maximumTravelMinutes: 30,
         memberPlaces: [
             places([
@@ -500,6 +500,50 @@ private extension DevelopmentMockTripService {
                 ("스파이스 앨리", "맛집", "Kensington Street, Chippendale NSW"), ("맨리 워프", "맛집", "Belgrave Street, Manly NSW"),
                 ("더 록스 마켓", "맛집", "George Street, The Rocks NSW"), ("뉴타운 킹 스트리트", "맛집", "King Street, Newtown NSW"),
                 ("본다이 파머스 마켓", "맛집", "2–4 Wellington Street, Bondi NSW")
+            ])
+        ]
+    )
+
+    private static let vancouver = Trip(
+        id: "dev-seed-trip-vancouver",
+        inviteCode: "666666",
+        title: "5박 6일 밴쿠버 여행",
+        country: "캐나다",
+        destination: "밴쿠버",
+        startDate: makeDate(year: 2026, month: 12, day: 14),
+        endDate: makeDate(year: 2026, month: 12, day: 19),
+        transportation: Transportation.publicTransit.rawValue,
+        maximumTravelMinutes: 30,
+        memberPlaces: [
+            places([
+                ("밴쿠버 공립도서관 중앙관", "문화", "350 West Georgia Street, Vancouver, BC, Canada"),
+                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "1689 Johnston Street, Vancouver, BC, Canada"),
+                ("UBC 캠퍼스 메인 몰", "산책", "Main Mall, University of British Columbia, Vancouver, BC, Canada"),
+                ("UBC 인류학박물관", "문화", "6393 NW Marine Drive, Vancouver, BC, Canada"),
+                ("스탠리 파크", "자연", "Stanley Park, Vancouver, BC, Canada"),
+                ("잉글리시 베이 비치", "자연", "Beach Avenue & Denman Street, Vancouver, BC, Canada"),
+                ("캐나다 플레이스", "전망", "999 Canada Place, Vancouver, BC, Canada"),
+                ("쉽야즈 크리스마스 마켓", "축제", "125 Victory Ship Way, North Vancouver, BC, Canada")
+            ]),
+            places([
+                ("밴쿠버 공립도서관 중앙관", "문화", "350 West Georgia Street, Vancouver, BC, Canada"),
+                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "1689 Johnston Street, Vancouver, BC, Canada"),
+                ("넷 로프트", "쇼핑", "1666 Johnston Street, Vancouver, BC, Canada"),
+                ("롭슨 스트리트", "쇼핑", "Robson Street, Vancouver, BC, Canada"),
+                ("UBC 북스토어", "쇼핑", "6200 University Boulevard, Vancouver, BC, Canada"),
+                ("개스타운 워터 스트리트", "쇼핑", "Water Street, Vancouver, BC, Canada"),
+                ("론즈데일 키 마켓", "맛집", "123 Carrie Cates Court, North Vancouver, BC, Canada"),
+                ("쉽야즈 크리스마스 마켓", "축제", "125 Victory Ship Way, North Vancouver, BC, Canada")
+            ]),
+            places([
+                ("밴쿠버 공립도서관 중앙관", "문화", "350 West Georgia Street, Vancouver, BC, Canada"),
+                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "1689 Johnston Street, Vancouver, BC, Canada"),
+                ("UBC 인류학박물관", "문화", "6393 NW Marine Drive, Vancouver, BC, Canada"),
+                ("스탠리 파크", "자연", "Stanley Park, Vancouver, BC, Canada"),
+                ("개스타운 증기시계", "관광", "305 Water Street, Vancouver, BC, Canada"),
+                ("개스타운 워터 스트리트", "쇼핑", "Water Street, Vancouver, BC, Canada"),
+                ("론즈데일 키 마켓", "맛집", "123 Carrie Cates Court, North Vancouver, BC, Canada"),
+                ("쉽야즈 크리스마스 마켓", "축제", "125 Victory Ship Way, North Vancouver, BC, Canada")
             ])
         ]
     )

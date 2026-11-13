@@ -98,25 +98,13 @@ struct PlaceGroupingView: View {
             guard !Task.isCancelled else { return }
             store.send(.cancellationNoticeDismissed)
         }
-        .sheet(
-            isPresented: Binding(
-                get: { store.isTransportationSheetPresented },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.transportationSheetDismissed)
-                    }
-                }
-            )
-        ) {
-            TripSetUpTransportationView(
-                store: store.scope(
-                    state: \.transportationSheet,
-                    action: \.transportationSheet
-                )
-            )
-            .presentationDetents([.height(524)])
-            .presentationDragIndicator(.hidden)
+        .overlay {
+            if store.isTransportationSheetPresented {
+                transportationOverlay
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.22), value: store.isTransportationSheetPresented)
         .preferredColorScheme(.dark)
         .task {
             store.send(.onAppear)
@@ -124,6 +112,25 @@ struct PlaceGroupingView: View {
         .onDisappear {
             store.send(.onDisappear)
         }
+    }
+
+    private var transportationOverlay: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.55)
+
+                TripSetUpTransportationView(
+                    store: store.scope(
+                        state: \.transportationSheet,
+                        action: \.transportationSheet
+                    )
+                )
+                .frame(width: geometry.size.width + 2)
+                .frame(height: TripSetUpTransportationView.sheetHeight, alignment: .top)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .ignoresSafeArea()
     }
 
     private var tripHeader: some View {

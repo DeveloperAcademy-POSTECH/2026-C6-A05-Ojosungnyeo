@@ -52,27 +52,6 @@ struct TripSetUpView: View {
                     WaitingForParticipantsView(store: waitingStore)
                 }
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { store.isTransportationSheetPresented },
-                    set: { isPresented in
-                        if !isPresented {
-                            store.send(.transportationSheetDismissed)
-                        }
-                    }
-                )
-            ) {
-                TripSetUpTransportationView(
-                    store: store.scope(
-                        state: \.transportationSheet,
-                        action: \.transportationSheet
-                    )
-                )
-                .presentationDetents([.height(524)])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(40)
-                .presentationBackground(DDColor.surfaceDefault)
-            }
         }
         .overlay {
             if store.isDatePickerPresented {
@@ -81,6 +60,13 @@ struct TripSetUpView: View {
             }
         }
         .animation(.easeOut(duration: 0.22), value: store.isDatePickerPresented)
+        .overlay {
+            if store.isTransportationSheetPresented {
+                transportationOverlay
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.22), value: store.isTransportationSheetPresented)
         .allowsHitTesting(
             !store.isConfirmationAlertPresented && store.creationErrorMessage == nil
         )
@@ -121,6 +107,25 @@ struct TripSetUpView: View {
                 // background, not the presenting view, owns the screen edge.
                 .frame(width: geometry.size.width + 2)
                 .frame(height: TripDatePickerView.sheetHeight, alignment: .top)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .ignoresSafeArea()
+    }
+
+    private var transportationOverlay: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.55)
+
+                TripSetUpTransportationView(
+                    store: store.scope(
+                        state: \.transportationSheet,
+                        action: \.transportationSheet
+                    )
+                )
+                .frame(width: geometry.size.width + 2)
+                .frame(height: TripSetUpTransportationView.sheetHeight, alignment: .top)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
@@ -313,6 +318,17 @@ struct TripSetUpView: View {
     var state = TripSetUpFeature.State(selectedCities: [.previewTokyo])
     state.isDatePickerPresented = true
     state.draftStartDate = previewTripDate(year: 2026, month: 11, day: 13)
+
+    return TripSetUpView(
+        store: Store(initialState: state) {
+            TripSetUpFeature()
+        }
+    )
+}
+
+#Preview("TripSetUpView_Transportation") {
+    var state = TripSetUpFeature.State(selectedCities: [.previewTokyo])
+    state.isTransportationSheetPresented = true
 
     return TripSetUpView(
         store: Store(initialState: state) {

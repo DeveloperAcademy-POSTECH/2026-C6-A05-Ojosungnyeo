@@ -170,7 +170,7 @@ struct HomeFeature: Reducer {
                 state.tripItinerary.timeTable.tripStartDate = source.tripStartDate
                 state.tripItinerary.timeTable.tripEndDate = source.tripEndDate
                 state.tripItinerary.timeTable.recommendationTripID = source.tripID
-                state.tripItinerary.timeTable.recommendations = state.placeGrouping.recommendedGroups
+                let recommendations = state.placeGrouping.recommendedGroups
                     .filter { state.placeGrouping.confirmedGroupIDs.contains($0.id) }
                     .flatMap { group in
                         group.places.map { place in
@@ -193,7 +193,25 @@ struct HomeFeature: Reducer {
                             )
                         }
                     }
-                return .none
+                state.tripItinerary.timeTable.recommendations = recommendations
+                let tripID = source.tripID
+                let snapshots = recommendations.map {
+                    TripRecommendationSnapshot(
+                        id: $0.id,
+                        groupID: $0.groupID,
+                        placeID: $0.placeID,
+                        placeName: $0.placeName,
+                        category: $0.category,
+                        groupCategories: $0.groupCategories,
+                        memberIDs: $0.memberIDs,
+                        placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
+                        latitude: $0.latitude,
+                        longitude: $0.longitude
+                    )
+                }
+                return .run { _ in
+                    try? await tripClient.saveRecommendations(tripID, snapshots)
+                }
 
             case .placeGrouping(.delegate(.proceedToItinerary)):
                 let waiting = state.placeGrouping.waitingForConfirmation

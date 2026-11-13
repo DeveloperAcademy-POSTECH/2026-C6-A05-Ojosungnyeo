@@ -888,7 +888,8 @@ private enum PlaceGroupingEngine {
             while let index = queue.popLast() {
                 region.append(places[index])
                 for candidate in places.indices where !visited.contains(candidate) {
-                    if distance(places[index].place, places[candidate].place) <= maximumDistance {
+                    if isSamePlace(places[index].place, places[candidate].place)
+                        || distance(places[index].place, places[candidate].place) <= maximumDistance {
                         visited.insert(candidate)
                         queue.append(candidate)
                     }
@@ -921,6 +922,25 @@ private enum PlaceGroupingEngine {
             .distance(from: CLLocation(latitude: rhs.latitude, longitude: rhs.longitude))
     }
 
+    private static func isSamePlace(_ lhs: PinnedPlace, _ rhs: PinnedPlace) -> Bool {
+        if lhs.id == rhs.id { return true }
+
+        let lhsName = normalizedPlaceName(lhs.name)
+        let rhsName = normalizedPlaceName(rhs.name)
+        return !lhsName.isEmpty
+            && lhsName == rhsName
+            && distance(lhs, rhs) <= 500
+    }
+
+    private static func normalizedPlaceName(_ value: String) -> String {
+        value
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .unicodeScalars
+            .filter(CharacterSet.alphanumerics.contains)
+            .map(String.init)
+            .joined()
+    }
+
     private static func regionRadius(_ places: [PinnedPlace]) -> Double {
         guard !places.isEmpty else { return 800 }
         let latitude = places.map(\.latitude).reduce(0, +) / Double(places.count)
@@ -932,8 +952,10 @@ private enum PlaceGroupingEngine {
     }
 
     private static func unique(_ places: [PinnedPlace]) -> [PinnedPlace] {
-        var ids = Set<String>()
-        return places.filter { ids.insert($0.id).inserted }
+        places.reduce(into: [PinnedPlace]()) { result, place in
+            guard !result.contains(where: { isSamePlace($0, place) }) else { return }
+            result.append(place)
+        }
     }
 
     private static func courseName(

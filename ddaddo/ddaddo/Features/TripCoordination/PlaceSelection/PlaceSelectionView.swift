@@ -190,6 +190,7 @@ struct PlaceSelectionView: View {
             store.completionAlert == nil
                 && store.pendingDeletionPlaceID == nil
                 && store.placeSyncErrorMessage == nil
+                && store.destinationValidationMessage == nil
         )
         .overlay {
             if store.pendingDeletionPlaceID != nil {
@@ -222,6 +223,30 @@ struct PlaceSelectionView: View {
                     confirmTitle: "확인",
                     onConfirm: { store.send(.placeSyncErrorDismissed) }
                 )
+            } else if let message = store.destinationValidationMessage {
+                if store.canOverrideDestinationValidation {
+                    DDAlertOverlay(
+                        title: "여행지와 다른 장소예요",
+                        message: message,
+                        cancelTitle: "취소",
+                        confirmTitle: "그래도 추가",
+                        onCancel: {
+                            store.send(.destinationValidationCancelButtonTapped)
+                        },
+                        onConfirm: {
+                            store.send(.destinationValidationConfirmButtonTapped)
+                        }
+                    )
+                } else {
+                    DDAlertOverlay(
+                        title: "장소를 확인할 수 없어요",
+                        message: message,
+                        confirmTitle: "확인",
+                        onConfirm: {
+                            store.send(.destinationValidationConfirmButtonTapped)
+                        }
+                    )
+                }
             }
         }
     }

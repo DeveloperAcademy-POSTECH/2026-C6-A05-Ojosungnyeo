@@ -54,28 +54,6 @@ struct TripSetUpView: View {
             }
             .sheet(
                 isPresented: Binding(
-                    get: { store.isDatePickerPresented },
-                    set: { isPresented in
-                        if !isPresented {
-                            store.send(.tripDatePickerCloseButtonTapped)
-                        }
-                    }
-                )
-            ) {
-                TripDatePickerView(
-                    selectedStartDate: store.draftStartDate,
-                    selectedEndDate: store.draftEndDate,
-                    onDateSelected: { store.send(.tripDateTapped($0)) },
-                    onClose: { store.send(.tripDatePickerCloseButtonTapped) },
-                    onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
-                )
-                .presentationDetents([.height(526)])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(36)
-                .presentationBackground(DDColor.surfaceDefault)
-            }
-            .sheet(
-                isPresented: Binding(
                     get: { store.isTransportationSheetPresented },
                     set: { isPresented in
                         if !isPresented {
@@ -96,6 +74,13 @@ struct TripSetUpView: View {
                 .presentationBackground(DDColor.surfaceDefault)
             }
         }
+        .overlay {
+            if store.isDatePickerPresented {
+                datePickerOverlay
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.22), value: store.isDatePickerPresented)
         .allowsHitTesting(
             !store.isConfirmationAlertPresented && store.creationErrorMessage == nil
         )
@@ -118,6 +103,28 @@ struct TripSetUpView: View {
                 )
             }
         }
+    }
+
+    private var datePickerOverlay: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.55)
+
+                TripDatePickerView(
+                    selectedStartDate: store.draftStartDate,
+                    selectedEndDate: store.draftEndDate,
+                    onDateSelected: { store.send(.tripDateTapped($0)) },
+                    onClose: { store.send(.tripDatePickerCloseButtonTapped) },
+                    onConfirm: { store.send(.tripDatePickerConfirmButtonTapped) }
+                )
+                // Extend one point past both horizontal edges so the sheet's
+                // background, not the presenting view, owns the screen edge.
+                .frame(width: geometry.size.width + 2)
+                .frame(height: TripDatePickerView.sheetHeight, alignment: .top)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .ignoresSafeArea()
     }
 
     private var header: some View {
@@ -300,6 +307,24 @@ struct TripSetUpView: View {
             TripSetUpFeature()
         }
     )
+}
+
+#Preview("TripSetUpView_DatePicker") {
+    var state = TripSetUpFeature.State(selectedCities: [.previewTokyo])
+    state.isDatePickerPresented = true
+    state.draftStartDate = previewTripDate(year: 2026, month: 11, day: 13)
+
+    return TripSetUpView(
+        store: Store(initialState: state) {
+            TripSetUpFeature()
+        }
+    )
+}
+
+private func previewTripDate(year: Int, month: Int, day: Int) -> Date {
+    Calendar(identifier: .gregorian).date(
+        from: DateComponents(year: year, month: month, day: day)
+    ) ?? Date()
 }
 
 private extension TripDestination {

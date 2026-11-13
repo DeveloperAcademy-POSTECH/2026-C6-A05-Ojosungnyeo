@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct TripDatePickerView: View {
+    static let sheetHeight: CGFloat = 480
+
     enum SelectionMode {
         case range
         case single
@@ -64,14 +66,56 @@ struct TripDatePickerView: View {
             calendarView
             Spacer(minLength: DDSpacing.zero)
         }
-        .frame(height: 526)
-        .frame(maxWidth: .infinity)
+        .frame(height: Self.sheetHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(DDColor.surfaceDefault)
-        .overlay {
-            RoundedRectangle(cornerRadius: 36)
-                .stroke(DDColor.borderDefault, lineWidth: 1)
+        .clipShape(
+            .rect(
+                topLeadingRadius: 40,
+                topTrailingRadius: 40
+            )
+        )
+        .overlay(alignment: .top) {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 40,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 40
+            )
+            .strokeBorder(
+                Color(
+                    red: 74 / 255,
+                    green: 74 / 255,
+                    blue: 74 / 255
+                ),
+                lineWidth: 1
+            )
+            .frame(height: Self.sheetHeight + 120)
+            .allowsHitTesting(false)
         }
-        .clipShape(.rect(topLeadingRadius: 36, topTrailingRadius: 36))
+        .overlay(alignment: .topLeading) {
+            if isMonthYearPickerPresented {
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isMonthYearPickerPresented = false
+                        }
+
+                    monthYearPicker
+                        .offset(x: 34, y: 125)
+                        .transition(
+                            .opacity.combined(
+                                with: .scale(scale: 0.98, anchor: .topLeading)
+                            )
+                        )
+                }
+                .zIndex(1)
+            }
+        }
+        .ddFillBottomSheetToScreenEdge()
+        .ignoresSafeArea(edges: .bottom)
+        .animation(.easeOut(duration: 0.16), value: isMonthYearPickerPresented)
     }
 
     private var grabber: some View {
@@ -106,15 +150,17 @@ struct TripDatePickerView: View {
             .disabled(!isSelectionComplete)
             .accessibilityLabel("여행 날짜 확정")
         }
-        .padding(.horizontal, DDSpacing.large)
+        .padding(.horizontal, 20)
         .padding(.top, DDSpacing.small)
         .padding(.bottom, DDSpacing.large)
     }
 
     private var calendarView: some View {
-        VStack(spacing: DDSpacing.medium) {
+        VStack(spacing: DDSpacing.zero) {
             monthNavigation
+                .padding(.bottom, 6)
             weekdayHeader
+                .padding(.bottom, 7)
 
             VStack(spacing: 6) {
                 ForEach(Array(monthWeeks(for: displayedMonth).enumerated()), id: \.offset) { _, week in
@@ -122,7 +168,7 @@ struct TripDatePickerView: View {
                 }
             }
         }
-        .padding(.horizontal, DDSpacing.xLarge)
+        .padding(.horizontal, 28)
     }
 
     private var monthNavigation: some View {
@@ -136,10 +182,6 @@ struct TripDatePickerView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("연도와 월 선택")
-            .popover(isPresented: $isMonthYearPickerPresented, arrowEdge: .top) {
-                monthYearPicker
-                    .presentationCompactAdaptation(.popover)
-            }
 
             Spacer()
 
@@ -157,41 +199,70 @@ struct TripDatePickerView: View {
                 )
             }
         }
-        .frame(height: 32)
+        .frame(height: 43)
+        .padding(.horizontal, 4)
     }
 
     private var monthYearPicker: some View {
-        HStack(spacing: DDSpacing.zero) {
-            Picker("연도", selection: displayedYearBinding) {
-                ForEach(availableYears, id: \.self) { year in
-                    Text(verbatim: "\(year)년")
-                        .tag(year)
-                }
-            }
-            .pickerStyle(.wheel)
-            .labelsHidden()
-            .frame(width: 120)
+        VStack(spacing: DDSpacing.zero) {
+            HStack(spacing: DDSpacing.small) {
+                Text("연도와 월 선택")
+                    .ddTypography(.heading18)
+                    .foregroundStyle(DDColor.textPrimary)
 
-            Picker("월", selection: displayedMonthBinding) {
-                ForEach(availableMonths(for: displayedYear), id: \.self) { month in
-                    Text("\(month)월")
-                        .tag(month)
+                Spacer(minLength: DDSpacing.zero)
+
+                Button {
+                    isMonthYearPickerPresented = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(DDColor.textSecondary)
+                        .frame(width: 17, height: 20)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("연도와 월 선택 닫기")
             }
-            .pickerStyle(.wheel)
-            .labelsHidden()
-            .frame(width: 120)
+            .frame(height: 24)
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+
+            HStack(spacing: 15) {
+                MonthYearWheel(
+                    values: availableYears,
+                    selection: displayedYearBinding,
+                    suffix: "년"
+                )
+
+                MonthYearWheel(
+                    values: availableMonths(for: displayedYear),
+                    selection: displayedMonthBinding,
+                    suffix: "월"
+                )
+            }
+            .padding(.top, 20)
+
+            Spacer(minLength: DDSpacing.zero)
         }
-        .frame(width: 300, height: 156, alignment: .center)
-        .clipped()
-        .background(DDColor.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(width: 300, height: 230, alignment: .top)
+        .background {
+            MonthYearPopoverShape()
+                .fill(DDColor.surfaceElevated)
+        }
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(DDColor.borderDefault, lineWidth: 1)
+            MonthYearPopoverShape()
+                .stroke(
+                    Color(
+                        red: 74 / 255,
+                        green: 74 / 255,
+                        blue: 74 / 255
+                    ),
+                    lineWidth: 1
+                )
+                .allowsHitTesting(false)
         }
-        .presentationBackground(DDColor.surfaceElevated)
-        .presentationCornerRadius(20)
+        .contentShape(MonthYearPopoverShape())
         .preferredColorScheme(.dark)
     }
 
@@ -205,6 +276,7 @@ struct TripDatePickerView: View {
             }
         }
         .frame(height: 20)
+        .padding(.horizontal, 4)
     }
 
     private func monthNavigationButton(
@@ -589,6 +661,99 @@ struct TripDatePickerView: View {
     }
 }
 
+private struct MonthYearWheel: View {
+    let values: [Int]
+    @Binding var selection: Int
+    let suffix: String
+
+    @State private var scrollPosition: Int?
+
+    var body: some View {
+        ScrollView(.vertical) {
+            LazyVStack(spacing: 0) {
+                ForEach(values, id: \.self) { value in
+                    Text(verbatim: "\(value)\(suffix)")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(
+                            value == selection
+                                ? DDColor.textPrimary
+                                : DDColor.textTertiary
+                        )
+                        .frame(width: 97, height: 32)
+                        .id(value)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .contentMargins(.vertical, 32, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $scrollPosition, anchor: .center)
+        .frame(width: 97, height: 96)
+        .background(alignment: .center) {
+            Capsule()
+                .fill(
+                    Color(
+                        red: 53 / 255,
+                        green: 53 / 255,
+                        blue: 53 / 255
+                    )
+                )
+                .frame(width: 97, height: 32)
+        }
+        .clipped()
+        .onAppear {
+            scrollPosition = selection
+        }
+        .onChange(of: scrollPosition) { _, newValue in
+            guard let newValue, values.contains(newValue) else { return }
+            selection = newValue
+        }
+        .onChange(of: selection) { _, newValue in
+            guard scrollPosition != newValue else { return }
+            scrollPosition = newValue
+        }
+    }
+}
+
+private struct MonthYearPopoverShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let bodyTop: CGFloat = 14
+        let cornerRadius: CGFloat = 20
+        let tailStartX: CGFloat = 53
+        let tailTipX: CGFloat = 63
+        let tailEndX: CGFloat = 73
+
+        var path = Path()
+        path.move(to: CGPoint(x: cornerRadius, y: bodyTop))
+        path.addLine(to: CGPoint(x: tailStartX, y: bodyTop))
+        path.addLine(to: CGPoint(x: tailTipX, y: 0))
+        path.addLine(to: CGPoint(x: tailEndX, y: bodyTop))
+        path.addLine(to: CGPoint(x: rect.width - cornerRadius, y: bodyTop))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.width, y: bodyTop + cornerRadius),
+            control: CGPoint(x: rect.width, y: bodyTop)
+        )
+        path.addLine(to: CGPoint(x: rect.width, y: rect.height - cornerRadius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.width - cornerRadius, y: rect.height),
+            control: CGPoint(x: rect.width, y: rect.height)
+        )
+        path.addLine(to: CGPoint(x: cornerRadius, y: rect.height))
+        path.addQuadCurve(
+            to: CGPoint(x: 0, y: rect.height - cornerRadius),
+            control: CGPoint(x: 0, y: rect.height)
+        )
+        path.addLine(to: CGPoint(x: 0, y: bodyTop + cornerRadius))
+        path.addQuadCurve(
+            to: CGPoint(x: cornerRadius, y: bodyTop),
+            control: CGPoint(x: 0, y: bodyTop)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
 private enum WeekHighlight: Equatable {
     case single(Int)
     case range(WeekSelection)
@@ -620,35 +785,45 @@ private func previewDate(year: Int, month: Int, day: Int) -> Date {
 }
 
 #Preview("시작일 선택") {
-    ZStack(alignment: .bottom) {
-        Color.black.opacity(0.7)
-            .ignoresSafeArea()
+    GeometryReader { geometry in
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.7)
 
-        TripDatePickerView(
-            selectedStartDate: previewDate(year: 2026, month: 10, day: 20),
-            selectedEndDate: nil,
-            today: previewDate(year: 2026, month: 10, day: 8),
-            onDateSelected: { _ in },
-            onClose: {},
-            onConfirm: {}
-        )
+            TripDatePickerView(
+                selectedStartDate: previewDate(year: 2026, month: 10, day: 20),
+                selectedEndDate: nil,
+                today: previewDate(year: 2026, month: 10, day: 8),
+                onDateSelected: { _ in },
+                onClose: {},
+                onConfirm: {}
+            )
+            .frame(width: geometry.size.width + 2)
+            .frame(height: TripDatePickerView.sheetHeight, alignment: .top)
+        }
+        .frame(width: geometry.size.width, height: geometry.size.height)
     }
+    .ignoresSafeArea()
     .preferredColorScheme(.dark)
 }
 
 #Preview("범위 선택 완료") {
-    ZStack(alignment: .bottom) {
-        Color.black.opacity(0.7)
-            .ignoresSafeArea()
+    GeometryReader { geometry in
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.7)
 
-        TripDatePickerView(
-            selectedStartDate: previewDate(year: 2026, month: 10, day: 20),
-            selectedEndDate: previewDate(year: 2026, month: 10, day: 25),
-            today: previewDate(year: 2026, month: 10, day: 5),
-            onDateSelected: { _ in },
-            onClose: {},
-            onConfirm: {}
-        )
+            TripDatePickerView(
+                selectedStartDate: previewDate(year: 2026, month: 10, day: 20),
+                selectedEndDate: previewDate(year: 2026, month: 10, day: 25),
+                today: previewDate(year: 2026, month: 10, day: 5),
+                onDateSelected: { _ in },
+                onClose: {},
+                onConfirm: {}
+            )
+            .frame(width: geometry.size.width + 2)
+            .frame(height: TripDatePickerView.sheetHeight, alignment: .top)
+        }
+        .frame(width: geometry.size.width, height: geometry.size.height)
     }
+    .ignoresSafeArea()
     .preferredColorScheme(.dark)
 }

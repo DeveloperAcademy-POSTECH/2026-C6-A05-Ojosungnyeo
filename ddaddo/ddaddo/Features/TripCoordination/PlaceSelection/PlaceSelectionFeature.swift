@@ -7,9 +7,15 @@
 
 import ComposableArchitecture
 import CoreGraphics
+import CoreLocation
 import Foundation
 
 struct PlaceSelectionFeature: Reducer {
+    struct DestinationCoordinate: Equatable {
+        let latitude: Double
+        let longitude: Double
+    }
+
     enum Delegate: Equatable {
         case proceedToAnalysis
         case returnToInvitation
@@ -79,6 +85,9 @@ struct PlaceSelectionFeature: Reducer {
         var completionAlert: CompletionAlert?
         var pendingDeletionPlaceID: String?
         var placeSyncErrorMessage: String?
+        var destinationCoordinate: DestinationCoordinate?
+        var destinationValidationMessage: String?
+        var canOverrideDestinationValidation = false
         var requestedPhotoPlaceIDs: Set<String> = []
         var hasRestoredSavedPlacesPresentation = false
         var placeSearch = PlaceSearchFeature.State()
@@ -362,6 +371,8 @@ struct PlaceSelectionFeature: Reducer {
         case placePhotoResponse(String, [Data])
         case placeMutationFailed(String)
         case placeSyncErrorDismissed
+        case destinationValidationCancelButtonTapped
+        case destinationValidationConfirmButtonTapped
         case backButtonTapped
         case searchFieldTapped
         case searchTextChanged(String)
@@ -385,7 +396,7 @@ struct PlaceSelectionFeature: Reducer {
         case completionAlertConfirmButtonTapped
         case timerTicked
         case moveCriteriaButtonTapped
-        case placeDetailsResponse(PlaceDetails)
+        case placeDetailsResponse(PlaceDetails, DestinationCoordinate)
         case placeDetailsFailed
         case searchDismissed
         case placeSearch(PlaceSearchFeature.Action)
@@ -535,6 +546,23 @@ struct PlaceSelectionFeature: Reducer {
 
             case .placeSyncErrorDismissed:
                 state.placeSyncErrorMessage = nil
+                return .none
+
+            case .destinationValidationCancelButtonTapped:
+                state.destinationValidationMessage = nil
+                state.canOverrideDestinationValidation = false
+                state.selectedPlace = nil
+                state.searchText = ""
+                state.isMemberPlacesSheetPresented = true
+                return .none
+
+            case .destinationValidationConfirmButtonTapped:
+                let shouldAddPlace = state.canOverrideDestinationValidation
+                state.destinationValidationMessage = nil
+                state.canOverrideDestinationValidation = false
+                if shouldAddPlace {
+                    return .send(.addSelectedPlaceButtonTapped)
+                }
                 return .none
 
             case .backButtonTapped:
@@ -803,15 +831,35 @@ struct PlaceSelectionFeature: Reducer {
             case .moveCriteriaButtonTapped:
                 return .none
 
-            case let .placeDetailsResponse(details):
+            case let .placeDetailsResponse(details, destinationCoordinate):
                 guard state.selectedPinnedPlace == nil else { return .none }
+                state.destinationCoordinate = destinationCoordinate
                 state.selectedPlace = details
                 state.isPlaceDetailsLoading = false
+
+                let destinationLocation = CLLocation(
+                    latitude: destinationCoordinate.latitude,
+                    longitude: destinationCoordinate.longitude
+                )
+                let placeLocation = CLLocation(
+                    latitude: details.latitude,
+                    longitude: details.longitude
+                )
+                guard destinationLocation.distance(from: placeLocation) <= 100_000 else {
+                    state.canOverrideDestinationValidation = true
+                    state.destinationValidationMessage = "\(state.destinationName) 여행지와 먼 장소예요. 그래도 추가할까요?"
+                    return .none
+                }
                 return .none
 
             case .placeDetailsFailed:
                 guard state.selectedPinnedPlace == nil else { return .none }
                 state.isPlaceDetailsLoading = false
+                state.selectedPlace = nil
+                state.searchText = ""
+                state.isMemberPlacesSheetPresented = true
+                state.canOverrideDestinationValidation = false
+                state.destinationValidationMessage = "장소의 위치를 확인하지 못했어요. 다른 장소를 선택해 주세요."
                 return .none
 
             case .searchDismissed, .placeSearch(.delegate(.close)):
@@ -835,9 +883,30 @@ struct PlaceSelectionFeature: Reducer {
                     longitude: 139.6500,
                     photoData: []
                 )
+                let destinationName = state.destinationName
+                let cachedDestinationCoordinate = state.destinationCoordinate
                 return .run { send in
                     do {
-                        await send(.placeDetailsResponse(try await placeClient.fetchDetails(result)))
+                        let details = try await placeClient.fetchDetails(result)
+                        let destinationCoordinate: DestinationCoordinate
+                        if let cachedDestinationCoordinate {
+                            destinationCoordinate = cachedDestinationCoordinate
+                        } else {
+                            guard let destinationResult = try await placeClient
+                                .autocomplete("\(destinationName) 도시 중심")
+                                .first
+                            else {
+                                throw PlaceSelectionValidationError.destinationNotFound
+                            }
+                            let destinationDetails = try await placeClient.fetchDetails(
+                                destinationResult
+                            )
+                            destinationCoordinate = DestinationCoordinate(
+                                latitude: destinationDetails.latitude,
+                                longitude: destinationDetails.longitude
+                            )
+                        }
+                        await send(.placeDetailsResponse(details, destinationCoordinate))
                     } catch {
                         await send(.placeDetailsFailed)
                     }
@@ -920,4 +989,8 @@ struct PlaceSelectionFeature: Reducer {
             }
         }
     }
+}
+
+private enum PlaceSelectionValidationError: Error {
+    case destinationNotFound
 }

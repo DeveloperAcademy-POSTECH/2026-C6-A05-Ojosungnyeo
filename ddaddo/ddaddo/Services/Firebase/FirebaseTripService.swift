@@ -477,6 +477,9 @@ enum FirebaseTripService {
             if let branchGroupID = schedule.branchGroupID {
                 data["branchGroupID"] = branchGroupID
             }
+            if let recommendationGroupID = schedule.recommendationGroupID {
+                data["recommendationGroupID"] = recommendationGroupID
+            }
             return data
         }
 
@@ -642,7 +645,8 @@ enum FirebaseTripService {
                 courseID: courseID,
                 day: day,
                 startMinuteOfDay: startMinute,
-                branchGroupID: data["branchGroupID"] as? Int
+                branchGroupID: data["branchGroupID"] as? Int,
+                recommendationGroupID: data["recommendationGroupID"] as? String
             )
         }
         let recommendations: [TripRecommendationSnapshot] =

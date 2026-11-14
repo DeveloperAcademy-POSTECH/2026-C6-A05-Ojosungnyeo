@@ -114,6 +114,11 @@ struct HomeView: View {
                 SettingsView(store: store.scope(state: \.settings, action: \.settings))
                     .transition(.move(edge: .trailing))
             }
+
+            if store.isSavingRecommendations {
+                LoadingView(message: "추천 그룹을 저장 중...")
+                    .zIndex(6)
+            }
         }
         .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
@@ -143,6 +148,15 @@ struct HomeView: View {
                     message: message,
                     confirmTitle: "확인",
                     onConfirm: { store.send(.withdrawalErrorDismissed) }
+                )
+            } else if let message = store.recommendationSaveErrorMessage {
+                DDAlertOverlay(
+                    title: "추천 그룹을 저장할 수 없어요",
+                    message: message,
+                    cancelTitle: "나중에",
+                    confirmTitle: "다시 시도",
+                    onCancel: { store.send(.recommendationsSaveErrorDismissed) },
+                    onConfirm: { store.send(.retryRecommendationsSaveTapped) }
                 )
             }
         }

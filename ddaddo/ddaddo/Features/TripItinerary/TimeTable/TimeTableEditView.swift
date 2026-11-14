@@ -204,9 +204,14 @@ private struct TimeTableEditContent: View {
         .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
         .overlay {
             GeometryReader { proxy in
+                insertionIndicatorsOverlay
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+            .allowsHitTesting(false)
+        }
+        .overlay {
+            GeometryReader { proxy in
                 ZStack {
-                    insertionIndicatorsOverlay
-
                     if let dragging, let dragLocation {
                         dragPreview(dragging)
                             .position(
@@ -562,14 +567,19 @@ private struct TimeTableEditContent: View {
             .frame(width: 2)
     }
 
+    private func insertionIndicatorWidth(for frame: CGRect) -> CGFloat {
+        max(0, frame.width - 48 - DDSpacing.large)
+    }
+
     @ViewBuilder
     private var insertionIndicatorsOverlay: some View {
         if let targetedRowID,
+           targetedRowID != draggedRowID,
            let frame = dropFrames["row:\(targetedRowID)"] {
             insertionIndicator
-                .frame(width: max(0, frame.width - 48 - DDSpacing.large))
+                .frame(width: insertionIndicatorWidth(for: frame))
                 .position(
-                    x: frame.minX + 48 + (frame.width - 48 - DDSpacing.large) / 2,
+                    x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
                     y: frame.minY - DDSpacing.small
                 )
                 .zIndex(2)
@@ -578,9 +588,9 @@ private struct TimeTableEditContent: View {
             if let lastRow = rows.last,
                let frame = dropFrames["row:\(lastRow.id)"] {
                 insertionIndicator
-                    .frame(width: max(0, frame.width - 48 - DDSpacing.large))
+                    .frame(width: insertionIndicatorWidth(for: frame))
                     .position(
-                        x: frame.minX + 48 + (frame.width - 48 - DDSpacing.large) / 2,
+                        x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
                         y: frame.maxY + DDSpacing.small
                     )
                     .zIndex(2)
@@ -700,7 +710,9 @@ private struct TimeTableEditContent: View {
             case .recommendation:
                 target = .merge(row.id)
             case .row:
-                target = location.x >= frame.midX ? .merge(row.id) : .row(row.id)
+                target = location.x >= frame.midX && canMergeDraggedItem(into: row.id)
+                    ? .merge(row.id)
+                    : .row(row.id)
             case nil:
                 target = .row(row.id)
             }

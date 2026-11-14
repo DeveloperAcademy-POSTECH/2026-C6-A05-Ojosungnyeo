@@ -128,8 +128,16 @@ private struct TimeTableEditContent: View {
         draggedRowID != nil
     }
 
-    private var availableRecommendationGroups: [ConfirmedRecommendationGroup] {
-        let placedGroupIDs = timeTableStore.placedRecommendationGroupIDs
+    private func availableRecommendationGroups(
+        rowsByDay: [TripDay: [TimeTableEditRow]]
+    ) -> [ConfirmedRecommendationGroup] {
+        let placedGroupIDs = Set(rowsByDay.values
+            .flatMap { $0 }
+            .flatMap(\.sources)
+            .compactMap { source -> String? in
+                guard case let .recommendationGroup(groupID) = source else { return nil }
+                return groupID
+            })
         let orderedGroupIDs = timeTableStore.recommendations.reduce(into: [String]()) { result, item in
             guard !result.contains(item.groupID) else { return }
             result.append(item.groupID)
@@ -303,30 +311,32 @@ private struct TimeTableEditContent: View {
     }
 
     private var recommendationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("추천 그룹 추가하기")
-                .ddTypography(.bodyEmphasis16)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.leading, DDSpacing.large)
+        WithViewStore(timeTableStore, observe: \.edit.rowsByDay) { viewStore in
+            VStack(alignment: .leading, spacing: 10) {
+                Text("추천 그룹 추가하기")
+                    .ddTypography(.bodyEmphasis16)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .padding(.leading, DDSpacing.large)
 
-            ScrollView(.horizontal) {
-                HStack(spacing: DDSpacing.large) {
-                    ForEach(availableRecommendationGroups) { group in
-                        editCard(
-                            title: group.title,
-                            subtitle: group.category,
-                            memberIDs: group.memberIDs,
-                            width: 200,
-                            drag: .recommendation(group.id)
-                        )
-                        .opacity(dragging == .recommendation(group.id) ? 0 : 1)
+                ScrollView(.horizontal) {
+                    HStack(spacing: DDSpacing.large) {
+                        ForEach(availableRecommendationGroups(rowsByDay: viewStore.state)) { group in
+                            editCard(
+                                title: group.title,
+                                subtitle: group.category,
+                                memberIDs: group.memberIDs,
+                                width: 200,
+                                drag: .recommendation(group.id)
+                            )
+                            .opacity(dragging == .recommendation(group.id) ? 0 : 1)
+                        }
                     }
+                    .padding(.horizontal, DDSpacing.large)
                 }
-                .padding(.horizontal, DDSpacing.large)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .padding(.top, DDSpacing.large)
         }
-        .padding(.top, DDSpacing.large)
     }
 
     private var scheduleSection: some View {

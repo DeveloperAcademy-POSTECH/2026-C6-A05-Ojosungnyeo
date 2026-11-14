@@ -126,6 +126,16 @@ struct TimeTableFeature: Reducer {
             }
         }
 
+        var placedRecommendationGroupIDs: Set<String> {
+            Set(edit.rowsByDay.values
+                .flatMap { $0 }
+                .flatMap(\.sources)
+                .compactMap { source -> String? in
+                    guard case let .recommendationGroup(groupID) = source else { return nil }
+                    return groupID
+                })
+        }
+
         var timeSelectionCourseIDs: [TimeTableCourse.ID]? {
             guard let day = edit.editingDay, day == selectedDay else { return nil }
 
@@ -452,9 +462,7 @@ struct TimeTableFeature: Reducer {
 
             case let .edit(.recommendationDropped(id, before: targetID)):
                 guard state.recommendations.contains(where: { $0.groupID == id }),
-                      !state.edit.rowsByDay.values.flatMap({ $0 }).contains(where: {
-                          $0.sources.contains(.recommendationGroup(id))
-                      }) else { return .none }
+                      !state.placedRecommendationGroupIDs.contains(id) else { return .none }
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 let row = TimeTableEditRow(id: "recommendation-\(id)", sources: [.recommendationGroup(id)])
                 let index = targetID.flatMap { targetID in
@@ -491,9 +499,7 @@ struct TimeTableFeature: Reducer {
 
             case let .edit(.recommendationMerged(groupID, into: targetID)):
                 guard let recommendation = state.recommendations.first(where: { $0.groupID == groupID }),
-                      !state.edit.rowsByDay.values.flatMap({ $0 }).contains(where: {
-                          $0.sources.contains(.recommendationGroup(groupID))
-                      }) else { return .none }
+                      !state.placedRecommendationGroupIDs.contains(groupID) else { return .none }
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 guard let index = rows.firstIndex(where: { $0.id == targetID }),
                       let targetMembers = Self.memberIDs(for: rows[index], state: state),

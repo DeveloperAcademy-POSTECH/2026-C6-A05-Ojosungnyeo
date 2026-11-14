@@ -129,15 +129,7 @@ private struct TimeTableEditContent: View {
     }
 
     private var availableRecommendationGroups: [ConfirmedRecommendationGroup] {
-        let placedGroupIDs = Set(
-            store.rowsByDay.values
-                .flatMap { $0 }
-                .flatMap(\.sources)
-                .compactMap { source -> String? in
-                    guard case let .recommendationGroup(groupID) = source else { return nil }
-                    return groupID
-                }
-        )
+        let placedGroupIDs = timeTableStore.placedRecommendationGroupIDs
         let orderedGroupIDs = timeTableStore.recommendations.reduce(into: [String]()) { result, item in
             guard !result.contains(item.groupID) else { return }
             result.append(item.groupID)
@@ -830,6 +822,7 @@ private struct TimeTableEditContent: View {
         guard let dragging else { return false }
         switch dragging {
         case let .recommendation(id):
+            guard !timeTableStore.placedRecommendationGroupIDs.contains(id) else { return false }
             store.send(.recommendationDropped(id, before: targetID))
         case let .row(id, source):
             store.send(.scheduleRowMoved(id, source: source, before: targetID))
@@ -841,7 +834,9 @@ private struct TimeTableEditContent: View {
     private func merge(into rowID: String) -> Bool {
         guard let dragging else { return false }
         switch dragging {
-        case let .recommendation(id): store.send(.recommendationMerged(id, into: rowID))
+        case let .recommendation(id):
+            guard !timeTableStore.placedRecommendationGroupIDs.contains(id) else { return false }
+            store.send(.recommendationMerged(id, into: rowID))
         case let .row(id, source): store.send(.rowMerged(id, source: source, into: rowID))
         }
         self.dragging = nil

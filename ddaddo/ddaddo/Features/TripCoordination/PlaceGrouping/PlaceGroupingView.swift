@@ -24,6 +24,7 @@ struct PlaceGroupingView: View {
     private var sheetDragTranslation: CGFloat = 0
     @State private var sheetDetent: PlaceGroupingSheetLayout.Detent
     @State private var bottomSafeAreaInset = placeGroupingWindowBottomSafeAreaInset()
+    @State private var confirmationGuideHeight: CGFloat = 16
 
     init(
         store: StoreOf<PlaceGroupingFeature>,
@@ -53,7 +54,9 @@ struct PlaceGroupingView: View {
                 bottomSheet(
                     layout: PlaceGroupingSheetLayout(
                         availableHeight: geometry.size.height,
-                        bottomSafeAreaInset: bottomSafeAreaInset
+                        bottomSafeAreaInset: bottomSafeAreaInset,
+                        confirmationGuideHeight: store.selectedTab == .recommendedGroups
+                            ? confirmationGuideHeight : 0
                     )
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -235,7 +238,23 @@ struct PlaceGroupingView: View {
 
             tabSelector
                 .padding(.horizontal, DDSpacing.large)
-                .padding(.bottom, 14)
+                .padding(.bottom, store.selectedTab == .recommendedGroups ? DDSpacing.small : 14)
+
+            if store.selectedTab == .recommendedGroups {
+                Text("모든 지역그룹을 확정해야 확정이 완료됩니다")
+                    .ddTypography(.caption12)
+                    .foregroundStyle(DDColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 16)
+                    .onGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.size.height
+                    } action: { height in
+                        confirmationGuideHeight = height
+                    }
+                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.bottom, 14)
+            }
 
             if sheetDetent != .collapsed || sheetDragTranslation < 0 {
                 if store.selectedTab == .preferences {
@@ -449,6 +468,14 @@ private struct PlaceGroupingBottomSafeAreaInsetKey: PreferenceKey {
         initialSheetDetent: .expanded
     )
     .id("expanded-sheet-preview")
+}
+
+#Preview("접힌 높이 · 확정 안내") {
+    PlaceGroupingView(
+        store: placeGroupingPreviewStore(state: PlaceGroupingPreviewData.manyGroupsState),
+        initialSheetDetent: .collapsed
+    )
+    .id("collapsed-sheet-preview")
 }
 
 private func placeGroupingPreviewStore(state: PlaceGroupingFeature.State) -> StoreOf<PlaceGroupingFeature> {

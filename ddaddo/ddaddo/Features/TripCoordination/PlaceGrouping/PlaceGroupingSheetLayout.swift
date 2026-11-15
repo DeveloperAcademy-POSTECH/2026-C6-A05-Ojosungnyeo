@@ -14,13 +14,15 @@ struct PlaceGroupingSheetLayout {
 
     let availableHeight: CGFloat
     let bottomSafeAreaInset: CGFloat
+    var confirmationGuideHeight: CGFloat = 16
 
     var expandedHeight: CGFloat {
         max(0, availableHeight - 12)
     }
 
     var collapsedHeight: CGFloat {
-        min(93 + bottomSafeAreaInset, expandedHeight)
+        let guideHeight = confirmationGuideHeight > 0 ? 8 + confirmationGuideHeight : 0
+        return min(93 + guideHeight + bottomSafeAreaInset, expandedHeight)
     }
 
     func height(for detent: Detent) -> CGFloat {

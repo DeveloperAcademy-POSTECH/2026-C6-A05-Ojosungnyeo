@@ -20,9 +20,18 @@ private func placeGroupingWindowBottomSafeAreaInset() -> CGFloat {
 
 struct PlaceGroupingView: View {
     let store: StoreOf<PlaceGroupingFeature>
-    @State private var sheetDragTranslation: CGFloat = 0
-    @State private var isBottomSheetExpanded = true
+    @GestureState(resetTransaction: Transaction(animation: .easeOut(duration: 0.22)))
+    private var sheetDragTranslation: CGFloat = 0
+    @State private var sheetDetent: PlaceGroupingSheetLayout.Detent
     @State private var bottomSafeAreaInset = placeGroupingWindowBottomSafeAreaInset()
+
+    init(
+        store: StoreOf<PlaceGroupingFeature>,
+        initialSheetDetent: PlaceGroupingSheetLayout.Detent = .medium
+    ) {
+        self.store = store
+        _sheetDetent = State(initialValue: initialSheetDetent)
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -40,7 +49,16 @@ struct PlaceGroupingView: View {
                 Spacer(minLength: 0)
             }
 
-            bottomSheet
+            GeometryReader { geometry in
+                bottomSheet(
+                    layout: PlaceGroupingSheetLayout(
+                        availableHeight: geometry.size.height,
+                        bottomSafeAreaInset: bottomSafeAreaInset
+                    )
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+            .ignoresSafeArea(edges: .bottom)
 
             if store.isDetailPresented {
                 PlaceGroupingDetailView(
@@ -205,8 +223,10 @@ struct PlaceGroupingView: View {
         .padding(.horizontal, DDSpacing.large)
     }
 
-    private var bottomSheet: some View {
-        VStack(spacing: 0) {
+    private func bottomSheet(layout: PlaceGroupingSheetLayout) -> some View {
+        let height = layout.height(for: sheetDetent, dragTranslation: sheetDragTranslation)
+
+        return VStack(spacing: 0) {
             Capsule()
                 .fill(Color(red: 85 / 255, green: 85 / 255, blue: 85 / 255))
                 .frame(width: 142, height: 5)
@@ -217,7 +237,7 @@ struct PlaceGroupingView: View {
                 .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, 14)
 
-            if isBottomSheetExpanded {
+            if sheetDetent != .collapsed || sheetDragTranslation < 0 {
                 if store.selectedTab == .preferences {
                     ScrollView {
                         LazyVStack(spacing: 12) {
@@ -234,7 +254,7 @@ struct PlaceGroupingView: View {
                 }
             }
         }
-        .frame(height: currentSheetHeight, alignment: .top)
+        .frame(height: height, alignment: .top)
         .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
         .overlay(alignment: .top) {
@@ -243,7 +263,7 @@ struct PlaceGroupingView: View {
                     Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
                     lineWidth: 1
                 )
-                .frame(height: currentSheetHeight + 120)
+                .frame(height: height + 120)
                 .allowsHitTesting(false)
         }
         .ddFillBottomSheetToScreenEdge(
@@ -254,30 +274,20 @@ struct PlaceGroupingView: View {
             Color.clear
                 .contentShape(.rect)
                 .frame(height: 35)
-                .gesture(sheetDragGesture)
+                .gesture(sheetDragGesture(layout: layout))
         }
     }
 
-    private var collapsedSheetHeight: CGFloat {
-        93 + bottomSafeAreaInset
-    }
-
-    private var currentSheetHeight: CGFloat {
-        let restingHeight: CGFloat = isBottomSheetExpanded ? 413 : collapsedSheetHeight
-        return min(413, max(collapsedSheetHeight, restingHeight - sheetDragTranslation))
-    }
-
-    private var sheetDragGesture: some Gesture {
+    private func sheetDragGesture(layout: PlaceGroupingSheetLayout) -> some Gesture {
         DragGesture(minimumDistance: 5)
-            .onChanged { value in
-                sheetDragTranslation = value.translation.height
+            .updating($sheetDragTranslation) { value, translation, _ in
+                translation = value.translation.height
             }
             .onEnded { value in
-                let restingHeight: CGFloat = isBottomSheetExpanded ? 413 : collapsedSheetHeight
-                let releasedHeight = restingHeight - value.translation.height
+                let projectedHeight = layout.height(for: sheetDetent)
+                    - value.predictedEndTranslation.height
                 withAnimation(.easeOut(duration: 0.22)) {
-                    isBottomSheetExpanded = releasedHeight > (413 + collapsedSheetHeight) / 2
-                    sheetDragTranslation = 0
+                    sheetDetent = layout.nearestDetent(to: projectedHeight)
                 }
             }
     }
@@ -423,10 +433,28 @@ private struct PlaceGroupingBottomSafeAreaInsetKey: PreferenceKey {
     }
 }
 
-#Preview {
+#Preview("기본 높이") {
+    PlaceGroupingView(store: placeGroupingPreviewStore(state: PlaceGroupingFeature.State()))
+        .id("default-sheet-preview")
+}
+
+#Preview("추천 그룹 많음 · 드래그") {
+    PlaceGroupingView(store: placeGroupingPreviewStore(state: PlaceGroupingPreviewData.manyGroupsState))
+        .id("draggable-sheet-preview")
+}
+
+#Preview("추천 그룹 많음 · 전체") {
     PlaceGroupingView(
-        store: Store(initialState: PlaceGroupingFeature.State()) {
-            PlaceGroupingFeature()
-        }
+        store: placeGroupingPreviewStore(state: PlaceGroupingPreviewData.manyGroupsState),
+        initialSheetDetent: .expanded
     )
+    .id("expanded-sheet-preview")
+}
+
+private func placeGroupingPreviewStore(state: PlaceGroupingFeature.State) -> StoreOf<PlaceGroupingFeature> {
+    withDependencies {
+        $0.placeClient = .testValue
+    } operation: {
+        Store(initialState: state) { PlaceGroupingFeature() }
+    }
 }

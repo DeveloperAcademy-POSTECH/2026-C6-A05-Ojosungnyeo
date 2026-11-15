@@ -6,6 +6,22 @@
 //
 
 enum PlaceGroupingPreviewData {
+    static var manyGroupsState: PlaceGroupingFeature.State {
+        var state = PlaceGroupingFeature.State()
+        state.selectedTab = .recommendedGroups
+        state.recommendedGroups = (1...12).map { index in
+            .init(
+                id: "preview-group-\(index)",
+                title: "추천 그룹 \(index)",
+                participantSummary: "2명",
+                memberIDs: ["tae", "header"],
+                categories: ["문화"],
+                places: []
+            )
+        }
+        return state
+    }
+
     static let tripTitle = "오사카 여행"
     static let tripDates = "11월 22일 ~ 25일"
     static let travelCriteria = "대중교통 · 장소 간 최대 30분"

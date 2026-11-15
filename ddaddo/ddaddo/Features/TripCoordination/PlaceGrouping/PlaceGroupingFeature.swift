@@ -797,7 +797,7 @@ private enum PlaceGroupingEngine {
     }
 
     private struct OwnedPlace {
-        let member: TripMember
+        var members: Set<TripMember>
         let place: PinnedPlace
     }
 
@@ -821,11 +821,12 @@ private enum PlaceGroupingEngine {
             )
         }
 
-        let ownedPlaces = joined.flatMap { participant in
+        let selectedPlaces = joined.flatMap { participant in
             state.memberPlaces[participant.member, default: []].map {
-                OwnedPlace(member: participant.member, place: $0)
+                OwnedPlace(members: [participant.member], place: $0)
             }
         }
+        let ownedPlaces = mergingSamePlaces(selectedPlaces)
         let regions = connectedRegions(
             ownedPlaces,
             maximumDistance: maximumDistance(for: selection)
@@ -852,7 +853,9 @@ private enum PlaceGroupingEngine {
                 destination: state.destinationName,
                 index: regionIndex
             )
-            let memberIDs = Array(Set(region.map { $0.member.rawValue })).sorted()
+            let memberIDs = Array(Set(
+                region.flatMap(\.members).map(\.rawValue)
+            )).sorted()
             let categories = Array(Set(regionPlaces.map {
                 normalizedCategory($0.category)
             })).sorted()
@@ -900,6 +903,20 @@ private enum PlaceGroupingEngine {
         return result
     }
 
+    /// 같은 Google Place를 여러 명이 선택해도 장소 하나와 하나의 추천 그룹으로 취급한다.
+    /// 선택한 사람들은 대표 장소의 `members`에 합쳐 추천 그룹 참여자로 표시한다.
+    private static func mergingSamePlaces(_ places: [OwnedPlace]) -> [OwnedPlace] {
+        places.reduce(into: [OwnedPlace]()) { result, ownedPlace in
+            guard let index = result.firstIndex(where: {
+                isSamePlace($0.place, ownedPlace.place)
+            }) else {
+                result.append(ownedPlace)
+                return
+            }
+            result[index].members.formUnion(ownedPlace.members)
+        }
+    }
+
     private static func maximumDistance(
         for selection: TripSetUpTransportationFeature.Selection
     ) -> Double {
@@ -924,6 +941,9 @@ private enum PlaceGroupingEngine {
 
     private static func isSamePlace(_ lhs: PinnedPlace, _ rhs: PinnedPlace) -> Bool {
         if lhs.id == rhs.id { return true }
+
+        // 동일 장소가 언어 설정에 따라 서로 다른 이름으로 반환되는 경우를 보완한다.
+        if distance(lhs, rhs) <= 25 { return true }
 
         let lhsName = normalizedPlaceName(lhs.name)
         let rhsName = normalizedPlaceName(rhs.name)

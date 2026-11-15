@@ -24,9 +24,22 @@ struct WaitingForParticipantsView: View {
                 invitationCard
                     .padding(.top, DDSpacing.xxLarge + DDSpacing.large)
 
-                timer
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 108)
+                VStack(spacing: DDSpacing.medium) {
+                    HStack(spacing: DDSpacing.zero) {
+                        Text("장소 핀을 찍을 수 있는 시간")
+                            .ddTypography(.bodyEmphasis16)
+
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundStyle(DDColor.textPrimary)
+                    .frame(height: 24)
+                    .accessibilityLabel("장소 핀을 찍을 수 있는 시간⚡")
+
+                    timer
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 72)
 
                 participantsCard
                     .padding(.top, 98)

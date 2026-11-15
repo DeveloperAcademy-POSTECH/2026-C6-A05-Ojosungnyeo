@@ -132,12 +132,14 @@ enum FirebasePlaceSelectionService {
         ], merge: true)
     }
 
-    static func confirmPlaces(tripID: String) async throws {
+    static func setPlaceSelectionConfirmation(tripID: String, isConfirmed: Bool) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
         try await participant.setData(
             [
-                "placeSelectionConfirmed": true,
-                "placeSelectionConfirmedAt": FieldValue.serverTimestamp(),
+                "placeSelectionConfirmed": isConfirmed,
+                "placeSelectionConfirmedAt": isConfirmed
+                    ? FieldValue.serverTimestamp()
+                    : FieldValue.delete(),
                 "updatedAt": FieldValue.serverTimestamp()
             ],
             merge: true

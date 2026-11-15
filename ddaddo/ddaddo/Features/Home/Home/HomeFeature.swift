@@ -7,6 +7,11 @@ import ComposableArchitecture
 import Foundation
 
 struct HomeFeature: Reducer {
+    struct SavedRecommendations: Equatable {
+        let tripID: String
+        let snapshots: [TripRecommendationSnapshot]
+    }
+
     enum MascotMessage: Int, CaseIterable, Equatable {
         case welcome
         case destination
@@ -53,6 +58,10 @@ struct HomeFeature: Reducer {
         var isWithdrawalConfirmationPresented = false
         var isWithdrawing = false
         var withdrawalErrorMessage: String?
+        var isSavingRecommendations = false
+        var savedRecommendations: SavedRecommendations?
+        var isItineraryTransitionPending = false
+        var recommendationSaveErrorMessage: String?
     }
 
     @CasePathable
@@ -78,6 +87,9 @@ struct HomeFeature: Reducer {
         case withdrawalConfirmed
         case withdrawalResponse(Result<Void, Error>)
         case withdrawalErrorDismissed
+        case recommendationsSaveResponse(String, [TripRecommendationSnapshot], Result<Void, Error>)
+        case retryRecommendationsSaveTapped
+        case recommendationsSaveErrorDismissed
     }
 
     @Dependency(\.appleSignInClient) var appleSignInClient
@@ -162,9 +174,11 @@ struct HomeFeature: Reducer {
                 return .none
             case .placeGrouping(.confirmButtonTapped):
                 guard state.placeGrouping.haveAllRecommendedGroupsConfirmed,
-                      let source = state.placeGrouping.sourcePlaceSelection
+                      let source = state.placeGrouping.sourcePlaceSelection,
+                      !state.isSavingRecommendations
                 else { return .none }
 
+                state.isItineraryTransitionPending = false
                 state.tripItinerary.timeTable.tripTitle = state.placeGrouping.tripTitle
                 state.tripItinerary.timeTable.destinationName = source.destinationName
                 state.tripItinerary.timeTable.tripStartDate = source.tripStartDate
@@ -195,29 +209,28 @@ struct HomeFeature: Reducer {
                     }
                 state.tripItinerary.timeTable.recommendations = recommendations
                 let tripID = source.tripID
-                let snapshots = recommendations.map {
-                    TripRecommendationSnapshot(
-                        id: $0.id,
-                        groupID: $0.groupID,
-                        placeID: $0.placeID,
-                        placeName: $0.placeName,
-                        category: $0.category,
-                        groupCategories: $0.groupCategories,
-                        memberIDs: $0.memberIDs,
-                        placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
-                        latitude: $0.latitude,
-                        longitude: $0.longitude
-                    )
-                }
-                return .run { _ in
-                    try? await tripClient.saveRecommendations(tripID, snapshots)
-                }
+                let snapshots = Self.recommendationSnapshots(from: recommendations)
+                guard state.savedRecommendations != SavedRecommendations(
+                    tripID: tripID, snapshots: snapshots
+                ) else { return .none }
+                return saveRecommendations(&state, tripID: tripID, snapshots: snapshots)
 
             case .placeGrouping(.delegate(.proceedToItinerary)):
                 let waiting = state.placeGrouping.waitingForConfirmation
                 guard waiting.haveAllMembersConfirmed,
                       state.tripItinerary.timeTable.recommendationTripID == waiting.tripID
                 else { return .none }
+                let snapshots = Self.recommendationSnapshots(
+                    from: state.tripItinerary.timeTable.recommendations
+                )
+                guard state.savedRecommendations == SavedRecommendations(
+                    tripID: waiting.tripID, snapshots: snapshots
+                ) else {
+                    state.isItineraryTransitionPending = true
+                    guard !state.isSavingRecommendations else { return .none }
+                    return saveRecommendations(&state, tripID: waiting.tripID, snapshots: snapshots)
+                }
+                state.isItineraryTransitionPending = false
                 state.tripItinerary.selectedTab = .dailyItinerary
                 state.tripItinerary.timeTable.resetScheduledItinerary()
                 state.tripItinerary.routeOverview.replaceItinerary(
@@ -227,11 +240,50 @@ struct HomeFeature: Reducer {
                 state.isPlaceGroupingPresented = false
                 state.isTripItineraryPresented = true
                 return .none
+            case let .recommendationsSaveResponse(tripID, snapshots, .success):
+                guard state.isSavingRecommendations,
+                      state.tripItinerary.timeTable.recommendationTripID == tripID
+                else { return .none }
+                state.isSavingRecommendations = false
+                state.recommendationSaveErrorMessage = nil
+                state.savedRecommendations = SavedRecommendations(
+                    tripID: tripID, snapshots: snapshots
+                )
+                return state.isItineraryTransitionPending
+                    ? .send(.placeGrouping(.delegate(.proceedToItinerary))) : .none
+            case let .recommendationsSaveResponse(tripID, _, .failure):
+                guard state.isSavingRecommendations,
+                      state.tripItinerary.timeTable.recommendationTripID == tripID
+                else { return .none }
+                state.isSavingRecommendations = false
+                state.recommendationSaveErrorMessage = "추천 그룹을 저장하지 못했어요.\n잠시 후 다시 시도해 주세요."
+                return .none
+            case .retryRecommendationsSaveTapped:
+                guard state.recommendationSaveErrorMessage != nil,
+                      let tripID = state.tripItinerary.timeTable.recommendationTripID,
+                      !state.isSavingRecommendations
+                else { return .none }
+                return saveRecommendations(
+                    &state,
+                    tripID: tripID,
+                    snapshots: Self.recommendationSnapshots(
+                        from: state.tripItinerary.timeTable.recommendations
+                    )
+                )
+            case .recommendationsSaveErrorDismissed:
+                state.recommendationSaveErrorMessage = nil
+                state.isItineraryTransitionPending = false
+                return .send(.placeGrouping(.waitingForConfirmation(.backButtonTapped)))
+            case .placeGrouping(.waitingForConfirmation(.backButtonTapped)):
+                state.isItineraryTransitionPending = false
+                return .none
             case .placeGrouping(.delegate(.reanalyzeGrouping)):
+                state.isItineraryTransitionPending = false
                 state.isPlaceGroupingPresented = false
                 state.isPlaceAnalysisLoading = true
                 return .none
             case .placeGrouping(.delegate(.returnToUpcomingTrips)):
+                state.isItineraryTransitionPending = false
                 state.isPlaceGroupingPresented = false
                 state.isPlaceAnalysisLoading = false
                 state.isUpcomingTripsPresented = true
@@ -397,6 +449,46 @@ struct HomeFeature: Reducer {
 
         Scope(state: \.settings, action: \.settings) {
             SettingsFeature()
+        }
+    }
+
+    private func saveRecommendations(
+        _ state: inout State,
+        tripID: String,
+        snapshots: [TripRecommendationSnapshot]
+    ) -> Effect<Action> {
+        state.isSavingRecommendations = true
+        state.recommendationSaveErrorMessage = nil
+        return .run { send in
+            do {
+                try await tripClient.saveRecommendations(tripID, snapshots)
+                await send(.recommendationsSaveResponse(tripID, snapshots, .success(())))
+            } catch {
+                #if DEBUG
+                let failure = error as NSError
+                print("[Recommendations] Save failed: \(failure.domain) (\(failure.code))")
+                #endif
+                await send(.recommendationsSaveResponse(tripID, snapshots, .failure(error)))
+            }
+        }
+    }
+
+    private static func recommendationSnapshots(
+        from recommendations: [TimeTableRecommendation]
+    ) -> [TripRecommendationSnapshot] {
+        recommendations.map {
+            TripRecommendationSnapshot(
+                id: $0.id,
+                groupID: $0.groupID,
+                placeID: $0.placeID,
+                placeName: $0.placeName,
+                category: $0.category,
+                groupCategories: $0.groupCategories,
+                memberIDs: $0.memberIDs,
+                placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
+                latitude: $0.latitude,
+                longitude: $0.longitude
+            )
         }
     }
 

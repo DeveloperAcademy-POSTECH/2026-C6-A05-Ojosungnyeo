@@ -126,6 +126,27 @@ struct TimeTableFeature: Reducer {
             }
         }
 
+        var placedRecommendationGroupIDs: Set<String> {
+            Self.placedRecommendationGroupIDs(in: edit)
+        }
+
+        static func placedRecommendationGroupIDs(in edit: TimeTableEditFeature.State) -> Set<String> {
+            let groupIDByScheduleID = Dictionary(
+                uniqueKeysWithValues: edit.draftPlacements.compactMap { placement in
+                    placement.recommendationGroupID.map { (placement.id, $0) }
+                }
+            )
+            return Set(edit.rowsByDay.values
+                .flatMap { $0 }
+                .flatMap(\.sources)
+                .compactMap { source -> String? in
+                    switch source {
+                    case let .recommendationGroup(groupID): return groupID
+                    case let .schedule(scheduleID): return groupIDByScheduleID[scheduleID]
+                    }
+                })
+        }
+
         var timeSelectionCourseIDs: [TimeTableCourse.ID]? {
             guard let day = edit.editingDay, day == selectedDay else { return nil }
 
@@ -251,7 +272,8 @@ struct TimeTableFeature: Reducer {
                                 courseID: nextCourseID,
                                 day: day,
                                 timing: .init(startMinuteOfDay: 9 * 60 + rowIndex * 90),
-                                branchGroupID: branchID
+                                branchGroupID: branchID,
+                                recommendationGroupID: groupID
                             )
                         )
                         materializedScheduleIDs.append(nextScheduleID)
@@ -396,7 +418,8 @@ struct TimeTableFeature: Reducer {
                         courseID: schedule.courseID,
                         day: day,
                         timing: .init(startMinuteOfDay: schedule.startMinuteOfDay),
-                        branchGroupID: schedule.branchGroupID
+                        branchGroupID: schedule.branchGroupID,
+                        recommendationGroupID: schedule.recommendationGroupID
                     )
                 }
                 return .send(.delegate(.itineraryUpdated))
@@ -452,9 +475,7 @@ struct TimeTableFeature: Reducer {
 
             case let .edit(.recommendationDropped(id, before: targetID)):
                 guard state.recommendations.contains(where: { $0.groupID == id }),
-                      !state.edit.rowsByDay.values.flatMap({ $0 }).contains(where: {
-                          $0.sources.contains(.recommendationGroup(id))
-                      }) else { return .none }
+                      !state.placedRecommendationGroupIDs.contains(id) else { return .none }
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 let row = TimeTableEditRow(id: "recommendation-\(id)", sources: [.recommendationGroup(id)])
                 let index = targetID.flatMap { targetID in
@@ -491,9 +512,7 @@ struct TimeTableFeature: Reducer {
 
             case let .edit(.recommendationMerged(groupID, into: targetID)):
                 guard let recommendation = state.recommendations.first(where: { $0.groupID == groupID }),
-                      !state.edit.rowsByDay.values.flatMap({ $0 }).contains(where: {
-                          $0.sources.contains(.recommendationGroup(groupID))
-                      }) else { return .none }
+                      !state.placedRecommendationGroupIDs.contains(groupID) else { return .none }
                 var rows = state.edit.rowsByDay[state.selectedDay, default: []]
                 guard let index = rows.firstIndex(where: { $0.id == targetID }),
                       let targetMembers = Self.memberIDs(for: rows[index], state: state),
@@ -581,7 +600,8 @@ struct TimeTableFeature: Reducer {
                         courseID: schedule.courseID,
                         day: schedule.day.rawValue,
                         startMinuteOfDay: schedule.timing.startMinuteOfDay,
-                        branchGroupID: schedule.branchGroupID
+                        branchGroupID: schedule.branchGroupID,
+                        recommendationGroupID: schedule.recommendationGroupID
                     )
                 }
                 let request = TripItinerarySaveRequest(
@@ -973,6 +993,7 @@ struct TimeTableSchedule: Equatable, Identifiable {
     let day: TripDay
     var timing: TimeTableScheduleTiming
     let branchGroupID: Int?
+    var recommendationGroupID: String? = nil
 
     static func hasTimeConflict(
         courseIDs: [TimeTableCourse.ID],

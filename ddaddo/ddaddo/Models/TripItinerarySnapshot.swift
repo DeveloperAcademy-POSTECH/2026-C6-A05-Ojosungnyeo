@@ -60,6 +60,7 @@ struct TripItinerarySaveRequest: Equatable, Sendable {
         let day: String
         let startMinuteOfDay: Int
         let branchGroupID: Int?
+        var recommendationGroupID: String? = nil
     }
 
     let tripID: String

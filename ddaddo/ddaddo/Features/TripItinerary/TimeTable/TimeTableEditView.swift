@@ -128,16 +128,10 @@ private struct TimeTableEditContent: View {
         draggedRowID != nil
     }
 
-    private var availableRecommendationGroups: [ConfirmedRecommendationGroup] {
-        let placedGroupIDs = Set(
-            store.rowsByDay.values
-                .flatMap { $0 }
-                .flatMap(\.sources)
-                .compactMap { source -> String? in
-                    guard case let .recommendationGroup(groupID) = source else { return nil }
-                    return groupID
-                }
-        )
+    private func availableRecommendationGroups(
+        editState: TimeTableEditFeature.State
+    ) -> [ConfirmedRecommendationGroup] {
+        let placedGroupIDs = TimeTableFeature.State.placedRecommendationGroupIDs(in: editState)
         let orderedGroupIDs = timeTableStore.recommendations.reduce(into: [String]()) { result, item in
             guard !result.contains(item.groupID) else { return }
             result.append(item.groupID)
@@ -210,9 +204,14 @@ private struct TimeTableEditContent: View {
         .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
         .overlay {
             GeometryReader { proxy in
+                insertionIndicatorsOverlay
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+            .allowsHitTesting(false)
+        }
+        .overlay {
+            GeometryReader { proxy in
                 ZStack {
-                    insertionIndicatorsOverlay
-
                     if let dragging, let dragLocation {
                         dragPreview(dragging)
                             .position(
@@ -311,30 +310,32 @@ private struct TimeTableEditContent: View {
     }
 
     private var recommendationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("추천 그룹 추가하기")
-                .ddTypography(.bodyEmphasis16)
-                .foregroundStyle(DDColor.textPrimary)
-                .padding(.leading, DDSpacing.large)
+        WithViewStore(timeTableStore, observe: \.edit) { viewStore in
+            VStack(alignment: .leading, spacing: 10) {
+                Text("추천 그룹 추가하기")
+                    .ddTypography(.bodyEmphasis16)
+                    .foregroundStyle(DDColor.textPrimary)
+                    .padding(.leading, DDSpacing.large)
 
-            ScrollView(.horizontal) {
-                HStack(spacing: DDSpacing.large) {
-                    ForEach(availableRecommendationGroups) { group in
-                        editCard(
-                            title: group.title,
-                            subtitle: group.category,
-                            memberIDs: group.memberIDs,
-                            width: 200,
-                            drag: .recommendation(group.id)
-                        )
-                        .opacity(dragging == .recommendation(group.id) ? 0 : 1)
+                ScrollView(.horizontal) {
+                    HStack(spacing: DDSpacing.large) {
+                        ForEach(availableRecommendationGroups(editState: viewStore.state)) { group in
+                            editCard(
+                                title: group.title,
+                                subtitle: group.category,
+                                memberIDs: group.memberIDs,
+                                width: 200,
+                                drag: .recommendation(group.id)
+                            )
+                            .opacity(dragging == .recommendation(group.id) ? 0 : 1)
+                        }
                     }
+                    .padding(.horizontal, DDSpacing.large)
                 }
-                .padding(.horizontal, DDSpacing.large)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .padding(.top, DDSpacing.large)
         }
-        .padding(.top, DDSpacing.large)
     }
 
     private var scheduleSection: some View {
@@ -566,14 +567,19 @@ private struct TimeTableEditContent: View {
             .frame(width: 2)
     }
 
+    private func insertionIndicatorWidth(for frame: CGRect) -> CGFloat {
+        max(0, frame.width - 48 - DDSpacing.large)
+    }
+
     @ViewBuilder
     private var insertionIndicatorsOverlay: some View {
         if let targetedRowID,
+           targetedRowID != draggedRowID,
            let frame = dropFrames["row:\(targetedRowID)"] {
             insertionIndicator
-                .frame(width: max(0, frame.width - 48 - DDSpacing.large))
+                .frame(width: insertionIndicatorWidth(for: frame))
                 .position(
-                    x: frame.minX + 48 + (frame.width - 48 - DDSpacing.large) / 2,
+                    x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
                     y: frame.minY - DDSpacing.small
                 )
                 .zIndex(2)
@@ -582,9 +588,9 @@ private struct TimeTableEditContent: View {
             if let lastRow = rows.last,
                let frame = dropFrames["row:\(lastRow.id)"] {
                 insertionIndicator
-                    .frame(width: max(0, frame.width - 48 - DDSpacing.large))
+                    .frame(width: insertionIndicatorWidth(for: frame))
                     .position(
-                        x: frame.minX + 48 + (frame.width - 48 - DDSpacing.large) / 2,
+                        x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
                         y: frame.maxY + DDSpacing.small
                     )
                     .zIndex(2)
@@ -704,7 +710,9 @@ private struct TimeTableEditContent: View {
             case .recommendation:
                 target = .merge(row.id)
             case .row:
-                target = location.x >= frame.midX ? .merge(row.id) : .row(row.id)
+                target = location.x >= frame.midX && canMergeDraggedItem(into: row.id)
+                    ? .merge(row.id)
+                    : .row(row.id)
             case nil:
                 target = .row(row.id)
             }
@@ -841,7 +849,8 @@ private struct TimeTableEditContent: View {
     private func merge(into rowID: String) -> Bool {
         guard let dragging else { return false }
         switch dragging {
-        case let .recommendation(id): store.send(.recommendationMerged(id, into: rowID))
+        case let .recommendation(id):
+            store.send(.recommendationMerged(id, into: rowID))
         case let .row(id, source): store.send(.rowMerged(id, source: source, into: rowID))
         }
         self.dragging = nil

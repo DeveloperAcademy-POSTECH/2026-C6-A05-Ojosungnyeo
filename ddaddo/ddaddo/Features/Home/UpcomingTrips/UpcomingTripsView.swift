@@ -321,9 +321,11 @@ private struct SwipeableUpcomingTripCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(trip.destination) 여행 삭제")
 
-                UpcomingTripTicketCard(trip: trip, action: action)
-                    .frame(width: proxy.size.width)
+                UpcomingTripTicketCard(trip: trip)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .contentShape(.rect(cornerRadius: 20))
                     .offset(x: cardOffset)
+                    .onTapGesture(perform: action)
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 20)
                             .onChanged { value in
@@ -338,10 +340,12 @@ private struct SwipeableUpcomingTripCard: View {
                                 }
                             }
                     )
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("\(trip.destination) 여행, \(trip.progressTitle)")
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .aspectRatio(377.6288757324219 / 146, contentMode: .fit)
+        .frame(height: 146)
     }
 }
 
@@ -381,103 +385,86 @@ private struct UpcomingTripsBroadcastBanner: View {
 
 private struct UpcomingTripTicketCard: View {
     let trip: UpcomingTripsFeature.Trip
-    let action: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
-            let trailingWidth = proxy.size.width * 0.378
+            let trailingWidth = proxy.size.width * (140 / 370)
             let leadingWidth = proxy.size.width - trailingWidth
 
-            ZStack {
-                ticketBackground(
-                    width: proxy.size.width,
-                    trailingWidth: trailingWidth
-                )
+            ZStack(alignment: .leading) {
+                HStack(spacing: 0) {
+                    Color(red: 94 / 255, green: 94 / 255, blue: 94 / 255)
+                        .frame(width: leadingWidth)
 
-                Image("DDHomeTripCardMascot")
+                    DDColor.surfaceSelected
+                        .frame(width: trailingWidth)
+                }
+
+                Image("DDUpcomingTripCardMascot")
                     .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .mask {
-                        ZStack {
-                            Color.white
-
-                            Rectangle()
-                                .frame(width: 54, height: 48)
-                                .position(x: leadingWidth - 25, y: 48)
-                                .blendMode(.destinationOut)
-                        }
-                        .compositingGroup()
-                    }
+                    .frame(width: 134, height: 188)
+                    .opacity(0.5)
+                    .offset(x: 44, y: 21)
                     .allowsHitTesting(false)
 
-                Image(systemName: "airplane")
+                Image(systemName: "airplane.up.forward")
                     .font(.system(size: 29, weight: .semibold))
                     .foregroundStyle(DDColor.surfaceControl)
-                    .rotationEffect(.degrees(-20))
-                    .position(x: leadingWidth - 25, y: 48)
+                    .rotationEffect(.degrees(22.6))
+                    .position(x: leadingWidth - 44, y: 48)
                     .accessibilityHidden(true)
 
-                VStack(spacing: 0) {
-                    HStack(alignment: .top, spacing: DDSpacing.small) {
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(trip.dateText)
                             .ddTypography(.label14)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         Spacer(minLength: 0)
 
-                        Text(trip.progressTitle)
-                            .ddTypography(.labelEmphasis14)
-                            .foregroundStyle(DDColor.surfaceControl)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    HStack(alignment: .bottom, spacing: DDSpacing.small) {
                         VStack(alignment: .leading, spacing: 0) {
                             Text(trip.destination)
-                                .ddTypography(.title28)
+                                .font(.custom("Pretendard-Bold", size: 28, relativeTo: .title))
                                 .foregroundStyle(DDColor.surfaceSelected)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.75)
+                                .minimumScaleFactor(0.65)
 
                             Text(trip.country)
                                 .ddTypography(.body16)
                                 .foregroundStyle(DDColor.textSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
+                    }
+                    .frame(width: leadingWidth - 16, height: 117, alignment: .leading)
+                    .padding(.leading, DDSpacing.large)
+
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(trip.progressTitle)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.surfaceControl)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         Spacer(minLength: 0)
 
-                        Button("바로가기", action: action)
-                            .ddTypography(.bodyEmphasis16)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .padding(.horizontal, DDSpacing.large)
-                            .frame(height: 40)
-                            .background(DDColor.surfaceControl)
-                            .clipShape(Capsule())
+                        Image(systemName: "chevron.down.dotted.2")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(DDColor.textOnPrimary)
+                            .rotationEffect(.degrees(-90))
+                            .accessibilityHidden(true)
                     }
+                    .frame(width: trailingWidth - 16, height: 117, alignment: .trailing)
+                    .padding(.trailing, DDSpacing.large)
                 }
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.vertical, DDSpacing.medium)
+                .padding(.top, 13)
+                .padding(.bottom, DDSpacing.large)
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipShape(.rect(cornerRadius: 20))
         }
-        .aspectRatio(377.6288757324219 / 146, contentMode: .fit)
-    }
-
-    private func ticketBackground(
-        width: CGFloat,
-        trailingWidth: CGFloat
-    ) -> some View {
-        HStack(spacing: 0) {
-            Color(red: 96 / 255, green: 96 / 255, blue: 96 / 255)
-                .frame(width: width - trailingWidth)
-
-            DDColor.surfaceSelected
-                .frame(width: trailingWidth)
-        }
-        .clipShape(.rect(cornerRadius: 20))
     }
 }
 

@@ -78,7 +78,7 @@ struct RouteEditorView: View {
             SelectedPlaceBottomSheet(
                 place: place,
                 isLoading: store.isPlaceDetailsLoading,
-                canAdd: true,
+                canAdd: !store.isPlaceDetailsLoading,
                 isAlreadyAdded: false,
                 fallbackImageName: nil,
                 closeButtonTapped: {

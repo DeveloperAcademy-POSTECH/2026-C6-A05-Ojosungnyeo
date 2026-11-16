@@ -196,7 +196,9 @@ struct RouteStop: Equatable, Identifiable {
     }
 
     var mapStops: [RouteStop] {
-        guard !places.isEmpty else { return [self] }
+        // 서버 일정은 실제 장소 상세 좌표가 있을 때만 지도에 표시한다.
+        // 로컬 프리뷰 데이터만 기존 대표 좌표를 사용할 수 있다.
+        guard !places.isEmpty else { return scheduleID == nil ? [self] : [] }
         return places.enumerated().map { index, place in
             RouteStop(
                 id: 1_000_000 + id * 10_000 + index,

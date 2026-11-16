@@ -76,6 +76,7 @@ struct RouteEditorFeature: Reducer {
 
             case .placeDetailsFailed:
                 state.isPlaceDetailsLoading = false
+                state.selectedPlace = nil
                 return .none
 
             case .detailBackButtonTapped, .detailCloseButtonTapped:
@@ -85,7 +86,9 @@ struct RouteEditorFeature: Reducer {
                 return .none
 
             case .addButtonTapped:
-                guard state.selectedPlace != nil else { return .none }
+                guard !state.isPlaceDetailsLoading,
+                      state.selectedPlace != nil
+                else { return .none }
                 state.isDaySelectionPresented = true
                 return .none
 
@@ -94,7 +97,8 @@ struct RouteEditorFeature: Reducer {
                 return .none
 
             case let .daySelected(day):
-                guard state.availableDays.contains(day),
+                guard !state.isPlaceDetailsLoading,
+                      state.availableDays.contains(day),
                       let place = state.selectedPlace
                 else { return .none }
                 state.isDaySelectionPresented = false

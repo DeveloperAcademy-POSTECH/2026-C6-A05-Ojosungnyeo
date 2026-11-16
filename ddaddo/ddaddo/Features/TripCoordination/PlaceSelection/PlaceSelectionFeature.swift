@@ -11,6 +11,8 @@ import CoreLocation
 import Foundation
 
 struct PlaceSelectionFeature: Reducer {
+    private static let destinationValidationRadius: CLLocationDistance = 200_000
+
     struct DestinationCoordinate: Equatable {
         let latitude: Double
         let longitude: Double
@@ -883,7 +885,9 @@ struct PlaceSelectionFeature: Reducer {
                     latitude: details.latitude,
                     longitude: details.longitude
                 )
-                guard destinationLocation.distance(from: placeLocation) <= 100_000 else {
+                guard destinationLocation.distance(from: placeLocation)
+                        <= Self.destinationValidationRadius
+                else {
                     state.canOverrideDestinationValidation = true
                     state.destinationValidationMessage = "\(state.destinationName) 여행지와 먼 장소예요. 그래도 추가할까요?"
                     return .none

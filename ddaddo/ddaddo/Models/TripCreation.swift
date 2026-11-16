@@ -51,4 +51,5 @@ struct UpcomingTripSnapshot: Equatable, Sendable {
     let startDate: Date
     let endDate: Date
     let progress: Progress
+    let joinedAvatarNames: [String]
 }

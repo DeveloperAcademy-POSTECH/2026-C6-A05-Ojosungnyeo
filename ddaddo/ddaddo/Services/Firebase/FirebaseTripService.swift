@@ -374,15 +374,16 @@ enum FirebaseTripService {
                     else { return nil }
 
                     let destination = (document.get("destinations") as? [[String: Any]])?.first
+                    let participants = try await document.reference
+                        .collection("participants")
+                        .order(by: "slotIndex")
+                        .getDocuments()
+                        .documents
+                        .filter { $0.get("status") as? String == "joined" }
                     let progress: UpcomingTripSnapshot.Progress
                     if document.get("status") as? String == "itinerary" {
                         progress = .itinerary
                     } else {
-                        let participants = try await document.reference
-                            .collection("participants")
-                            .getDocuments()
-                            .documents
-                            .filter { $0.get("status") as? String == "joined" }
                         let hasFinishedPlaceSelection = !participants.isEmpty
                             && participants.allSatisfy {
                                 $0.get("placeSelectionConfirmed") as? Bool == true
@@ -395,7 +396,8 @@ enum FirebaseTripService {
                         countryName: destination?["country"] as? String ?? "",
                         startDate: startDate,
                         endDate: endDate,
-                        progress: progress
+                        progress: progress,
+                        joinedAvatarNames: participants.compactMap { $0.get("avatarName") as? String }
                     )
                 }
             }
@@ -480,6 +482,9 @@ enum FirebaseTripService {
             }
             if let recommendationGroupID = schedule.recommendationGroupID {
                 data["recommendationGroupID"] = recommendationGroupID
+            }
+            if let orderIndex = schedule.orderIndex {
+                data["orderIndex"] = orderIndex
             }
             return data
         }
@@ -647,7 +652,8 @@ enum FirebaseTripService {
                 day: day,
                 startMinuteOfDay: startMinute,
                 branchGroupID: data["branchGroupID"] as? Int,
-                recommendationGroupID: data["recommendationGroupID"] as? String
+                recommendationGroupID: data["recommendationGroupID"] as? String,
+                orderIndex: data["orderIndex"] as? Int
             )
         }
         let recommendations: [TripRecommendationSnapshot] =

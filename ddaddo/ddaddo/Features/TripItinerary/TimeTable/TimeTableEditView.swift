@@ -103,6 +103,7 @@ private struct TimeTableEditContent: View {
         case row(String)
         case merge(String)
         case append
+        case day(TripDay)
         case trash
     }
 
@@ -287,7 +288,7 @@ private struct TimeTableEditContent: View {
                             .foregroundStyle(DDColor.textPrimary)
                             .frame(width: 64, height: 40)
                             .background(
-                                day == timeTableStore.selectedDay
+                                day == timeTableStore.selectedDay || activeDropTarget == .day(day)
                                     ? Color(red: 118 / 255, green: 118 / 255, blue: 118 / 255)
                                     : .clear
                             )
@@ -300,6 +301,7 @@ private struct TimeTableEditContent: View {
                             }
                     }
                     .buttonStyle(.plain)
+                    .background(dropFrame("day:\(day.rawValue)"))
                 }
             }
             .padding(.horizontal, DDSpacing.large)
@@ -702,6 +704,12 @@ private struct TimeTableEditContent: View {
         let target: DropTarget?
         if let insertionTarget = insertionTarget(at: location) {
             target = insertionTarget
+        } else if case .row = dragging,
+                  let day = timeTableStore.availableDays.first(where: {
+                      $0 != timeTableStore.selectedDay &&
+                      dropFrames["day:\($0.rawValue)"]?.contains(location) == true
+                  }) {
+            target = .day(day)
         } else if case .row = dragging, dropFrames["trash"]?.contains(location) == true {
             target = .trash
         } else if let row = rows.first(where: { dropFrames["row:\($0.id)"]?.contains(location) == true }),
@@ -727,7 +735,7 @@ private struct TimeTableEditContent: View {
             targetedRowID = id
         case .merge:
             targetedRowID = nil
-        case .append, .trash, nil:
+        case .append, .day, .trash, nil:
             targetedRowID = nil
         }
         isAppendTargeted = target == .append
@@ -758,6 +766,10 @@ private struct TimeTableEditContent: View {
         case let .row(id): _ = drop(before: id)
         case let .merge(id): _ = merge(into: id)
         case .append: _ = drop(before: nil)
+        case let .day(day):
+            if case let .row(rowID, source) = dragging {
+                store.send(.rowMovedToDay(rowID, source: source, day: day))
+            }
         case .trash:
             if case let .row(rowID, source) = dragging {
                 store.send(.deletionRequested(timeTableStore.selectedDay, rowID: rowID, source: source))

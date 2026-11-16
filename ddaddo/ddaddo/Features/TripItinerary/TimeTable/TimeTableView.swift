@@ -51,6 +51,11 @@ private struct TimeTableReadOnlyContent: View {
                 store.coursesByID[schedule.courseID].map { (index, schedule, $0) }
             }
             .sorted {
+                if let left = $0.1.orderIndex, let right = $1.1.orderIndex, left != right {
+                    return left < right
+                }
+                if $0.1.orderIndex != nil && $1.1.orderIndex == nil { return true }
+                if $0.1.orderIndex == nil && $1.1.orderIndex != nil { return false }
                 let left = $0.1.timing.startMinuteOfDay
                 let right = $1.1.timing.startMinuteOfDay
                 return left == right ? $0.0 < $1.0 : left < right
@@ -251,9 +256,11 @@ private struct TimeTableReadOnlyContent: View {
                             .ddTypography(.bodyEmphasis16)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
-                        HStack(spacing: -5) {
-                            ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
-                                Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                        if TimeTableCourse.kind(of: first.memberIDs, among: store.tripMembers) == .separate {
+                            HStack(spacing: -5) {
+                                ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
+                                    Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                                }
                             }
                         }
                     }
@@ -369,7 +376,7 @@ private struct TimeTableReadOnlyContent: View {
                 }
                 .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, DDSpacing.large)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -588,6 +595,11 @@ struct TimeTableContent: View {
         }
 
         return rows.enumerated().sorted {
+            let lhsOrder = $0.element.schedules.compactMap(\.orderIndex).min()
+            let rhsOrder = $1.element.schedules.compactMap(\.orderIndex).min()
+            if let lhsOrder, let rhsOrder, lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+            if lhsOrder != nil && rhsOrder == nil { return true }
+            if lhsOrder == nil && rhsOrder != nil { return false }
             let lhsMinute = $0.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
             let rhsMinute = $1.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
             return lhsMinute == rhsMinute ? $0.offset < $1.offset : lhsMinute < rhsMinute

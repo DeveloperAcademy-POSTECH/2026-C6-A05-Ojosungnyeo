@@ -19,6 +19,7 @@ struct WaitingForParticipantsFeature: Reducer {
         let avatarName: String?
         let hasJoined: Bool
         let isCurrentUser: Bool
+        let isPlaceSelectionConfirmed: Bool
 
         var displayName: String {
             if name.hasPrefix("친구 "),
@@ -141,7 +142,8 @@ struct WaitingForParticipantsFeature: Reducer {
                         member: TripMember(avatar: avatar),
                         name: participant.name,
                         hasJoined: participant.hasJoined,
-                        isCurrentUser: participant.isCurrentUser
+                        isCurrentUser: participant.isCurrentUser,
+                        isConfirmed: participant.isPlaceSelectionConfirmed
                     )
                 },
                 remainingSeconds: remainingSeconds
@@ -281,7 +283,8 @@ private extension WaitingForParticipantsFeature.Invitation {
                     name: $0.name,
                     avatarName: $0.avatarName,
                     hasJoined: $0.hasJoined,
-                    isCurrentUser: $0.isCurrentUser
+                    isCurrentUser: $0.isCurrentUser,
+                    isPlaceSelectionConfirmed: $0.isPlaceSelectionConfirmed
                 )
             }
         )
@@ -299,10 +302,10 @@ private extension WaitingForParticipantsFeature.Invitation {
             url: URL(string: "https://ddaddo-web.vercel.app/invite")!,
             expiresAt: expiresAt,
             participants: [
-                .init(id: 1, name: "테이", avatarName: "DDMiniHeadTae", hasJoined: true, isCurrentUser: true),
-                .init(id: 2, name: "헤더", avatarName: "DDMiniHeadHeader", hasJoined: true, isCurrentUser: false),
-                .init(id: 3, name: "그레", avatarName: "DDMiniHeadGrae", hasJoined: false, isCurrentUser: false),
-                .init(id: 4, name: "주니", avatarName: "DDMiniHeadJuni", hasJoined: false, isCurrentUser: false)
+                .init(id: 1, name: "테이", avatarName: "DDMiniHeadTae", hasJoined: true, isCurrentUser: true, isPlaceSelectionConfirmed: false),
+                .init(id: 2, name: "헤더", avatarName: "DDMiniHeadHeader", hasJoined: true, isCurrentUser: false, isPlaceSelectionConfirmed: false),
+                .init(id: 3, name: "그레", avatarName: "DDMiniHeadGrae", hasJoined: false, isCurrentUser: false, isPlaceSelectionConfirmed: false),
+                .init(id: 4, name: "주니", avatarName: "DDMiniHeadJuni", hasJoined: false, isCurrentUser: false, isPlaceSelectionConfirmed: false)
             ]
         )
     }

@@ -20,7 +20,8 @@ private func activeWindowBottomSafeAreaInset() -> CGFloat {
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
-    @GestureState private var sheetDragTranslation: CGFloat = 0
+    @GestureState private var isSheetDragging = false
+    @State private var sheetDragTranslation: CGFloat = 0
     @State private var bottomSafeAreaInset = activeWindowBottomSafeAreaInset()
 
     var body: some View {
@@ -95,7 +96,6 @@ struct PlaceSelectionView: View {
                 .ignoresSafeArea(edges: .bottom)
             } else if store.isMemberPlacesSheetPresented {
                 MemberPlacesBottomSheet(
-                    isExpanded: store.isBottomSheetExpanded,
                     selectedMember: store.selectedMember,
                     participants: store.participants,
                     places: store.displayedPlaces,
@@ -162,6 +162,13 @@ struct PlaceSelectionView: View {
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
+        .onChange(of: isSheetDragging) { _, isDragging in
+            if !isDragging && sheetDragTranslation != 0 {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    sheetDragTranslation = 0
+                }
+            }
+        }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -392,12 +399,23 @@ struct PlaceSelectionView: View {
     }
 
     private var sheetDragGesture: some Gesture {
-        DragGesture(minimumDistance: 5)
-            .updating($sheetDragTranslation) { value, state, _ in
-                state = value.translation.height
+        DragGesture(minimumDistance: 5, coordinateSpace: .global)
+            .updating($isSheetDragging) { _, isDragging, transaction in
+                transaction.disablesAnimations = true
+                isDragging = true
+            }
+            .onChanged { value in
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    sheetDragTranslation = value.translation.height
+                }
             }
             .onEnded { value in
-                store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
+                withAnimation(.easeOut(duration: 0.22)) {
+                    store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
+                    sheetDragTranslation = 0
+                }
             }
     }
 }

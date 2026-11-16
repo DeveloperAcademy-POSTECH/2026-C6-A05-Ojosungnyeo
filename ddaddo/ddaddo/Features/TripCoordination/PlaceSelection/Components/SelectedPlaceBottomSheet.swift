@@ -133,15 +133,7 @@ struct SelectedPlaceBottomSheet: View {
         .frame(maxWidth: .infinity)
         .frame(height: 355 + bottomSafeAreaInset)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-                .stroke(DDColor.borderDefault, lineWidth: 1)
-        }
+        .ddBottomSheetBorder()
         .overlay(alignment: .bottom) {
             if isCopyToastPresented {
                 Text("주소가 복사되었어요")

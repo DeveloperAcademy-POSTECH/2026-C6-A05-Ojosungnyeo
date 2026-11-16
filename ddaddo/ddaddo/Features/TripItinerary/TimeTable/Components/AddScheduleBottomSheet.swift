@@ -41,6 +41,7 @@ struct AddScheduleBottomSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .ddBottomSheetBorder()
         .preferredColorScheme(.dark)
     }
 

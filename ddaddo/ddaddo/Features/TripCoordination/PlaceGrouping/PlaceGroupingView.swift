@@ -20,8 +20,8 @@ private func placeGroupingWindowBottomSafeAreaInset() -> CGFloat {
 
 struct PlaceGroupingView: View {
     let store: StoreOf<PlaceGroupingFeature>
-    @GestureState(resetTransaction: Transaction(animation: .easeOut(duration: 0.22)))
-    private var sheetDragTranslation: CGFloat = 0
+    @GestureState private var isSheetDragging = false
+    @State private var sheetDragTranslation: CGFloat = 0
     @State private var sheetDetent: PlaceGroupingSheetLayout.Detent
     @State private var bottomSafeAreaInset = placeGroupingWindowBottomSafeAreaInset()
     @State private var confirmationGuideHeight: CGFloat = 16
@@ -114,6 +114,13 @@ struct PlaceGroupingView: View {
         }
         .onPreferenceChange(PlaceGroupingBottomSafeAreaInsetKey.self) {
             bottomSafeAreaInset = max($0, placeGroupingWindowBottomSafeAreaInset())
+        }
+        .onChange(of: isSheetDragging) { _, isDragging in
+            if !isDragging && sheetDragTranslation != 0 {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    sheetDragTranslation = 0
+                }
+            }
         }
         .animation(
             .easeInOut(duration: 0.3),
@@ -251,7 +258,7 @@ struct PlaceGroupingView: View {
                     .padding(.bottom, 14)
             }
 
-            if sheetDetent != .collapsed || sheetDragTranslation < 0 {
+            Group {
                 if store.selectedTab == .preferences {
                     ScrollView {
                         LazyVStack(spacing: 12) {
@@ -267,19 +274,13 @@ struct PlaceGroupingView: View {
                     recommendedGroups
                 }
             }
+            .opacity(height > layout.collapsedHeight ? 1 : 0)
+            .allowsHitTesting(height > layout.collapsedHeight)
         }
         .frame(height: height, alignment: .top)
         .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay(alignment: .top) {
-            UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40)
-                .stroke(
-                    Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
-                    lineWidth: 1
-                )
-                .frame(height: height + 120)
-                .allowsHitTesting(false)
-        }
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge(
             color: Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)
         )
@@ -293,15 +294,24 @@ struct PlaceGroupingView: View {
     }
 
     private func sheetDragGesture(layout: PlaceGroupingSheetLayout) -> some Gesture {
-        DragGesture(minimumDistance: 5)
-            .updating($sheetDragTranslation) { value, translation, _ in
-                translation = value.translation.height
+        DragGesture(minimumDistance: 5, coordinateSpace: .global)
+            .updating($isSheetDragging) { _, isDragging, transaction in
+                transaction.disablesAnimations = true
+                isDragging = true
+            }
+            .onChanged { value in
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    sheetDragTranslation = value.translation.height
+                }
             }
             .onEnded { value in
                 let projectedHeight = layout.height(for: sheetDetent)
                     - value.predictedEndTranslation.height
                 withAnimation(.easeOut(duration: 0.22)) {
                     sheetDetent = layout.nearestDetent(to: projectedHeight)
+                    sheetDragTranslation = 0
                 }
             }
     }

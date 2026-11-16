@@ -155,6 +155,7 @@ struct RouteEditorView: View {
         .frame(height: 222)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(topLeadingRadius: 28, topTrailingRadius: 28))
+        .ddBottomSheetBorder(cornerRadius: 28)
         .frame(maxHeight: .infinity, alignment: .bottom)
         .ddFillBottomSheetToScreenEdge(color: DDColor.surfaceElevated)
         .ignoresSafeArea(edges: .bottom)

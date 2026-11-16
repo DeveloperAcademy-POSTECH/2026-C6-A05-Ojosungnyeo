@@ -120,11 +120,12 @@ struct RouteOverviewView: View {
         )
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge()
         .offset(y: tabBarCoveredHeight)
         .contentShape(.rect)
         .gesture(
-            DragGesture(minimumDistance: 12)
+            DragGesture(minimumDistance: 12, coordinateSpace: .global)
                 .onEnded { value in
                     if value.translation.height < -30 {
                         withAnimation(.easeInOut(duration: 0.25)) {

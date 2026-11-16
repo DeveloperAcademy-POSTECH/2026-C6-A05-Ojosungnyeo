@@ -69,6 +69,7 @@ struct TimeTableEditFeature: Reducer {
         case placeSearchResultTapped(PlaceSearchResult)
         case recommendationDropped(String, before: TimeTableEditRow.ID?)
         case scheduleRowMoved(TimeTableEditRow.ID, source: TimeTableEditRow.Source, before: TimeTableEditRow.ID?)
+        case rowMovedToDay(TimeTableEditRow.ID, source: TimeTableEditRow.Source, day: TripDay)
         case rowMerged(TimeTableEditRow.ID, source: TimeTableEditRow.Source, into: TimeTableEditRow.ID)
         case recommendationMerged(String, into: TimeTableEditRow.ID)
         case deletionRequested(TripDay, rowID: TimeTableEditRow.ID, source: TimeTableEditRow.Source)
@@ -91,7 +92,7 @@ struct TimeTableEditFeature: Reducer {
 
             case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
                  .groupAddButtonTapped, .timeSelectionDoneTapped,
-                 .recommendationDropped, .scheduleRowMoved, .rowMerged, .recommendationMerged,
+                 .recommendationDropped, .scheduleRowMoved, .rowMovedToDay, .rowMerged, .recommendationMerged,
                  .delegate:
                 return .none
 

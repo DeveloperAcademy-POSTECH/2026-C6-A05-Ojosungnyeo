@@ -381,7 +381,7 @@ private struct TimeTableReadOnlyContent: View {
                 }
                 .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, DDSpacing.large)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

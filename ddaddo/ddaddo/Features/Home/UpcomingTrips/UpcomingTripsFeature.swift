@@ -21,6 +21,7 @@ struct UpcomingTripsFeature: Reducer {
         let dateText: String
         var startDate: Date? = nil
         var endDate: Date? = nil
+        var joinedAvatarNames: [String] = []
         let progress: UpcomingTripSnapshot.Progress
 
         var progressTitle: String {
@@ -323,6 +324,7 @@ struct UpcomingTripsFeature: Reducer {
             dateText: dateText(from: snapshot.startDate, to: snapshot.endDate),
             startDate: snapshot.startDate,
             endDate: snapshot.endDate,
+            joinedAvatarNames: snapshot.joinedAvatarNames,
             progress: snapshot.progress
         )
     }

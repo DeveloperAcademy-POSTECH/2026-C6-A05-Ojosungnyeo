@@ -131,6 +131,9 @@ struct HomeFeature: Reducer {
                     state.tripItinerary.timeTable.destinationName = trip?.destinationName
                     state.tripItinerary.timeTable.tripStartDate = trip?.startDate
                     state.tripItinerary.timeTable.tripEndDate = trip?.endDate
+                    state.tripItinerary.timeTable.tripMembers = trip?.joinedAvatarNames
+                        .compactMap(ParticipantAvatar.init(rawValue:))
+                        .map(TripMember.init(avatar:)) ?? []
                     state.isUpcomingTripsPresented = false
                     state.isTripItineraryPresented = true
                     return .none
@@ -233,6 +236,8 @@ struct HomeFeature: Reducer {
                 state.isItineraryTransitionPending = false
                 state.tripItinerary.selectedTab = .dailyItinerary
                 state.tripItinerary.timeTable.resetScheduledItinerary()
+                state.tripItinerary.timeTable.tripMembers = state.placeGrouping.sourcePlaceSelection?
+                    .participants.filter(\.hasJoined).map(\.member) ?? []
                 state.tripItinerary.routeOverview.replaceItinerary(
                     placements: state.tripItinerary.timeTable.placements,
                     coursesByID: state.tripItinerary.timeTable.coursesByID

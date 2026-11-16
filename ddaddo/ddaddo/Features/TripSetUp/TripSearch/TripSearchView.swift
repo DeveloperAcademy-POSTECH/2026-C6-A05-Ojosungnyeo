@@ -154,32 +154,30 @@ struct TripSearchView: View {
     }
 
     private var selectionArea: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("선택한 여행지 \(store.selectedCities.count)")
-                .ddTypography(.captionEmphasis12)
-                .foregroundStyle(DDColor.textSecondary)
+        DDBottomActionArea(topSpacing: 5) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("선택한 여행지 \(store.selectedCities.count)")
+                    .ddTypography(.captionEmphasis12)
+                    .foregroundStyle(DDColor.textSecondary)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: DDSpacing.small) {
-                    ForEach(store.selectedCities) { city in
-                        selectedCityChip(city)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DDSpacing.small) {
+                        ForEach(store.selectedCities) { city in
+                            selectedCityChip(city)
+                        }
                     }
                 }
-            }
-            .frame(height: 32)
-            .padding(.top, DDSpacing.medium)
+                .frame(height: 32)
+                .padding(.top, DDSpacing.medium)
 
-            DDCTAButton(
-                title: "\(store.selectedCities.count)개 도시로 여행 만들기",
-                isEnabled: !store.selectedCities.isEmpty,
-                action: { store.send(.nextButtonTapped) }
-            )
-            .padding(.top, 17)
+                DDCTAButton(
+                    title: "\(store.selectedCities.count)개 도시로 여행 만들기",
+                    isEnabled: !store.selectedCities.isEmpty,
+                    action: { store.send(.nextButtonTapped) }
+                )
+                .padding(.top, 17)
+            }
         }
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, 5)
-        .padding(.bottom, 11)
-        .background(DDColor.surfaceDefault)
     }
 
     private func selectedCityChip(_ city: TripSearchFeature.City) -> some View {

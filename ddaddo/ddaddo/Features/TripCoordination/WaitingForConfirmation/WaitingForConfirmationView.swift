@@ -17,9 +17,13 @@ struct WaitingForConfirmationView: View {
             confirmationGuide
             confirmationStatus
             Spacer(minLength: 0)
-            bottomAction
         }
         .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                bottomAction
+            }
+        }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .task {
@@ -159,7 +163,6 @@ struct WaitingForConfirmationView: View {
             .buttonStyle(.plain)
             .disabled(!store.haveAllMembersConfirmed)
         }
-        .padding(.bottom, 11)
     }
 }
 

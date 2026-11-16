@@ -239,22 +239,20 @@ struct TripSetUpView: View {
     }
 
     private var bottomActionArea: some View {
-        Button {
-            store.send(.saveButtonTapped)
-        } label: {
-            Text(store.isCreatingTrip ? "여행 만드는 중..." : "친구 초대하러 가기")
-                .ddTypography(.heading20)
-                .foregroundStyle(DDColor.textOnPrimary)
-                .frame(maxWidth: .infinity, minHeight: 55)
-                .background(store.isSaveEnabled ? DDColor.actionPrimary : DDColor.textTertiary)
-                .clipShape(.rect(cornerRadius: DDRadius.medium))
+        DDBottomActionArea(topSpacing: DDSpacing.xLarge) {
+            Button {
+                store.send(.saveButtonTapped)
+            } label: {
+                Text(store.isCreatingTrip ? "여행 만드는 중..." : "친구 초대하러 가기")
+                    .ddTypography(.heading20)
+                    .foregroundStyle(DDColor.textOnPrimary)
+                    .frame(maxWidth: .infinity, minHeight: 55)
+                    .background(store.isSaveEnabled ? DDColor.actionPrimary : DDColor.textTertiary)
+                    .clipShape(.rect(cornerRadius: DDRadius.medium))
+            }
+            .buttonStyle(.plain)
+            .disabled(!store.isSaveEnabled || store.isCreatingTrip)
         }
-        .buttonStyle(.plain)
-        .disabled(!store.isSaveEnabled || store.isCreatingTrip)
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.xLarge)
-        .padding(.bottom, 11)
-        .background(DDColor.surfaceDefault)
     }
 
     private func navigationCard(

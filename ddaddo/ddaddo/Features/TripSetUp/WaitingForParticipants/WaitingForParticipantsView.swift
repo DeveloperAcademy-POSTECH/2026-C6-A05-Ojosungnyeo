@@ -55,13 +55,11 @@ struct WaitingForParticipantsView: View {
         }
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: DDSpacing.zero) {
-            DDCTAButton(title: "지도에 핀 찍으러 가기") {
-                store.send(.mapButtonTapped)
+            DDBottomActionArea(topSpacing: DDSpacing.medium) {
+                DDCTAButton(title: "지도에 핀 찍으러 가기") {
+                    store.send(.mapButtonTapped)
+                }
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.medium)
-            .padding(.bottom, 11)
-            .background(DDColor.surfaceDefault)
         }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)

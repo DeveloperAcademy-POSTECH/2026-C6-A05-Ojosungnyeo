@@ -141,16 +141,20 @@ struct SettingsView: View {
             Text(store.nicknameError ?? "2~10자로 입력해 주세요.")
                 .ddTypography(.caption12).foregroundStyle(store.nicknameError == nil ? DDColor.textSecondary : DDColor.statusError).padding(.top, 12)
             Spacer()
-            DDCTAButton(
-                title: store.isSavingNickname ? "저장 중..." : "저장하기",
-                isEnabled: nicknameSaveEnabled,
-                disabledBackgroundColor: DDColor.surfaceControl,
-                disabledForegroundColor: DDColor.textTertiary
-            ) {
-                store.send(.saveNicknameTapped)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                DDCTAButton(
+                    title: store.isSavingNickname ? "저장 중..." : "저장하기",
+                    isEnabled: nicknameSaveEnabled,
+                    disabledBackgroundColor: DDColor.surfaceControl,
+                    disabledForegroundColor: DDColor.textTertiary
+                ) {
+                    store.send(.saveNicknameTapped)
+                }
             }
-                .padding(.bottom, 11)
-        }.padding(.horizontal, DDSpacing.large)
+        }
     }
 
     private var accountManagement: some View {
@@ -250,9 +254,13 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .padding(.top, 28)
             Spacer()
-            withdrawalProceedButton
-                .padding(.bottom, 11)
-        }.padding(.horizontal, DDSpacing.large)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                withdrawalProceedButton
+            }
+        }
     }
 
     private var withdrawalComplete: some View {
@@ -262,8 +270,13 @@ struct SettingsView: View {
             Text("탈퇴가 완료됐어요").ddTypography(.title24).padding(.top, 0)
             Text("함께해주셔서 고마워요.").ddTypography(.body16).foregroundStyle(DDColor.textSecondary).padding(.top, 10)
             Spacer()
-            DDCTAButton(title: "처음 화면으로") { store.send(.returnToLoginTapped) }.padding(.bottom, 11)
-        }.padding(.horizontal, DDSpacing.large)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                DDCTAButton(title: "처음 화면으로") { store.send(.returnToLoginTapped) }
+            }
+        }
     }
 
     private func header(_ title: String) -> some View {

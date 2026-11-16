@@ -425,17 +425,21 @@ struct PlaceGroupingView: View {
                 .padding(.bottom, 12)
             }
             .scrollIndicators(.hidden)
+            .padding(.horizontal, DDBottomActionLayout.horizontalInset)
 
-            DDCTAButton(
-                title: "지역 그룹 확정하기",
-                isEnabled: store.haveAllRecommendedGroupsConfirmed
+            DDBottomActionArea(
+                topSpacing: DDSpacing.small,
+                bottomSafeAreaInset: bottomSafeAreaInset,
+                backgroundColor: .clear
             ) {
-                store.send(.confirmButtonTapped)
+                DDCTAButton(
+                    title: "지역 그룹 확정하기",
+                    isEnabled: store.haveAllRecommendedGroupsConfirmed
+                ) {
+                    store.send(.confirmButtonTapped)
+                }
             }
-            .padding(.top, 8)
-            .padding(.bottom, 34)
         }
-        .padding(.horizontal, DDSpacing.large)
     }
 }
 

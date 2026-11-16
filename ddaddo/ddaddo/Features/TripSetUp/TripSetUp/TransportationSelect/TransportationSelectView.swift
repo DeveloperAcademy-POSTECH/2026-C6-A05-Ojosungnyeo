@@ -151,35 +151,33 @@ struct TransportationSelectView: View {
     }
 
     private var bottomAction: some View {
-        VStack(spacing: DDSpacing.large) {
-            HStack(spacing: 10) {
-                Image("DDTransportationInfo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 16, height: 16)
+        DDBottomActionArea {
+            VStack(spacing: DDSpacing.large) {
+                HStack(spacing: 10) {
+                    Image("DDTransportationInfo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
 
-                Text("먼저 선택한 멤버의 기준으로 그룹을 만들어요.\n그룹 편집 전까지 이동 기준을 바꿀 수 있어요.")
-                    .ddTypography(.caption12)
-                    .foregroundStyle(DDColor.textSecondary)
+                    Text("먼저 선택한 멤버의 기준으로 그룹을 만들어요.\n그룹 편집 전까지 이동 기준을 바꿀 수 있어요.")
+                        .ddTypography(.caption12)
+                        .foregroundStyle(DDColor.textSecondary)
 
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, DDSpacing.medium)
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .background(DDColor.surfaceElevated)
-            .clipShape(.rect(cornerRadius: 12))
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, DDSpacing.medium)
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .background(DDColor.surfaceElevated)
+                .clipShape(.rect(cornerRadius: 12))
 
-            DDCTAButton(
-                title: "이 기준으로 그룹핑 보여주기",
-                isEnabled: store.isSelectionComplete
-            ) {
-                store.send(.recommendationButtonTapped)
+                DDCTAButton(
+                    title: "이 기준으로 그룹핑 보여주기",
+                    isEnabled: store.isSelectionComplete
+                ) {
+                    store.send(.recommendationButtonTapped)
+                }
             }
         }
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.large)
-        .padding(.bottom, 11)
-        .background(DDColor.surfaceDefault)
     }
 
     private func requiredTitle(_ title: String) -> some View {

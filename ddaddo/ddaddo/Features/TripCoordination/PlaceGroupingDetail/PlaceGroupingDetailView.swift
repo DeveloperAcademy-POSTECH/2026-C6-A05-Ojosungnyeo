@@ -114,16 +114,14 @@ struct PlaceGroupingDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DDCTAButton(
-                title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
-                isEnabled: !store.isGroupConfirmed
-            ) {
-                store.send(.confirmButtonTapped)
+            DDBottomActionArea(topSpacing: DDSpacing.xLarge) {
+                DDCTAButton(
+                    title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
+                    isEnabled: !store.isGroupConfirmed
+                ) {
+                    store.send(.confirmButtonTapped)
+                }
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.xLarge)
-            .padding(.bottom, 11)
-            .background(DDColor.surfaceDefault)
         }
         .overlay(alignment: .top) {
             if let notice = store.cancellationNotice {

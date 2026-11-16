@@ -43,7 +43,7 @@ struct PlaceSelectionBottomSheet: View {
                 Spacer(minLength: DDSpacing.large)
 
                 DDCTAButton(title: "장소 검색하기", action: searchButtonTapped)
-                    .padding(.bottom, max(DDSpacing.xLarge, bottomSafeAreaInset + 11))
+                    .padding(.bottom, DDBottomActionLayout.bottomPadding(safeAreaInset: bottomSafeAreaInset))
             } else {
                 Spacer(minLength: 0)
             }

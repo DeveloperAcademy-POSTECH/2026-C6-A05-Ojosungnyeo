@@ -200,7 +200,8 @@ enum FirebaseTripService {
                 name: name,
                 avatarName: avatar.rawValue,
                 hasJoined: document.get("status") as? String == "joined",
-                isCurrentUser: document.get("uid") as? String == currentUserID
+                isCurrentUser: document.get("uid") as? String == currentUserID,
+                isPlaceSelectionConfirmed: document.get("placeSelectionConfirmed") as? Bool ?? false
             )
         }.prefix(4))
 

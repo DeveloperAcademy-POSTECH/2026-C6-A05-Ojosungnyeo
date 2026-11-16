@@ -57,6 +57,12 @@ enum DevelopmentMockTripService {
         )
     ]
 
+    /// 부스에서 직접 조작하지 않는 Dev 계정은 장소 선택을 완료한 상태로 유지합니다.
+    private static let preconfirmedPlaceSelectionNicknames: Set<String> = [
+        "한테이",
+        "흑르딩"
+    ]
+
     static func reset() async throws {
         guard FirebaseApp.app()?.options.projectID == "ddaddodev" else {
             throw DevelopmentMockTripError.developmentBuildRequired
@@ -121,6 +127,8 @@ enum DevelopmentMockTripService {
 
             for (index, resolvedMember) in tripMembers.enumerated() {
                 let places = resolvedPlacesByTripID[trip.id]?[index] ?? []
+                let isPlaceSelectionConfirmed = preconfirmedPlaceSelectionNicknames
+                    .contains(resolvedMember.member.nickname)
                 batch.setData(
                     [
                         "slotIndex": index,
@@ -130,7 +138,7 @@ enum DevelopmentMockTripService {
                         "role": index == 0 ? "owner" : "member",
                         "status": "joined",
                         "selectedPlaces": places,
-                        "placeSelectionConfirmed": false,
+                        "placeSelectionConfirmed": isPlaceSelectionConfirmed,
                         "groupingConfirmed": false,
                         "confirmedGroupIDs": [],
                         "joinedGroupIDs": [],

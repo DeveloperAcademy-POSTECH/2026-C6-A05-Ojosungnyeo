@@ -823,3 +823,23 @@ private struct PlaceDragPreview: View {
         }
     )
 }
+
+#Preview("영문 닉네임 조사") {
+    VStack(alignment: .leading, spacing: DDSpacing.xLarge) {
+        ConfirmationCancellationBanner(
+            notice: .init(memberName: "Alex", character: .grae)
+        )
+
+        Text("\("Alex".withKoreanParticle(.topic)) 이 지역에 그룹핑된 장소가 없어요")
+            .ddTypography(.body16)
+            .foregroundStyle(DDColor.textSecondary)
+
+        ConfirmationCancellationBanner(
+            notice: .init(memberName: "민주", character: .tae)
+        )
+    }
+    .padding(DDSpacing.large)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .background(DDColor.surfaceDefault)
+    .preferredColorScheme(.dark)
+}

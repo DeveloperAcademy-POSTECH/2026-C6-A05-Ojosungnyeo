@@ -70,7 +70,7 @@ struct RouteEditorView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 15)
+                .padding(.horizontal, DDSpacing.large)
 
                 Spacer()
             }
@@ -155,6 +155,7 @@ struct RouteEditorView: View {
         .frame(height: 222)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(topLeadingRadius: 28, topTrailingRadius: 28))
+        .ddBottomSheetBorder(cornerRadius: 28)
         .frame(maxHeight: .infinity, alignment: .bottom)
         .ddFillBottomSheetToScreenEdge(color: DDColor.surfaceElevated)
         .ignoresSafeArea(edges: .bottom)
@@ -168,7 +169,7 @@ private struct RouteEditorSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchBar
-                .padding(.horizontal, 15)
+                .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, DDSpacing.xLarge)
 
             ScrollView {

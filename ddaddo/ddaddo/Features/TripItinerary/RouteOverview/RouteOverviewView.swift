@@ -51,21 +51,13 @@ struct RouteOverviewView: View {
     }
 
     private var tripNavigation: some View {
-        ZStack {
-            DDBackButton {
-                onBack()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-
-            VStack(spacing: 0) {
-                Text(store.tripHeaderTitle)
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textPrimary)
-            }
+        DDNavigationHeader(onBack: onBack) {
+            Text(store.tripHeaderTitle)
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, DDSpacing.small)
-        .frame(height: 44)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var dayPicker: some View {
@@ -92,7 +84,7 @@ struct RouteOverviewView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 17)
+            .padding(.horizontal, DDSpacing.large)
         }
         .scrollIndicators(.hidden)
         .padding(.vertical, 8)
@@ -119,8 +111,7 @@ struct RouteOverviewView: View {
                     .padding(.top, 12)
             }
         }
-        .padding(.leading, 15)
-        .padding(.trailing, DDSpacing.large)
+        .padding(.horizontal, DDSpacing.large)
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(
@@ -129,11 +120,12 @@ struct RouteOverviewView: View {
         )
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge()
         .offset(y: tabBarCoveredHeight)
         .contentShape(.rect)
         .gesture(
-            DragGesture(minimumDistance: 12)
+            DragGesture(minimumDistance: 12, coordinateSpace: .global)
                 .onEnded { value in
                     if value.translation.height < -30 {
                         withAnimation(.easeInOut(duration: 0.25)) {

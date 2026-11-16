@@ -229,11 +229,7 @@ private struct TimeTableEditContent: View {
     }
 
     private var navigationBar: some View {
-        HStack {
-            DDBackButton {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(onBack: { store.send(.backButtonTapped) }) {
             Spacer()
 
             Button("저장") { store.send(.saveButtonTapped) }
@@ -246,7 +242,6 @@ private struct TimeTableEditContent: View {
                 .opacity(store.isSaving ? 0.5 : 1)
         }
         .frame(height: 44)
-        .padding(.leading, DDSpacing.small)
         .padding(.trailing, DDSpacing.large)
     }
 

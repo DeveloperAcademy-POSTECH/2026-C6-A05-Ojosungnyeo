@@ -28,7 +28,7 @@ struct PlaceSelectionBottomSheet: View {
             avatarGroup
                 .padding(.top, DDSpacing.xLarge)
 
-            if isExpanded {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("아직 추가한 장소가 없따...")
                     .ddTypography(.heading18)
                     .foregroundStyle(DDColor.textPrimary)
@@ -43,14 +43,14 @@ struct PlaceSelectionBottomSheet: View {
                 Spacer(minLength: DDSpacing.large)
 
                 DDCTAButton(title: "장소 검색하기", action: searchButtonTapped)
-                    .padding(.bottom, max(DDSpacing.xLarge, bottomSafeAreaInset + 11))
-            } else {
-                Spacer(minLength: 0)
+                    .padding(.bottom, DDBottomActionLayout.bottomPadding(safeAreaInset: bottomSafeAreaInset))
             }
+            .opacity(isExpanded ? 1 : 0)
+            .allowsHitTesting(isExpanded)
         }
         .padding(.horizontal, DDSpacing.large)
         .frame(maxWidth: .infinity)
-        .frame(height: (isExpanded ? 288 : 501) + bottomSafeAreaInset)
+        .frame(height: 288 + bottomSafeAreaInset, alignment: .topLeading)
         .background(DDColor.surfaceDefault)
         .clipShape(
             .rect(
@@ -58,16 +58,7 @@ struct PlaceSelectionBottomSheet: View {
                 topTrailingRadius: 40
             )
         )
-        .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-            .stroke(DDColor.borderDefault, lineWidth: 1)
-            .allowsHitTesting(false)
-        }
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge()
     }
 

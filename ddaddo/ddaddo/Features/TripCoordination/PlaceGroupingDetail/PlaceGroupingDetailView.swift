@@ -114,16 +114,14 @@ struct PlaceGroupingDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DDCTAButton(
-                title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
-                isEnabled: !store.isGroupConfirmed
-            ) {
-                store.send(.confirmButtonTapped)
+            DDBottomActionArea(topSpacing: DDSpacing.xLarge) {
+                DDCTAButton(
+                    title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
+                    isEnabled: !store.isGroupConfirmed
+                ) {
+                    store.send(.confirmButtonTapped)
+                }
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.xLarge)
-            .padding(.bottom, 11)
-            .background(DDColor.surfaceDefault)
         }
         .overlay(alignment: .top) {
             if let notice = store.cancellationNotice {
@@ -179,8 +177,8 @@ struct PlaceGroupingDetailView: View {
     }
 
     private var tripNavigation: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
+        DDNavigationHeader(height: 51, onBack: onBack) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
@@ -190,16 +188,9 @@ struct PlaceGroupingDetailView: View {
                     .foregroundStyle(DDColor.textSecondary)
             }
 
-            HStack {
-                DDBackButton {
-                    onBack()
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, DDSpacing.small)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var groupHeading: some View {
@@ -831,4 +822,24 @@ private struct PlaceDragPreview: View {
             PlaceGroupingDetailFeature()
         }
     )
+}
+
+#Preview("영문 닉네임 조사") {
+    VStack(alignment: .leading, spacing: DDSpacing.xLarge) {
+        ConfirmationCancellationBanner(
+            notice: .init(memberName: "Alex", character: .grae)
+        )
+
+        Text("\("Alex".withKoreanParticle(.topic)) 이 지역에 그룹핑된 장소가 없어요")
+            .ddTypography(.body16)
+            .foregroundStyle(DDColor.textSecondary)
+
+        ConfirmationCancellationBanner(
+            notice: .init(memberName: "민주", character: .tae)
+        )
+    }
+    .padding(DDSpacing.large)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .background(DDColor.surfaceDefault)
+    .preferredColorScheme(.dark)
 }

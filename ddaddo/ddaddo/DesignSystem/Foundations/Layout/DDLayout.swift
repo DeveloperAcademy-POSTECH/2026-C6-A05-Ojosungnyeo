@@ -23,3 +23,13 @@ enum DDRadius {
     static let medium: CGFloat = 16
     static let pill: CGFloat = 999
 }
+
+enum DDBottomActionLayout {
+    static let horizontalInset: CGFloat = DDSpacing.large
+    static let bottomSpacing: CGFloat = 11
+
+    /// 이미 안전 영역 안에 있는 화면은 0, 화면 끝까지 내려간 시트는 실제 인셋을 전달한다.
+    static func bottomPadding(safeAreaInset: CGFloat = 0) -> CGFloat {
+        max(0, safeAreaInset) + bottomSpacing
+    }
+}

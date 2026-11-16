@@ -14,7 +14,7 @@ struct TripSetUpView: View {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     header
-                        .padding(.horizontal, DDSpacing.small)
+                        .padding(.trailing, DDSpacing.small)
 
                     ScrollView {
                         VStack(spacing: 0) {
@@ -133,18 +133,16 @@ struct TripSetUpView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "뒤로 가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text("여행 정보 추가")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
 
             Spacer()
         }
-        .frame(height: 44)
     }
 
     private var tripSummary: some View {
@@ -241,22 +239,20 @@ struct TripSetUpView: View {
     }
 
     private var bottomActionArea: some View {
-        Button {
-            store.send(.saveButtonTapped)
-        } label: {
-            Text(store.isCreatingTrip ? "여행 만드는 중..." : "친구 초대하러 가기")
-                .ddTypography(.heading20)
-                .foregroundStyle(DDColor.textOnPrimary)
-                .frame(maxWidth: .infinity, minHeight: 55)
-                .background(store.isSaveEnabled ? DDColor.actionPrimary : DDColor.textTertiary)
-                .clipShape(.rect(cornerRadius: DDRadius.medium))
+        DDBottomActionArea(topSpacing: DDSpacing.xLarge) {
+            Button {
+                store.send(.saveButtonTapped)
+            } label: {
+                Text(store.isCreatingTrip ? "여행 만드는 중..." : "친구 초대하러 가기")
+                    .ddTypography(.heading20)
+                    .foregroundStyle(DDColor.textOnPrimary)
+                    .frame(maxWidth: .infinity, minHeight: 55)
+                    .background(store.isSaveEnabled ? DDColor.actionPrimary : DDColor.textTertiary)
+                    .clipShape(.rect(cornerRadius: DDRadius.medium))
+            }
+            .buttonStyle(.plain)
+            .disabled(!store.isSaveEnabled || store.isCreatingTrip)
         }
-        .buttonStyle(.plain)
-        .disabled(!store.isSaveEnabled || store.isCreatingTrip)
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, DDSpacing.xLarge)
-        .padding(.bottom, 11)
-        .background(DDColor.surfaceDefault)
     }
 
     private func navigationCard(

@@ -55,13 +55,11 @@ struct WaitingForParticipantsView: View {
         }
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: DDSpacing.zero) {
-            DDCTAButton(title: "지도에 핀 찍으러 가기") {
-                store.send(.mapButtonTapped)
+            DDBottomActionArea(topSpacing: DDSpacing.medium) {
+                DDCTAButton(title: "지도에 핀 찍으러 가기") {
+                    store.send(.mapButtonTapped)
+                }
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.medium)
-            .padding(.bottom, 11)
-            .background(DDColor.surfaceDefault)
         }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -101,11 +99,10 @@ struct WaitingForParticipantsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "뒤로 가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             HStack(spacing: DDSpacing.xSmall) {
                 Text("친구를 기다리고 이따")
                     .ddTypography(.title24)
@@ -118,8 +115,8 @@ struct WaitingForParticipantsView: View {
 
             Spacer(minLength: DDSpacing.zero)
         }
-        .frame(height: 44)
-        .padding(.horizontal, -DDSpacing.small)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
 
     private var invitationCard: some View {

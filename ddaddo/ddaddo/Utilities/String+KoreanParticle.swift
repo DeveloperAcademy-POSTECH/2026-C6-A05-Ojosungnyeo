@@ -12,13 +12,19 @@ enum KoreanParticle {
 
     fileprivate func suffix(for text: String) -> String {
         let finalConsonant = text.koreanFinalConsonant
+        let lastCharacter = text.trimmingCharacters(in: .whitespacesAndNewlines).last
+        let hasEnglishEnding = lastCharacter?.isASCII == true
+            && text.contains { $0.isASCII && $0.isLetter }
 
         switch self {
         case .subject:
+            if hasEnglishEnding { return "(이)가" }
             return finalConsonant == nil ? "가" : "이"
         case .topic:
+            if hasEnglishEnding { return "(은)는" }
             return finalConsonant == nil ? "는" : "은"
         case .direction:
+            if hasEnglishEnding { return "(으)로" }
             return finalConsonant == nil || finalConsonant == 8 ? "로" : "으로"
         }
     }

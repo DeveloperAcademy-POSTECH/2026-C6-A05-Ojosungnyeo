@@ -86,16 +86,7 @@ struct ConfirmedPlacesBottomSheet: View {
         .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-            .stroke(DDColor.borderDefault, lineWidth: 1)
-            .allowsHitTesting(false)
-        }
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge()
     }
 }

@@ -112,7 +112,7 @@ struct SettingsView: View {
                 }
             }
             Spacer()
-        }.padding(.horizontal, 24)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private var nicknameEdit: some View {
@@ -141,16 +141,20 @@ struct SettingsView: View {
             Text(store.nicknameError ?? "2~10자로 입력해 주세요.")
                 .ddTypography(.caption12).foregroundStyle(store.nicknameError == nil ? DDColor.textSecondary : DDColor.statusError).padding(.top, 12)
             Spacer()
-            DDCTAButton(
-                title: store.isSavingNickname ? "저장 중..." : "저장하기",
-                isEnabled: nicknameSaveEnabled,
-                disabledBackgroundColor: DDColor.surfaceControl,
-                disabledForegroundColor: DDColor.textTertiary
-            ) {
-                store.send(.saveNicknameTapped)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                DDCTAButton(
+                    title: store.isSavingNickname ? "저장 중..." : "저장하기",
+                    isEnabled: nicknameSaveEnabled,
+                    disabledBackgroundColor: DDColor.surfaceControl,
+                    disabledForegroundColor: DDColor.textTertiary
+                ) {
+                    store.send(.saveNicknameTapped)
+                }
             }
-                .padding(.bottom, 11)
-        }.padding(.horizontal, 24)
+        }
     }
 
     private var accountManagement: some View {
@@ -192,7 +196,7 @@ struct SettingsView: View {
                     .stroke(settingsCardBorder, lineWidth: 1)
             }
             Spacer()
-        }.padding(.horizontal, 24)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private var withdrawalGuide: some View {
@@ -250,9 +254,13 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .padding(.top, 28)
             Spacer()
-            withdrawalProceedButton
-                .padding(.bottom, 11)
-        }.padding(.horizontal, 24)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                withdrawalProceedButton
+            }
+        }
     }
 
     private var withdrawalComplete: some View {
@@ -262,22 +270,27 @@ struct SettingsView: View {
             Text("탈퇴가 완료됐어요").ddTypography(.title24).padding(.top, 0)
             Text("함께해주셔서 고마워요.").ddTypography(.body16).foregroundStyle(DDColor.textSecondary).padding(.top, 10)
             Spacer()
-            DDCTAButton(title: "처음 화면으로") { store.send(.returnToLoginTapped) }.padding(.bottom, 11)
-        }.padding(.horizontal, 16)
+        }
+        .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                DDCTAButton(title: "처음 화면으로") { store.send(.returnToLoginTapped) }
+            }
+        }
     }
 
     private func header(_ title: String) -> some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "이전 화면으로 이동") {
-                store.send(.backButtonTapped)
-            }
+        DDNavigationHeader(
+            accessibilityLabel: "이전 화면으로 이동",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text(title)
                 .ddTypography(.title24)
             Spacer()
         }
         .foregroundStyle(DDColor.textPrimary)
-        .frame(height: 44)
-        .padding(.horizontal, -DDSpacing.large)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
@@ -420,6 +433,42 @@ private struct DDCompactToggleStyle: ToggleStyle {
                 nickname: "하르딩",
                 nicknameDraft: "하르딩"
             )
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}
+
+#Preview("계정 관리") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "지구인",
+                    nicknameDraft: "지구인"
+                )
+                state.screen = .account
+                return state
+            }()
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}
+
+#Preview("탈퇴 안내") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "지구인",
+                    nicknameDraft: "지구인"
+                )
+                state.screen = .withdrawal
+                return state
+            }()
         ) {
             SettingsFeature()
                 .dependency(\.notificationClient, NotificationClient.previewValue)

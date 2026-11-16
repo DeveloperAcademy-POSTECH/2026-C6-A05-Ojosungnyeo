@@ -28,7 +28,6 @@ struct HomeView: View {
                     bottomGradient
                     speechBubble
                     menuButton
-                    exploreTripsButton
 
                     if store.isMenuPresented {
                         menuDismissArea
@@ -47,6 +46,14 @@ struct HomeView: View {
             .ignoresSafeArea()
             .allowsHitTesting(!store.isUpcomingTripsPresented)
             .gesture(homeSwipeGesture)
+
+            VStack {
+                Spacer(minLength: 0)
+                DDBottomActionArea(backgroundColor: .clear) {
+                    exploreTripsButton
+                }
+            }
+            .allowsHitTesting(!store.isUpcomingTripsPresented)
 
             if store.isUpcomingTripsPresented {
                 UpcomingTripsView(
@@ -366,11 +373,11 @@ struct HomeView: View {
                     .ddTypography(.heading20)
             }
             .foregroundStyle(.white)
-            .frame(width: 346, height: 72)
+            .frame(maxWidth: .infinity)
+            .frame(height: 72)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .position(x: 201, y: 766)
     }
 
     private enum Layout {

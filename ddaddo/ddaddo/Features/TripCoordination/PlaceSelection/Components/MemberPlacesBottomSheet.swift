@@ -17,7 +17,6 @@ private struct MemberPlaceDropFramesKey: PreferenceKey {
 }
 
 struct MemberPlacesBottomSheet: View {
-    let isExpanded: Bool
     let selectedMember: TripMember
     let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
@@ -71,16 +70,12 @@ struct MemberPlacesBottomSheet: View {
                 memberSelector
                     .padding(.top, DDSpacing.xLarge)
 
-                if isExpanded {
-                    if places.isEmpty {
-                        emptyState
+                if places.isEmpty {
+                    emptyState
 
-                        Spacer(minLength: bottomContentInset)
-                    } else {
-                        placeList
-                    }
+                    Spacer(minLength: bottomContentInset)
                 } else {
-                    Spacer(minLength: 0)
+                    placeList
                 }
             }
             .padding(.horizontal, DDSpacing.large)
@@ -126,16 +121,7 @@ struct MemberPlacesBottomSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-            .stroke(DDColor.borderDefault, lineWidth: 1)
-            .allowsHitTesting(false)
-        }
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge()
         .onChange(of: canDragPlaces) { _, canDrag in
             if !canDrag {

@@ -24,12 +24,14 @@ struct NicknameSetupView: View {
             .padding(.top, 48)
 
             Spacer(minLength: 24)
-
-            continueButton
-                .padding(.bottom, 38)
         }
         .padding(.horizontal, 24)
         .padding(.top, 63)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                continueButton
+            }
+        }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .onTapGesture {

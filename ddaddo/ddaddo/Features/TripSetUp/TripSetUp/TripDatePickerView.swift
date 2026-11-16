@@ -75,24 +75,7 @@ struct TripDatePickerView: View {
                 topTrailingRadius: 40
             )
         )
-        .overlay(alignment: .top) {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-            .strokeBorder(
-                Color(
-                    red: 74 / 255,
-                    green: 74 / 255,
-                    blue: 74 / 255
-                ),
-                lineWidth: 1
-            )
-            .frame(height: Self.sheetHeight + 120)
-            .allowsHitTesting(false)
-        }
+        .ddBottomSheetBorder()
         .overlay(alignment: .topLeading) {
             if isMonthYearPickerPresented {
                 ZStack(alignment: .topLeading) {

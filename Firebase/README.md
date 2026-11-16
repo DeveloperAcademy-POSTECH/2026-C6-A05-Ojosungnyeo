@@ -13,7 +13,7 @@ Dev 프로젝트에 Firestore 규칙을 배포할 때는 저장소 루트에서 
 
 ```shell
 npx firebase-tools deploy \
-  --project ddaddo-bc479 \
+  --project ddaddodev \
   --config Firebase/Dev/firebase.json \
   --only firestore:rules
 ```

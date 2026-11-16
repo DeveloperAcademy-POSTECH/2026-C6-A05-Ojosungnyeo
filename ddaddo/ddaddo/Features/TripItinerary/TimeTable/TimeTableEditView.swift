@@ -478,7 +478,7 @@ private struct TimeTableEditContent: View {
     }
 
     private func shouldDisplayMemberDots(for memberIDs: [String]) -> Bool {
-        !memberIDs.isEmpty
+        TimeTableCourse.kind(of: memberIDs, among: timeTableStore.tripMembers) == .separate
     }
 
     private func dragHandle(_ item: DraggedItem) -> some View {

@@ -17,7 +17,7 @@ struct TimeTableFeature: Reducer {
     @ObservableState
     struct State: Equatable {
         var selectedDay = TripDay.day1
-        var tripMembers = TripMember.allCases
+        var tripMembers: [TripMember] = []
         var currentTripMember: TripMember?
         var tripStartDate: Date? = nil
         var tripEndDate: Date? = nil
@@ -208,6 +208,8 @@ struct TimeTableFeature: Reducer {
 
         mutating func resetScheduledItinerary() {
             selectedDay = .day1
+            tripMembers = []
+            currentTripMember = nil
             coursesByID = [:]
             groups = []
             placements = []
@@ -779,6 +781,7 @@ struct TimeTableFeature: Reducer {
     static var debugMockState: State {
         var state = State()
         state.isLocalPreview = true
+        state.tripMembers = TripMember.allCases
         state.tripTitle = "도쿄 여행을 살펴보게따"
         state.destinationName = "도쿄"
         let calendar = Calendar(identifier: .gregorian)
@@ -934,15 +937,19 @@ struct TimeTableCourse: Equatable, Identifiable {
     }
 
     func kind(among tripMembers: [TripMember]) -> Kind? {
+        Self.kind(of: members.map(\.rawValue), among: tripMembers)
+    }
+
+    static func kind(of memberIDs: [String], among tripMembers: [TripMember]) -> Kind? {
         let tripMemberIDs = tripMembers.map(\.id)
-        let courseMemberIDs = members.map(\.id)
+        let courseMemberIDs = memberIDs.compactMap(TripMember.init(rawValue:))
         let tripIDSet = Set(tripMemberIDs)
         let courseIDSet = Set(courseMemberIDs)
 
         guard !tripIDSet.isEmpty,
               !courseIDSet.isEmpty,
               tripIDSet.count == tripMemberIDs.count,
-              courseIDSet.count == courseMemberIDs.count,
+              courseIDSet.count == memberIDs.count,
               courseIDSet.isSubset(of: tripIDSet)
         else { return nil }
 

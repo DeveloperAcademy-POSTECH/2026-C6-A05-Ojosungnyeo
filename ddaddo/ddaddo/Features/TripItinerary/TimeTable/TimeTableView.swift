@@ -256,9 +256,11 @@ private struct TimeTableReadOnlyContent: View {
                             .ddTypography(.bodyEmphasis16)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
-                        HStack(spacing: -5) {
-                            ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
-                                Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                        if TimeTableCourse.kind(of: first.memberIDs, among: store.tripMembers) == .separate {
+                            HStack(spacing: -5) {
+                                ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
+                                    Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                                }
                             }
                         }
                     }

@@ -81,11 +81,7 @@ private struct TimeTableReadOnlyContent: View {
     }
 
     private var navigationBar: some View {
-        HStack {
-            DDBackButton {
-                onBack()
-            }
-
+        DDNavigationHeader(onBack: onBack) {
             Spacer()
 
             Button("편집", action: onEdit)
@@ -97,7 +93,6 @@ private struct TimeTableReadOnlyContent: View {
                 .buttonStyle(.plain)
         }
         .frame(height: 44)
-        .padding(.leading, DDSpacing.small)
         .padding(.trailing, DDSpacing.large)
     }
 
@@ -430,11 +425,7 @@ struct TimeTableContent: View {
     }
 
     private var navigationBar: some View {
-        HStack {
-            DDBackButton {
-                onBack()
-            }
-
+        DDNavigationHeader(onBack: onBack) {
             Spacer()
 
             if let onEdit {
@@ -461,7 +452,6 @@ struct TimeTableContent: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.leading, DDSpacing.small)
         .padding(.trailing, DDSpacing.large)
     }
 

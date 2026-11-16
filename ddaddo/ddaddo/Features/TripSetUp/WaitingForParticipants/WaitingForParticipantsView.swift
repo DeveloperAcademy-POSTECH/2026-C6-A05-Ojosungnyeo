@@ -101,11 +101,10 @@ struct WaitingForParticipantsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "뒤로 가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             HStack(spacing: DDSpacing.xSmall) {
                 Text("친구를 기다리고 이따")
                     .ddTypography(.title24)
@@ -118,8 +117,8 @@ struct WaitingForParticipantsView: View {
 
             Spacer(minLength: DDSpacing.zero)
         }
-        .frame(height: 44)
-        .padding(.horizontal, -DDSpacing.small)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
 
     private var invitationCard: some View {

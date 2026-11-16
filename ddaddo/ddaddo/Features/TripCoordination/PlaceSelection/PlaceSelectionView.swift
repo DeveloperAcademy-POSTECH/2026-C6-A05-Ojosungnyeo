@@ -261,11 +261,12 @@ struct PlaceSelectionView: View {
     }
 
     private var placeSelectionNavigationBar: some View {
-        HStack(alignment: .top, spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "친구 초대 화면으로 돌아가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "친구 초대 화면으로 돌아가기",
+            alignment: .top,
+            height: 62,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
                     .ddTypography(.heading18)
@@ -296,9 +297,8 @@ struct PlaceSelectionView: View {
                 maximumCount: store.maximumPlaceCount
             )
         }
-        .padding(.horizontal, DDSpacing.small)
+        .padding(.trailing, DDSpacing.small)
         .frame(maxWidth: .infinity)
-        .frame(height: 62, alignment: .top)
     }
 
     private var searchField: some View {

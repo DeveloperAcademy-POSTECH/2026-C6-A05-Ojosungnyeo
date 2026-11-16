@@ -35,8 +35,11 @@ struct TransportationSelectView: View {
     }
 
     private var tripNavigation: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
+        DDNavigationHeader(
+            height: 51,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("도쿄 여행")
                     .ddTypography(.labelEmphasis14)
                     .foregroundStyle(DDColor.textPrimary)
@@ -46,16 +49,9 @@ struct TransportationSelectView: View {
                     .foregroundStyle(DDColor.textSecondary)
             }
 
-            HStack {
-                DDBackButton {
-                    store.send(.backButtonTapped)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, DDSpacing.small)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var heading: some View {

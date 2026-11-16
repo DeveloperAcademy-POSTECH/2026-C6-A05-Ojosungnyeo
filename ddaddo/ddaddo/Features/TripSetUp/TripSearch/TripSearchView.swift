@@ -13,7 +13,7 @@ struct TripSearchView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 header
-                    .padding(.horizontal, DDSpacing.small)
+                    .padding(.trailing, DDSpacing.small)
 
                 searchField
                     .padding(.horizontal, DDSpacing.large)
@@ -53,18 +53,16 @@ struct TripSearchView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "뒤로 가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text("여행지 검색")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
 
             Spacer()
         }
-        .frame(height: 44)
     }
 
     private var searchField: some View {

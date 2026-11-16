@@ -179,29 +179,24 @@ struct PlaceGroupingView: View {
     }
 
     private var tripHeader: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
+        DDNavigationHeader(
+            accessibilityLabel: "예정된 여행으로 돌아가기",
+            height: 51,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
 
                 Text(store.tripDates)
                     .ddTypography(.label14)
-                    .multilineTextAlignment(.center)
                     .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
-                    .frame(width: 200, height: 20, alignment: .top)
+                    .frame(height: 20, alignment: .topLeading)
             }
-
-            HStack {
-                DDBackButton(accessibilityLabel: "예정된 여행으로 돌아가기") {
-                    store.send(.backButtonTapped)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, DDSpacing.small)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var travelCriteria: some View {

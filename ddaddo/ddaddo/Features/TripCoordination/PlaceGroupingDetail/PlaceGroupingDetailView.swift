@@ -179,8 +179,8 @@ struct PlaceGroupingDetailView: View {
     }
 
     private var tripNavigation: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
+        DDNavigationHeader(height: 51, onBack: onBack) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
@@ -190,16 +190,9 @@ struct PlaceGroupingDetailView: View {
                     .foregroundStyle(DDColor.textSecondary)
             }
 
-            HStack {
-                DDBackButton {
-                    onBack()
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, DDSpacing.small)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var groupHeading: some View {

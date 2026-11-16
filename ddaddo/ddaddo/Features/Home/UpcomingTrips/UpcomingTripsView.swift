@@ -56,7 +56,7 @@ struct UpcomingTripsView: View {
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 header
-                    .padding(.horizontal, DDSpacing.small)
+                    .padding(.trailing, DDSpacing.small)
                     .padding(.bottom, DDSpacing.small)
                     .background(DDColor.surfaceDefault)
             }
@@ -194,11 +194,10 @@ struct UpcomingTripsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "홈으로 돌아가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "홈으로 돌아가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text("예정된 여행")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
@@ -231,7 +230,6 @@ struct UpcomingTripsView: View {
                 action: { store.send(.addTripButtonTapped) }
             )
         }
-        .frame(height: 44)
     }
 
     private func headerButton(

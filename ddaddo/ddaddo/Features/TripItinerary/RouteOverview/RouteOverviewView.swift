@@ -51,21 +51,13 @@ struct RouteOverviewView: View {
     }
 
     private var tripNavigation: some View {
-        ZStack {
-            DDBackButton {
-                onBack()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-
-            VStack(spacing: 0) {
-                Text(store.tripHeaderTitle)
-                    .ddTypography(.bodyEmphasis16)
-                    .foregroundStyle(DDColor.textPrimary)
-            }
+        DDNavigationHeader(onBack: onBack) {
+            Text(store.tripHeaderTitle)
+                .ddTypography(.bodyEmphasis16)
+                .foregroundStyle(DDColor.textPrimary)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, DDSpacing.small)
-        .frame(height: 44)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var dayPicker: some View {

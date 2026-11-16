@@ -267,17 +267,17 @@ struct SettingsView: View {
     }
 
     private func header(_ title: String) -> some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "이전 화면으로 이동") {
-                store.send(.backButtonTapped)
-            }
+        DDNavigationHeader(
+            accessibilityLabel: "이전 화면으로 이동",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text(title)
                 .ddTypography(.title24)
             Spacer()
         }
         .foregroundStyle(DDColor.textPrimary)
-        .frame(height: 44)
-        .padding(.horizontal, -DDSpacing.large)
+        .padding(.leading, -DDSpacing.xLarge)
+        .padding(.trailing, -DDSpacing.large)
     }
     private func sectionTitle(_ title: String) -> some View {
         Text(title)

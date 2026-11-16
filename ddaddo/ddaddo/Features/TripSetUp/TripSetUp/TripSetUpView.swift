@@ -14,7 +14,7 @@ struct TripSetUpView: View {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     header
-                        .padding(.horizontal, DDSpacing.small)
+                        .padding(.trailing, DDSpacing.small)
 
                     ScrollView {
                         VStack(spacing: 0) {
@@ -133,18 +133,16 @@ struct TripSetUpView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            DDBackButton(accessibilityLabel: "뒤로 가기") {
-                store.send(.backButtonTapped)
-            }
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text("여행 정보 추가")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
 
             Spacer()
         }
-        .frame(height: 44)
     }
 
     private var tripSummary: some View {

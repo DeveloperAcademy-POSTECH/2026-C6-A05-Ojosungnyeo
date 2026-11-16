@@ -31,8 +31,11 @@ struct WaitingForConfirmationView: View {
     }
 
     private var navigationBar: some View {
-        ZStack {
-            VStack(spacing: 0) {
+        DDNavigationHeader(
+            height: 51,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
@@ -42,16 +45,10 @@ struct WaitingForConfirmationView: View {
                     .foregroundStyle(DDColor.textSecondary)
             }
 
-            HStack {
-                DDBackButton {
-                    store.send(.backButtonTapped)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, -DDSpacing.small)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
 
     private var confirmationGuide: some View {

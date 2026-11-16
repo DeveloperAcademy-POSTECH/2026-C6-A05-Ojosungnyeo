@@ -934,15 +934,28 @@ struct PlaceSelectionFeature: Reducer {
                         if let cachedDestinationCoordinate {
                             destinationCoordinate = cachedDestinationCoordinate
                         } else {
-                            guard let destinationResult = try await placeClient
-                                .autocomplete("\(destinationName) 도시 중심")
-                                .first
-                            else {
+                            let destinationQueries = [
+                                destinationName,
+                                "\(destinationName) city center",
+                                "\(destinationName) 도시 중심",
+                                "\(destinationName) country"
+                            ]
+                            var resolvedDestinationDetails: PlaceDetails?
+                            for query in destinationQueries {
+                                if case .some = resolvedDestinationDetails { break }
+                                guard let results = try? await placeClient.autocomplete(query) else {
+                                    continue
+                                }
+                                for result in results.prefix(5) {
+                                    if let details = try? await placeClient.fetchDetails(result) {
+                                        resolvedDestinationDetails = details
+                                        break
+                                    }
+                                }
+                            }
+                            guard let destinationDetails = resolvedDestinationDetails else {
                                 throw PlaceSelectionValidationError.destinationNotFound
                             }
-                            let destinationDetails = try await placeClient.fetchDetails(
-                                destinationResult
-                            )
                             destinationCoordinate = DestinationCoordinate(
                                 latitude: destinationDetails.latitude,
                                 longitude: destinationDetails.longitude

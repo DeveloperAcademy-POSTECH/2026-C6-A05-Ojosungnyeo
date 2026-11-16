@@ -23,6 +23,7 @@ struct MemberPlacesBottomSheet: View {
     let places: [PinnedPlace]
     let canDeletePlaces: Bool
     let canConfirm: Bool
+    var canCancelConfirmation = false
     let showsConfirmationButton: Bool
     let isConfirmationComplete: Bool
     var bottomContentInset: CGFloat = DDSpacing.xLarge
@@ -53,6 +54,10 @@ struct MemberPlacesBottomSheet: View {
         on: .main,
         in: .common
     ).autoconnect()
+
+    private var canDragPlaces: Bool {
+        canDeletePlaces && !isConfirmationComplete
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -132,6 +137,14 @@ struct MemberPlacesBottomSheet: View {
             .allowsHitTesting(false)
         }
         .ddFillBottomSheetToScreenEdge()
+        .onChange(of: canDragPlaces) { _, canDrag in
+            if !canDrag {
+                finishDrag()
+            }
+        }
+        .onDisappear {
+            finishDrag()
+        }
     }
 
     private var memberSelector: some View {
@@ -168,7 +181,8 @@ struct MemberPlacesBottomSheet: View {
                 .frame(height: 28)
                 .background(canConfirm ? DDColor.actionPrimary : DDColor.surfaceControl)
                 .clipShape(.capsule)
-                .disabled(isConfirmationComplete || !canConfirm)
+                .disabled(!canConfirm && !canCancelConfirmation)
+                .accessibilityHint(isConfirmationComplete ? "장소 확정을 취소하고 다시 수정해요" : "선택한 장소를 확정해요")
             }
         }
     }
@@ -194,16 +208,19 @@ struct MemberPlacesBottomSheet: View {
                     ForEach(places) { place in
                         PlacePinCard(
                             place: place,
-                            showsDragHandle: canDeletePlaces,
+                            showsDragHandle: canDragPlaces,
                             onDragChanged: { location in
-                                guard canDeletePlaces else { return }
+                                guard canDragPlaces else { return }
                                 draggingPlaceID = place.id
                                 dragLocation = verticalDragLocation(from: location)
                                 updateAutoScrollDirection(at: location)
                                 updateDropTarget(at: location)
                             },
                             onDragEnded: { location in
-                                guard canDeletePlaces else { return }
+                                guard canDragPlaces else {
+                                    finishDrag()
+                                    return
+                                }
                                 dragLocation = verticalDragLocation(from: location)
                                 updateAutoScrollDirection(at: location)
                                 updateDropTarget(at: location)
@@ -327,7 +344,8 @@ struct MemberPlacesBottomSheet: View {
 
     private func commitDrop() {
         defer { finishDrag() }
-        guard let draggingPlaceID,
+        guard canDragPlaces,
+              let draggingPlaceID,
               let draggedPlace = places.first(where: { $0.id == draggingPlaceID })
         else { return }
 

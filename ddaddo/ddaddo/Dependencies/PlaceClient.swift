@@ -15,7 +15,7 @@ struct PlaceClient: DependencyKey, Sendable {
     var savePlace: @Sendable (String, PinnedPlace) async throws -> Void
     var deletePlace: @Sendable (String, String) async throws -> Void
     var replacePlaces: @Sendable (String, [PinnedPlace]) async throws -> Void
-    var confirmPlaces: @Sendable (String) async throws -> Void
+    var setPlaceSelectionConfirmation: @Sendable (String, Bool) async throws -> Void
     var joinGroup: @Sendable (String, String) async throws -> Void
     var setGroupConfirmation: @Sendable (String, String, Bool, Bool) async throws -> Void
     var updateGroupPlaces: @Sendable (String, String, [String], String?) async throws -> Void
@@ -55,8 +55,11 @@ struct PlaceClient: DependencyKey, Sendable {
                     tripID: tripID
                 )
             },
-            confirmPlaces: { tripID in
-                try await FirebasePlaceSelectionService.confirmPlaces(tripID: tripID)
+            setPlaceSelectionConfirmation: { tripID, isConfirmed in
+                try await FirebasePlaceSelectionService.setPlaceSelectionConfirmation(
+                    tripID: tripID,
+                    isConfirmed: isConfirmed
+                )
             },
             joinGroup: { tripID, groupID in
                 try await FirebasePlaceSelectionService.joinGroup(
@@ -126,7 +129,7 @@ struct PlaceClient: DependencyKey, Sendable {
         savePlace: { _, _ in },
         deletePlace: { _, _ in },
         replacePlaces: { _, _ in },
-        confirmPlaces: { _ in },
+        setPlaceSelectionConfirmation: { _, _ in },
         joinGroup: { _, _ in },
         setGroupConfirmation: { _, _, _, _ in },
         updateGroupPlaces: { _, _, _, _ in },

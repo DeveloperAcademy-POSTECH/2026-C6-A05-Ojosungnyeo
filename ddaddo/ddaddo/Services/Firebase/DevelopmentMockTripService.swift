@@ -36,31 +36,31 @@ enum DevelopmentMockTripService {
 
     private static let members = [
         Member(
-            nickname: "데브주니",
-            nicknameKey: "c9dd15f227d8e64d2c71f96da03a19dc95054c7910986696a212a10f60f47a75",
+            nickname: "헤더",
+            nicknameKey: "999150ec9bb6ce141fed9c6666a1ba5f15641fdaca676919d2519c68bde470b3",
             avatar: .juni
         ),
         Member(
-            nickname: "데브짭주니",
-            nicknameKey: "a7d1dce39fac951b2b82a3a31b33530b1e6f238c5accecc45d1a1b2fde25418d",
+            nickname: "그레",
+            nicknameKey: "630f3a1e31f8a3de46cb12acf791b26344b091c20fef93e8a7cae85d880a6822",
             avatar: .grae
         ),
         Member(
-            nickname: "한테이",
-            nicknameKey: "7646cd9a72f31acbe7c2b25674f4bcda614d89d002727194ceae4fe18027e257",
+            nickname: "테이",
+            nicknameKey: "31eef782e2c8ab07f90fc402d3786cbff8118a68773bdcbbe458940fa189b762",
             avatar: .tae
         ),
         Member(
-            nickname: "흑르딩",
-            nicknameKey: "fe434f9eaba3fe1f6c20b87c550d10202f772ff4b49513dae4ed05e3bbe87e98",
+            nickname: "하르딘",
+            nicknameKey: "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039",
             avatar: .header
         )
     ]
 
     /// 부스에서 직접 조작하지 않는 Dev 계정은 장소 선택을 완료한 상태로 유지합니다.
     private static let preconfirmedPlaceSelectionNicknames: Set<String> = [
-        "한테이",
-        "흑르딩"
+        "테이",
+        "하르딘"
     ]
 
     static func reset() async throws {

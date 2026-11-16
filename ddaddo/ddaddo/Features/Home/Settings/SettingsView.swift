@@ -112,7 +112,7 @@ struct SettingsView: View {
                 }
             }
             Spacer()
-        }.padding(.horizontal, 24)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private var nicknameEdit: some View {
@@ -150,7 +150,7 @@ struct SettingsView: View {
                 store.send(.saveNicknameTapped)
             }
                 .padding(.bottom, 11)
-        }.padding(.horizontal, 24)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private var accountManagement: some View {
@@ -192,7 +192,7 @@ struct SettingsView: View {
                     .stroke(settingsCardBorder, lineWidth: 1)
             }
             Spacer()
-        }.padding(.horizontal, 24)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private var withdrawalGuide: some View {
@@ -252,7 +252,7 @@ struct SettingsView: View {
             Spacer()
             withdrawalProceedButton
                 .padding(.bottom, 11)
-        }.padding(.horizontal, 24)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private var withdrawalComplete: some View {
@@ -263,7 +263,7 @@ struct SettingsView: View {
             Text("함께해주셔서 고마워요.").ddTypography(.body16).foregroundStyle(DDColor.textSecondary).padding(.top, 10)
             Spacer()
             DDCTAButton(title: "처음 화면으로") { store.send(.returnToLoginTapped) }.padding(.bottom, 11)
-        }.padding(.horizontal, 16)
+        }.padding(.horizontal, DDSpacing.large)
     }
 
     private func header(_ title: String) -> some View {
@@ -276,8 +276,8 @@ struct SettingsView: View {
             Spacer()
         }
         .foregroundStyle(DDColor.textPrimary)
-        .padding(.leading, -DDSpacing.xLarge)
-        .padding(.trailing, -DDSpacing.large)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
@@ -420,6 +420,42 @@ private struct DDCompactToggleStyle: ToggleStyle {
                 nickname: "하르딩",
                 nicknameDraft: "하르딩"
             )
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}
+
+#Preview("계정 관리") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "지구인",
+                    nicknameDraft: "지구인"
+                )
+                state.screen = .account
+                return state
+            }()
+        ) {
+            SettingsFeature()
+                .dependency(\.notificationClient, NotificationClient.previewValue)
+        }
+    )
+}
+
+#Preview("탈퇴 안내") {
+    SettingsView(
+        store: Store(
+            initialState: {
+                var state = SettingsFeature.State(
+                    nickname: "지구인",
+                    nicknameDraft: "지구인"
+                )
+                state.screen = .withdrawal
+                return state
+            }()
         ) {
             SettingsFeature()
                 .dependency(\.notificationClient, NotificationClient.previewValue)

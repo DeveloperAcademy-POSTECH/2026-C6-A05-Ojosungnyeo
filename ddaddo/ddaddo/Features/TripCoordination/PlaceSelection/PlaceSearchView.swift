@@ -16,7 +16,7 @@ struct PlaceSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchBar
-                .padding(.horizontal, 15)
+                .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, DDSpacing.xLarge)
 
             results

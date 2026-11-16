@@ -84,7 +84,7 @@ struct RouteOverviewView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 17)
+            .padding(.horizontal, DDSpacing.large)
         }
         .scrollIndicators(.hidden)
         .padding(.vertical, 8)
@@ -111,8 +111,7 @@ struct RouteOverviewView: View {
                     .padding(.top, 12)
             }
         }
-        .padding(.leading, 15)
-        .padding(.trailing, DDSpacing.large)
+        .padding(.horizontal, DDSpacing.large)
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(

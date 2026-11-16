@@ -65,9 +65,13 @@ struct PlaceSelectionView: View {
                 ConfirmedPlacesBottomSheet(
                     participants: store.participants,
                     places: store.confirmedPlaces,
+                    canCancelConfirmation: store.canCancelPlaceConfirmation,
                     bottomSafeAreaInset: bottomSafeAreaInset,
                     memberTapped: { member in
                         store.send(.memberProfileTapped(member))
+                    },
+                    confirmationButtonTapped: {
+                        store.send(.confirmButtonTapped)
                     }
                 )
                 .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
@@ -97,6 +101,7 @@ struct PlaceSelectionView: View {
                     places: store.displayedPlaces,
                     canDeletePlaces: store.canEditDisplayedPlaces,
                     canConfirm: store.canConfirmPlaceSelection,
+                    canCancelConfirmation: store.canCancelPlaceConfirmation,
                     showsConfirmationButton: store.isViewingCurrentUser,
                     isConfirmationComplete: store.isCurrentUserConfirmed,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
@@ -424,10 +429,38 @@ private struct PlaceCountProgressView: View {
     }
 }
 
-#Preview {
-    PlaceSelectionView(
-        store: Store(initialState: PlaceSelectionFeature.State()) {
-            PlaceSelectionFeature()
-        }
+#Preview("장소 없음") {
+    PlaceSelectionView(store: placeSelectionPreviewStore(state: PlaceSelectionFeature.State()))
+}
+
+#Preview("장소 확정·취소") {
+    var state = PlaceSelectionFeature.State(
+        memberPlaces: PlaceSelectionFeature.State.mockMemberPlaces
     )
+    state.isMemberPlacesSheetPresented = true
+    state.hasRestoredSavedPlacesPresentation = true
+    return PlaceSelectionView(store: placeSelectionPreviewStore(state: state))
+}
+
+#Preview("확정 완료 · 드래그 숨김") {
+    var state = PlaceSelectionFeature.State(
+        memberPlaces: PlaceSelectionFeature.State.mockMemberPlaces
+    )
+    state.participants[0].isConfirmed = true
+    state.isMemberPlacesSheetPresented = true
+    state.hasRestoredSavedPlacesPresentation = true
+    return PlaceSelectionView(store: placeSelectionPreviewStore(state: state))
+}
+
+private func placeSelectionPreviewStore(
+    state: PlaceSelectionFeature.State
+) -> StoreOf<PlaceSelectionFeature> {
+    var client = PlaceClient.testValue
+    // Keep local preview edits without accessing a real trip or Google Places.
+    client.fetchMemberPlaces = { _ in throw CancellationError() }
+    return withDependencies {
+        $0.placeClient = client
+    } operation: {
+        Store(initialState: state) { PlaceSelectionFeature() }
+    }
 }

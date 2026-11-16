@@ -8,8 +8,10 @@ import SwiftUI
 struct ConfirmedPlacesBottomSheet: View {
     let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
+    let canCancelConfirmation: Bool
     var bottomSafeAreaInset: CGFloat = 34
     let memberTapped: (TripMember) -> Void
+    let confirmationButtonTapped: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DDSpacing.zero) {
@@ -41,13 +43,16 @@ struct ConfirmedPlacesBottomSheet: View {
 
                 Spacer(minLength: DDSpacing.small)
 
-                Text("확정완료")
+                Button("확정완료", action: confirmationButtonTapped)
                     .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
                     .foregroundStyle(DDColor.textTertiary)
                     .padding(.horizontal, DDSpacing.medium)
                     .frame(height: 28)
                     .background(DDColor.surfaceControl)
                     .clipShape(.capsule)
+                    .buttonStyle(.plain)
+                    .disabled(!canCancelConfirmation)
+                    .accessibilityHint("장소 확정을 취소하고 다시 수정해요")
             }
             .padding(.top, DDSpacing.xLarge)
 

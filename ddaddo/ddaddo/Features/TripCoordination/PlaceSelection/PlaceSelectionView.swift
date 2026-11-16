@@ -148,6 +148,7 @@ struct PlaceSelectionView: View {
 
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background {
             GeometryReader { geometry in
                 Color.clear.preference(
@@ -340,18 +341,30 @@ struct PlaceSelectionView: View {
                     Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
                 }
             } else {
-                DDSearchField(
-                    placeholder: "꼭 가고 싶은 장소 \(store.maximumPlaceCount)개를 추가하세요.",
-                    text: Binding(
-                        get: { store.searchText },
-                        set: { store.send(.searchTextChanged($0)) }
-                    )
-                )
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        store.send(.searchFieldTapped)
+                Button {
+                    store.send(.searchFieldTapped)
+                } label: {
+                    HStack(spacing: DDSpacing.small) {
+                        Image(systemName: "magnifyingglass")
+
+                        Text("꼭 가고 싶은 장소 \(store.maximumPlaceCount)개를 추가하세요.")
+                            .ddTypography(.body16)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 0)
                     }
-                )
+                    .foregroundStyle(DDColor.textSecondary)
+                    .padding(.horizontal, DDSpacing.large)
+                    .frame(height: 41)
+                    .background(DDColor.surfaceElevated)
+                    .clipShape(.capsule)
+                    .overlay {
+                        Capsule().stroke(DDColor.borderSubtle, lineWidth: 1)
+                    }
+                    .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("장소 검색")
             }
         }
         .padding(.horizontal, DDSpacing.large)

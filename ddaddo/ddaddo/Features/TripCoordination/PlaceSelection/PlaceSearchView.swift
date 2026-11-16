@@ -21,10 +21,14 @@ struct PlaceSearchView: View {
 
             results
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .onAppear {
             isSearchFocused = true
+        }
+        .onDisappear {
+            isSearchFocused = false
         }
     }
 
@@ -82,6 +86,7 @@ struct PlaceSearchView: View {
             LazyVStack(spacing: 0) {
                 ForEach(store.results) { result in
                     Button {
+                        isSearchFocused = false
                         store.send(.resultTapped(result))
                     } label: {
                         PlaceSearchResultRow(result: result)

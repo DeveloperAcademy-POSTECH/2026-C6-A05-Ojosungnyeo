@@ -495,42 +495,44 @@ private struct TimeTableEditContent: View {
             .padding(.horizontal, DDSpacing.medium)
             .frame(height: 71)
 
-            VStack(spacing: DDSpacing.small) {
-                ForEach(Array(placeNames.enumerated()), id: \.offset) { index, placeName in
-                    let place = DraggedPlace(
-                        payload: placePayload(index),
-                        frameScope: dragFrameID(drag),
-                        index: index,
-                        name: placeName,
-                        count: placeNames.count
-                    )
-                    HStack(spacing: DDSpacing.medium) {
-                        Text("\(index + 1)")
-                            .ddTypography(.bodyEmphasis16)
-                            .foregroundStyle(DDColor.actionPrimary)
-                            .frame(width: 20)
+            if placeNames.count > 1 {
+                VStack(spacing: DDSpacing.small) {
+                    ForEach(Array(placeNames.enumerated()), id: \.offset) { index, placeName in
+                        let place = DraggedPlace(
+                            payload: placePayload(index),
+                            frameScope: dragFrameID(drag),
+                            index: index,
+                            name: placeName,
+                            count: placeNames.count
+                        )
+                        HStack(spacing: DDSpacing.medium) {
+                            Text("\(index + 1)")
+                                .ddTypography(.bodyEmphasis16)
+                                .foregroundStyle(DDColor.actionPrimary)
+                                .frame(width: 20)
 
-                        Text(placeName)
-                            .ddTypography(.bodyEmphasis16)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .lineLimit(1)
+                            Text(placeName)
+                                .ddTypography(.bodyEmphasis16)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .lineLimit(1)
 
-                        Spacer(minLength: 0)
+                            Spacer(minLength: 0)
 
-                        placeDragHandle(place)
+                            placeDragHandle(place)
+                        }
+                        .padding(.horizontal, DDSpacing.medium)
+                        .frame(height: 44)
+                        .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                        .opacity(draggingPlace?.payload == place.payload ? 0.3 : 1)
+                        .saturation(draggingPlace?.payload == place.payload ? 0.25 : 1)
+                        .background(dropFrame("place:\(place.frameScope):\(index)"))
                     }
-                    .padding(.horizontal, DDSpacing.medium)
-                    .frame(height: 44)
-                    .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
-                    .contentShape(RoundedRectangle(cornerRadius: 14))
-                    .opacity(draggingPlace?.payload == place.payload ? 0.3 : 1)
-                    .saturation(draggingPlace?.payload == place.payload ? 0.25 : 1)
-                    .background(dropFrame("place:\(place.frameScope):\(index)"))
                 }
+                .padding(.horizontal, DDSpacing.small)
+                .padding(.top, DDSpacing.small)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, DDSpacing.small)
-            .padding(.top, DDSpacing.small)
-            .padding(.bottom, 12)
         }
         .frame(width: width)
         .frame(maxWidth: width == nil ? .infinity : nil)
@@ -677,7 +679,7 @@ private struct TimeTableEditContent: View {
                 return timeTableStore.recommendations.filter { $0.groupID == groupID }.count
             }
         }.max() ?? 0
-        guard placeCount > 0 else { return 71 }
+        guard placeCount > 1 else { return 71 }
         return 83 + CGFloat(placeCount) * 52
     }
 

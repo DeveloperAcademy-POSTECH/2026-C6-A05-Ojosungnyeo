@@ -553,7 +553,9 @@ struct PlaceGroupingFeature: Reducer {
                     )
                 }
                 state.placeGroups = state.placeGroups.map { group in
-                    guard group.id == selectedGroupID else { return group }
+                    guard group.places.contains(where: { $0.id == placeID }) else {
+                        return group
+                    }
                     return MapPlaceGroup(
                         id: group.id,
                         name: group.name,
@@ -865,13 +867,15 @@ private extension PlaceGroupingFeature.State {
                 places: group.places.filter { !deletedPlaceIDs.contains($0.id) }
             )
         }
+        let allDeletedPlaceIDs = deletedPlaceIDsByGroupID.values.reduce(into: Set<String>()) {
+            $0.formUnion($1)
+        }
         placeGroups = placeGroups.map { group in
-            let deletedPlaceIDs = deletedPlaceIDsByGroupID[group.id, default: []]
-            guard !deletedPlaceIDs.isEmpty else { return group }
+            guard !allDeletedPlaceIDs.isEmpty else { return group }
             return MapPlaceGroup(
                 id: group.id,
                 name: group.name,
-                places: group.places.filter { !deletedPlaceIDs.contains($0.id) },
+                places: group.places.filter { !allDeletedPlaceIDs.contains($0.id) },
                 radius: group.radius
             )
         }
@@ -971,7 +975,7 @@ private enum PlaceGroupingEngine {
             maximumTravelTime: TimeInterval(selection.duration.rawValue * 60),
             travelTimes: travelTimes
         )
-        let regions = mergingUndersizedRegions(connected)
+        let regions = mergingOverlappingRegions(connected)
         let mapGroups = regions.enumerated().map { index, region in
             let uniquePlaces = unique(region.map(\.place))
             return MapPlaceGroup(
@@ -982,34 +986,38 @@ private enum PlaceGroupingEngine {
                     index: index
                 ),
                 places: uniquePlaces,
-                radius: displayRadius(for: index, regions: regions)
+                radius: enclosingRadius(of: region)
             )
         }
 
         var recommendations: [PlaceGroupingFeature.RecommendedGroup] = []
         for (regionIndex, region) in regions.enumerated() {
-            let regionPlaces = unique(region.map(\.place))
-            let title = courseName(
-                places: regionPlaces,
-                destination: state.destinationName,
-                index: regionIndex
-            )
-            let memberIDs = Array(Set(
-                region.flatMap(\.members).map(\.rawValue)
-            )).sorted()
-            let categories = Array(Set(regionPlaces.map {
-                normalizedCategory($0.category)
-            })).sorted()
-            recommendations.append(
-                .init(
-                    id: "region-\(regionIndex)",
-                    title: title,
-                    participantSummary: "\(memberIDs.count)명",
-                    memberIDs: memberIDs,
-                    categories: categories,
-                    places: regionPlaces
-                )
-            )
+            let placesByCategory = Dictionary(grouping: region) {
+                normalizedCategory($0.place.category)
+            }
+            for (categoryIndex, category) in placesByCategory.keys.sorted().enumerated() {
+                let categoryPlaces = placesByCategory[category, default: []]
+                for (courseIndex, course) in spatiallySplit(categoryPlaces).enumerated() {
+                    let places = unique(course.map(\.place))
+                    let memberIDs = Array(Set(
+                        course.flatMap(\.members).map(\.rawValue)
+                    )).sorted()
+                    recommendations.append(
+                        .init(
+                            id: "region-\(regionIndex)-course-\(categoryIndex)-\(courseIndex)",
+                            title: courseName(
+                                places: places,
+                                destination: state.destinationName,
+                                index: courseIndex
+                            ),
+                            participantSummary: "\(memberIDs.count)명",
+                            memberIDs: memberIDs,
+                            categories: [category],
+                            places: places
+                        )
+                    )
+                }
+            }
         }
 
         return Result(
@@ -1054,13 +1062,12 @@ private enum PlaceGroupingEngine {
                 searchIndex += 1
             }
 
-            result.append(contentsOf: spatiallySplit(regionIndices.map { places[$0] }))
+            result.append(regionIndices.map { places[$0] })
         }
         return result
     }
 
-    /// 하나의 생활권에 장소가 많으면 먼저 가까운 위치끼리 균형 있게 나눈다.
-    /// 큰 원을 먼저 만들고 남은 장소로 작은 원을 만들어 원이 겹치는 현상을 방지한다.
+    /// 같은 지역·카테고리의 추천 코스가 5개를 넘으면 가까운 위치끼리 나눈다.
     private static func spatiallySplit(_ region: [OwnedPlace]) -> [[OwnedPlace]] {
         guard region.count > maximumPlacesPerGroup else { return [region] }
 
@@ -1092,37 +1099,39 @@ private enum PlaceGroupingEngine {
             + spatiallySplit(Array(sorted[splitIndex...]))
     }
 
-    /// 이동시간 행렬에 일부 경로가 없거나 경계값을 조금 넘더라도 한 장소짜리 그룹이
-    /// 연속해서 생기지 않도록 가장 가까운 생활권과 다시 묶는다. 합친 결과도 5개를
-    /// 넘으면 위치를 기준으로 균형 있게 재분할한다.
-    private static func mergingUndersizedRegions(
+    /// 각 원이 모든 장소를 포함하게 계산한 뒤 서로 겹치는 원은 같은 생활권으로 합친다.
+    /// 장소 수 제한은 지역 원이 아니라 이후 생성되는 추천 코스에만 적용한다.
+    private static func mergingOverlappingRegions(
         _ source: [[OwnedPlace]]
     ) -> [[OwnedPlace]] {
         var regions = source.filter { !$0.isEmpty }
 
-        while regions.count > 1,
-              let sourceIndex = regions.firstIndex(where: { $0.count == 1 }) {
-            let preferredTargets = regions.indices.filter {
-                $0 != sourceIndex && regions[$0].count < 3
-            }
-            let targetCandidates = preferredTargets.isEmpty
-                ? regions.indices.filter { $0 != sourceIndex }
-                : preferredTargets
-            guard let targetIndex = targetCandidates.min(by: {
-                distanceBetweenRegions(regions[sourceIndex], regions[$0])
-                    < distanceBetweenRegions(regions[sourceIndex], regions[$1])
-            }) else { break }
-
-            let combined = regions[sourceIndex] + regions[targetIndex]
-            let replacement = spatiallySplit(combined)
-            let upperIndex = max(sourceIndex, targetIndex)
-            let lowerIndex = min(sourceIndex, targetIndex)
-            regions.remove(at: upperIndex)
-            regions.remove(at: lowerIndex)
-            regions.insert(contentsOf: replacement, at: lowerIndex)
+        while let pair = firstOverlappingPair(in: regions) {
+            let combined = regions[pair.0] + regions[pair.1]
+            regions.remove(at: pair.1)
+            regions[pair.0] = combined
         }
 
         return regions
+    }
+
+    private static func firstOverlappingPair(
+        in regions: [[OwnedPlace]]
+    ) -> (Int, Int)? {
+        guard regions.count > 1 else { return nil }
+        for lhsIndex in regions.indices {
+            for rhsIndex in regions.indices where rhsIndex > lhsIndex {
+                let centerDistance = distanceBetweenRegions(
+                    regions[lhsIndex], regions[rhsIndex]
+                )
+                let requiredDistance = enclosingRadius(of: regions[lhsIndex])
+                    + enclosingRadius(of: regions[rhsIndex])
+                if centerDistance <= requiredDistance {
+                    return (lhsIndex, rhsIndex)
+                }
+            }
+        }
+        return nil
     }
 
     private static func areWithinTravelLimit(
@@ -1143,6 +1152,7 @@ private enum PlaceGroupingEngine {
         // 대중교통 경로는 방향에 따라 환승 결과가 크게 달라질 수 있으므로,
         // 두 방향 중 실제로 조건을 만족하는 경로가 하나라도 있으면 같은 생활권으로 본다.
         return min(forward, backward) <= maximumTravelTime
+            || distance(lhs, rhs) <= maximumDistance
     }
 
     /// 같은 Google Place를 여러 명이 선택해도 장소 하나와 하나의 추천 그룹으로 취급한다.
@@ -1213,23 +1223,8 @@ private enum PlaceGroupingEngine {
         }.max() ?? 800
     }
 
-    private static func displayRadius(
-        for index: Int,
-        regions: [[OwnedPlace]]
-    ) -> Double {
-        let places = unique(regions[index].map(\.place))
-        let naturalRadius = places.count == 1
-            ? 350
-            : max(350, regionRadius(places) + 200)
-        let distances = regions.indices
-            .filter { $0 != index }
-            .map { distanceBetweenRegions(regions[index], regions[$0]) }
-        guard let nearestCenterDistance = distances.min() else {
-            return naturalRadius
-        }
-
-        // 이웃 원과 시각적으로 겹치지 않도록 두 중심 거리의 42% 안으로 제한한다.
-        return max(8, min(naturalRadius, nearestCenterDistance * 0.42))
+    private static func enclosingRadius(of region: [OwnedPlace]) -> Double {
+        max(350, regionRadius(unique(region.map(\.place))) + 200)
     }
 
     private static func distanceBetweenRegions(

@@ -433,8 +433,7 @@ private extension DevelopmentMockTripService {
                 ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
                 ("와이바이두 다리", "건축", "Waibaidu Bridge Shanghai"),
                 ("팡성교", "전망", "Fangsheng Bridge Zhujiajiao"),
-                ("청대 우체국", "역사", "Qing Dynasty Post Office Zhujiajiao"),
-                ("위안진선사", "문화", "Yuanjin Buddhist Temple Zhujiajiao")
+                ("청대 우체국", "역사", "Qing Dynasty Post Office Zhujiajiao")
             ]),
             places([
                 ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
@@ -448,8 +447,7 @@ private extension DevelopmentMockTripService {
                 ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
                 ("와이바이두 다리", "건축", "Waibaidu Bridge Shanghai"),
                 ("팡성교", "전망", "Fangsheng Bridge Zhujiajiao"),
-                ("청대 우체국", "역사", "Qing Dynasty Post Office Zhujiajiao"),
-                ("위안진선사", "문화", "Yuanjin Buddhist Temple Zhujiajiao")
+                ("청대 우체국", "역사", "Qing Dynasty Post Office Zhujiajiao")
             ]),
             places([
                 ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),

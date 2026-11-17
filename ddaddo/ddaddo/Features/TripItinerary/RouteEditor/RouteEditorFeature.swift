@@ -11,7 +11,7 @@ import Foundation
 struct RouteEditorFeature: Reducer {
     enum Delegate: Equatable {
         case dismissed
-        case placeAdded(PlaceDetails, TripDay)
+        case placeAdded(PlaceDetails, TripDay, [TripMember])
     }
 
     @ObservableState
@@ -20,7 +20,16 @@ struct RouteEditorFeature: Reducer {
         var selectedPlace: PlaceDetails?
         var isPlaceDetailsLoading = false
         var isDaySelectionPresented = false
+        var isFriendSelectionPresented = false
         var availableDays: [TripDay] = [.day1]
+        var tripMembers: [TripMember] = TripMember.allCases
+        var currentMember: TripMember = .tae
+        var selectedDay: TripDay?
+        var selectedFriends: Set<TripMember> = []
+
+        var availableFriends: [TripMember] {
+            tripMembers.filter { $0 != currentMember }
+        }
     }
 
     @CasePathable
@@ -33,6 +42,9 @@ struct RouteEditorFeature: Reducer {
         case addButtonTapped
         case daySelectionDismissed
         case daySelected(TripDay)
+        case aloneButtonTapped
+        case withFriendsButtonTapped
+        case friendTapped(TripMember)
         case delegate(Delegate)
     }
 
@@ -83,26 +95,58 @@ struct RouteEditorFeature: Reducer {
                 state.selectedPlace = nil
                 state.isPlaceDetailsLoading = false
                 state.isDaySelectionPresented = false
+                state.isFriendSelectionPresented = false
+                state.selectedDay = nil
+                state.selectedFriends = []
                 return .none
 
             case .addButtonTapped:
                 guard !state.isPlaceDetailsLoading,
                       state.selectedPlace != nil
                 else { return .none }
+                state.selectedDay = state.selectedDay ?? state.availableDays.first
                 state.isDaySelectionPresented = true
                 return .none
 
             case .daySelectionDismissed:
                 state.isDaySelectionPresented = false
+                state.isFriendSelectionPresented = false
+                state.selectedDay = nil
+                state.selectedFriends = []
                 return .none
 
             case let .daySelected(day):
                 guard !state.isPlaceDetailsLoading,
                       state.availableDays.contains(day),
-                      let place = state.selectedPlace
+                      state.selectedPlace != nil
+                else { return .none }
+                state.selectedDay = day
+                return .none
+
+            case .aloneButtonTapped:
+                guard let place = state.selectedPlace,
+                      let day = state.selectedDay
                 else { return .none }
                 state.isDaySelectionPresented = false
-                return .send(.delegate(.placeAdded(place, day)))
+                return .send(.delegate(.placeAdded(place, day, [state.currentMember])))
+
+            case .withFriendsButtonTapped:
+                guard !state.availableFriends.isEmpty else { return .none }
+                state.isFriendSelectionPresented = true
+                return .none
+
+            case let .friendTapped(member):
+                guard let place = state.selectedPlace,
+                      let day = state.selectedDay,
+                      state.availableFriends.contains(member)
+                else { return .none }
+                state.selectedFriends = [member]
+                let selectedMembers = state.tripMembers.filter {
+                    $0 == state.currentMember || state.selectedFriends.contains($0)
+                }
+                state.isDaySelectionPresented = false
+                state.isFriendSelectionPresented = false
+                return .send(.delegate(.placeAdded(place, day, selectedMembers)))
 
             case .delegate:
                 return .none

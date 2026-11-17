@@ -100,6 +100,7 @@ private struct TimeTableEditContent: View {
     @State private var placeDragLocation: CGPoint?
     @State private var placePreviewFrame: CGRect?
     @State private var isPlaceTrashTargeted = false
+    @State private var expandedSources: Set<TimeTableEditRow.Source> = []
 
     private struct DraggedPlace: Equatable {
         let payload: String
@@ -219,6 +220,13 @@ private struct TimeTableEditContent: View {
             }
         }
         .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
+        .overlay {
+            GeometryReader { proxy in
+                scheduleInsertionIndicatorsOverlay
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+            .allowsHitTesting(false)
+        }
         .overlay {
             GeometryReader { proxy in
                 ZStack {
@@ -407,12 +415,12 @@ private struct TimeTableEditContent: View {
                 let cardWidth = row.sources.count <= 2
                     ? 200
                     : max(
-                        112,
+                        180,
                         min(200, (geometry.size.width + spacing) * 2 / CGFloat(row.sources.count) - spacing)
                     )
 
                 ScrollView(.horizontal) {
-                    HStack(spacing: spacing) {
+                    HStack(alignment: .top, spacing: spacing) {
                         ForEach(row.sources, id: \.self) { source in
                             sourceCard(source, rowID: row.id, width: cardWidth)
                         }
@@ -435,6 +443,7 @@ private struct TimeTableEditContent: View {
                let course = timeTableStore.coursesByID[schedule.courseID] {
                 let dragItem = DraggedItem.row(rowID, source)
                 editablePlaceCard(
+                    source: source,
                     title: course.title,
                     subtitle: course.categorySummary,
                     memberIDs: course.members.map(\.rawValue),
@@ -456,6 +465,7 @@ private struct TimeTableEditContent: View {
             if let first = places.first {
                 let dragItem = DraggedItem.row(rowID, source)
                 editablePlaceCard(
+                    source: source,
                     title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
                     subtitle: places.categorySummary,
                     memberIDs: first.memberIDs,
@@ -474,6 +484,7 @@ private struct TimeTableEditContent: View {
     }
 
     private func editablePlaceCard(
+        source: TimeTableEditRow.Source,
         title: String,
         subtitle: String,
         memberIDs: [String],
@@ -491,6 +502,7 @@ private struct TimeTableEditContent: View {
                             .ddTypography(.bodyEmphasis16)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                         if shouldDisplayMemberDots(for: memberIDs) {
                             memberDots(memberIDs)
                         }
@@ -500,15 +512,35 @@ private struct TimeTableEditContent: View {
                         .ddTypography(.labelEmphasis14)
                         .foregroundStyle(DDColor.actionPrimary)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer(minLength: 0)
+                if placeNames.count > 1 {
+                    Button {
+                        if expandedSources.contains(source) {
+                            expandedSources.remove(source)
+                        } else {
+                            expandedSources.insert(source)
+                        }
+                    } label: {
+                        Image(systemName: expandedSources.contains(source) ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(DDColor.textSecondary)
+                            .frame(width: 28, height: 44)
+                            .contentShape(Rectangle())
+                            .transaction { $0.animation = nil }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(expandedSources.contains(source) ? "장소 목록 접기" : "장소 목록 펼치기")
+                }
                 dragHandle(drag)
             }
             .padding(.horizontal, DDSpacing.medium)
             .frame(height: 71)
 
-            if placeNames.count > 1 {
+            if placeNames.count > 1, expandedSources.contains(source) {
                 VStack(spacing: DDSpacing.small) {
                     ForEach(Array(placeNames.enumerated()), id: \.offset) { index, placeName in
                         let place = DraggedPlace(
@@ -696,6 +728,7 @@ private struct TimeTableEditContent: View {
 
     private func editRowHeight(_ row: TimeTableEditRow) -> CGFloat {
         let placeCount = row.sources.map { source -> Int in
+            guard expandedSources.contains(source) else { return 0 }
             switch source {
             case let .schedule(scheduleID):
                 guard let schedule = store.draftPlacements.first(where: { $0.id == scheduleID })
@@ -851,6 +884,36 @@ private struct TimeTableEditContent: View {
     }
 
     @ViewBuilder
+    private var scheduleInsertionIndicatorsOverlay: some View {
+        if draggingPlace == nil,
+           let targetedRowID,
+           (targetedRowID != draggedRowID ||
+            (rows.first(where: { $0.id == targetedRowID })?.sources.count ?? 0) > 1),
+           let frame = dropFrames["row:\(targetedRowID)"] {
+            insertionIndicator
+                .frame(width: insertionIndicatorWidth(for: frame))
+                .position(
+                    x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
+                    y: frame.minY - DDSpacing.large / 2
+                )
+        } else if draggingPlace == nil, isAppendTargeted {
+            if let lastRow = rows.last,
+               let frame = dropFrames["row:\(lastRow.id)"] {
+                insertionIndicator
+                    .frame(width: insertionIndicatorWidth(for: frame))
+                    .position(
+                        x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
+                        y: frame.maxY + DDSpacing.large / 2
+                    )
+            } else if let frame = dropFrames["append"] {
+                insertionIndicator
+                    .frame(width: frame.width)
+                    .position(x: frame.midX, y: frame.midY)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var insertionIndicatorsOverlay: some View {
         if let draggingPlace {
             if let placeDropIndex,
@@ -863,36 +926,6 @@ private struct TimeTableEditContent: View {
                             ? frame.maxY + DDSpacing.small / 2
                             : frame.minY - DDSpacing.small / 2
                     )
-                    .zIndex(2)
-                    .allowsHitTesting(false)
-            }
-        } else if let targetedRowID,
-           (targetedRowID != draggedRowID ||
-            (rows.first(where: { $0.id == targetedRowID })?.sources.count ?? 0) > 1),
-           let frame = dropFrames["row:\(targetedRowID)"] {
-            insertionIndicator
-                .frame(width: insertionIndicatorWidth(for: frame))
-                .position(
-                    x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
-                    y: frame.minY - DDSpacing.small
-                )
-                .zIndex(2)
-                .allowsHitTesting(false)
-        } else if isAppendTargeted {
-            if let lastRow = rows.last,
-               let frame = dropFrames["row:\(lastRow.id)"] {
-                insertionIndicator
-                    .frame(width: insertionIndicatorWidth(for: frame))
-                    .position(
-                        x: frame.minX + 48 + insertionIndicatorWidth(for: frame) / 2,
-                        y: frame.maxY + DDSpacing.small
-                    )
-                    .zIndex(2)
-                    .allowsHitTesting(false)
-            } else if let frame = dropFrames["append"] {
-                insertionIndicator
-                    .frame(width: frame.width)
-                    .position(x: frame.midX, y: frame.midY)
                     .zIndex(2)
                     .allowsHitTesting(false)
             }

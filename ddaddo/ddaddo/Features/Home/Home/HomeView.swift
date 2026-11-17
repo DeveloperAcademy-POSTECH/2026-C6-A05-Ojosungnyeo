@@ -85,11 +85,12 @@ struct HomeView: View {
                 .transition(.move(edge: .trailing))
             }
 
-            if store.isPlaceAnalysisLoading {
+            if store.isPlaceAnalysisLoading || store.placeGrouping.isRouteGroupingLoading {
                 LoadingView(message: "여행 취향과 장소를 분석 중...")
                     .transition(.opacity)
                     .zIndex(5)
-                    .task {
+                    .task(id: store.isPlaceAnalysisLoading) {
+                        guard store.isPlaceAnalysisLoading else { return }
                         try? await Task.sleep(for: .seconds(1.5))
                         guard !Task.isCancelled else { return }
                         store.send(.placeAnalysisFinished)
@@ -131,6 +132,10 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isPlaceSelectionPresented)
         .animation(.easeInOut(duration: 0.25), value: store.isPlaceAnalysisLoading)
+        .animation(
+            .easeInOut(duration: 0.25),
+            value: store.placeGrouping.isRouteGroupingLoading
+        )
         .animation(.easeInOut(duration: 0.3), value: store.isPlaceGroupingPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripSearchPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isSettingsPresented)

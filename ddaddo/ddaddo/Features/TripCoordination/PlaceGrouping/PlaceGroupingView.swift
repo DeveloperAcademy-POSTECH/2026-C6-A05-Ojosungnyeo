@@ -243,19 +243,12 @@ struct PlaceGroupingView: View {
                 .padding(.bottom, store.selectedTab == .recommendedGroups ? DDSpacing.small : 14)
 
             if store.selectedTab == .recommendedGroups {
-                Text("모든 지역그룹을 확정해야 확정이 완료됩니다")
-                    .ddTypography(.caption12)
-                    .foregroundStyle(DDColor.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 16)
+                recommendedGroupSelectionHeader
                     .onGeometryChange(for: CGFloat.self) { geometry in
                         geometry.size.height
                     } action: { height in
                         confirmationGuideHeight = height
                     }
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.bottom, 14)
             }
 
             Group {
@@ -347,6 +340,55 @@ struct PlaceGroupingView: View {
                 .clipShape(.capsule)
         }
         .buttonStyle(.plain)
+    }
+
+    private var recommendedGroupSelectionHeader: some View {
+        HStack(spacing: DDSpacing.xLarge) {
+            Text("지역 그룹")
+                .ddTypography(.heading18)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text("\(store.confirmedRecommendedGroupCount)/\(store.recommendedGroups.count) 선택")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+
+            Spacer(minLength: 0)
+
+            Button {
+                store.send(.selectAllRecommendedGroupsTapped)
+            } label: {
+                HStack(spacing: DDSpacing.small) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                store.haveAllRecommendedGroupsConfirmed
+                                    ? DDColor.actionPrimary
+                                    : DDColor.surfaceControl
+                            )
+
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(
+                                store.haveAllRecommendedGroupsConfirmed
+                                    ? DDColor.textOnPrimary
+                                    : DDColor.textSecondary
+                            )
+                    }
+                    .frame(width: 24, height: 24)
+
+                    Text("전체 선택")
+                        .ddTypography(.bodyEmphasis16)
+                        .foregroundStyle(DDColor.textPrimary)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(store.recommendedGroups.isEmpty)
+        }
+        .padding(.leading, DDSpacing.large)
+        .padding(.trailing, 28)
+        .frame(maxWidth: .infinity, minHeight: 52)
     }
 
     private func memberCard(_ member: PlaceGroupingFeature.Member) -> some View {
@@ -444,7 +486,7 @@ struct PlaceGroupingView: View {
             ) {
                 DDCTAButton(
                     title: "지역 그룹 확정하기",
-                    isEnabled: store.haveAllRecommendedGroupsConfirmed
+                    isEnabled: store.hasConfirmedRecommendedGroup
                 ) {
                     store.send(.confirmButtonTapped)
                 }

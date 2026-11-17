@@ -62,7 +62,11 @@ struct TripItineraryFeature: Reducer {
 
             case .timeTable(.delegate(.addPlaceRequested)):
                 state.routeEditor = RouteEditorFeature.State(
-                    availableDays: state.timeTable.availableDays
+                    availableDays: state.timeTable.availableDays,
+                    tripMembers: state.timeTable.tripMembers,
+                    currentMember: state.timeTable.currentTripMember
+                        ?? state.timeTable.tripMembers.first
+                        ?? .tae
                 )
                 state.isRouteEditorPresented = true
                 return .none
@@ -75,8 +79,8 @@ struct TripItineraryFeature: Reducer {
                 state.isRouteEditorPresented = false
                 return .none
 
-            case let .routeEditor(.delegate(.placeAdded(place, day))):
-                state.addPlace(place, to: day)
+            case let .routeEditor(.delegate(.placeAdded(place, day, members))):
+                state.addPlace(place, to: day, members: members)
                 state.isRouteEditorPresented = false
                 return .none
 
@@ -124,7 +128,11 @@ private extension TripItineraryFeature.State {
         )
     }
 
-    mutating func addPlace(_ place: PlaceDetails, to day: TripDay) {
+    mutating func addPlace(
+        _ place: PlaceDetails,
+        to day: TripDay,
+        members: [TripMember]
+    ) {
         let nextCourseID = (timeTable.coursesByID.keys.max() ?? -1) + 1
         timeTable.coursesByID[nextCourseID] = TimeTableCourse(
             id: nextCourseID,
@@ -132,7 +140,7 @@ private extension TripItineraryFeature.State {
             placeCount: 1,
             placeNames: [place.name],
             categories: [place.category],
-            members: timeTable.tripMembers,
+            members: members,
             durationMinutes: 60,
             places: [
                 ItineraryPlace(

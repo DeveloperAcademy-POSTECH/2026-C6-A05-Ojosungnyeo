@@ -61,8 +61,10 @@ struct TimeTableEditView: View {
         .overlay {
             if store.pendingDeletion != nil {
                 DDAlertOverlay(
-                    title: "일정을 삭제할까요?",
-                    message: "삭제한 일정은 여행 일정에서 사라져요.",
+                    title: store.pendingDeletion?.isPlace == true
+                        ? "장소를 삭제할까요?" : "일정을 삭제할까요?",
+                    message: store.pendingDeletion?.isPlace == true
+                        ? "삭제한 장소는 그룹에서 사라져요." : "삭제한 일정은 여행 일정에서 사라져요.",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
                     confirmColor: DDColor.alertDestructive,
@@ -97,9 +99,11 @@ private struct TimeTableEditContent: View {
     @State private var placeDropIndex: Int?
     @State private var placeDragLocation: CGPoint?
     @State private var placePreviewFrame: CGRect?
+    @State private var isPlaceTrashTargeted = false
 
     private struct DraggedPlace: Equatable {
         let payload: String
+        let deletionTarget: TimeTableEditFeature.PlaceDeletionTarget?
         let frameScope: String
         let index: Int
         let name: String
@@ -437,7 +441,12 @@ private struct TimeTableEditContent: View {
                     placeNames: course.placeNames,
                     width: width,
                     drag: dragItem,
-                    placePayload: { index in "course:\(course.id):\(index)" }
+                    placePayload: { index in "course:\(course.id):\(index)" },
+                    placeDeletionTarget: { index in
+                        guard let ids = store.coursePlaceIDsByID[course.id],
+                              ids.indices.contains(index) else { return nil }
+                        return .course(scheduleID: id, courseID: course.id, placeID: ids[index])
+                    }
                 )
                     .opacity(dragging == dragItem ? 0.3 : 1)
                     .saturation(dragging == dragItem ? 0.25 : 1)
@@ -453,7 +462,10 @@ private struct TimeTableEditContent: View {
                     placeNames: places.map(\.placeName),
                     width: width,
                     drag: dragItem,
-                    placePayload: { index in "recommendation:\(id):\(index)" }
+                    placePayload: { index in "recommendation:\(id):\(index)" },
+                    placeDeletionTarget: { index in
+                        .recommendation(groupID: id, recommendationID: places[index].id)
+                    }
                 )
                     .opacity(dragging == dragItem ? 0.3 : 1)
                     .saturation(dragging == dragItem ? 0.25 : 1)
@@ -468,7 +480,8 @@ private struct TimeTableEditContent: View {
         placeNames: [String],
         width: CGFloat?,
         drag: DraggedItem,
-        placePayload: @escaping (Int) -> String
+        placePayload: @escaping (Int) -> String,
+        placeDeletionTarget: @escaping (Int) -> TimeTableEditFeature.PlaceDeletionTarget?
     ) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: DDSpacing.small) {
@@ -500,6 +513,7 @@ private struct TimeTableEditContent: View {
                     ForEach(Array(placeNames.enumerated()), id: \.offset) { index, placeName in
                         let place = DraggedPlace(
                             payload: placePayload(index),
+                            deletionTarget: placeDeletionTarget(index),
                             frameScope: dragFrameID(drag),
                             index: index,
                             name: placeName,
@@ -564,6 +578,7 @@ private struct TimeTableEditContent: View {
                 .onChanged { phase in
                     guard case .second(true, let drag) = phase else { return }
                     draggingPlace = place
+                    isDeletionOverlayPresented = true
                     if placePreviewFrame == nil {
                         placePreviewFrame = dropFrames["place:\(place.frameScope):\(place.index)"]
                     }
@@ -616,6 +631,8 @@ private struct TimeTableEditContent: View {
     private func updatePlaceDropTarget(at location: CGPoint) {
         guard let draggingPlace else { return }
         placeDropIndex = nil
+        isPlaceTrashTargeted = dropFrames["trash"]?.contains(location) == true
+        guard !isPlaceTrashTargeted else { return }
 
         for index in 0..<draggingPlace.count {
             guard let frame = dropFrames["place:\(draggingPlace.frameScope):\(index)"],
@@ -634,7 +651,14 @@ private struct TimeTableEditContent: View {
     }
 
     private func commitPlaceDrop() {
-        guard let draggingPlace, let placeDropIndex else { return }
+        guard let draggingPlace else { return }
+        if isPlaceTrashTargeted {
+            if let target = draggingPlace.deletionTarget {
+                store.send(.placeDeletionRequested(target))
+            }
+            return
+        }
+        guard let placeDropIndex else { return }
         movePlace(
             payload: draggingPlace.payload,
             toInsertionIndex: placeDropIndex,
@@ -647,6 +671,8 @@ private struct TimeTableEditContent: View {
         placeDropIndex = nil
         placeDragLocation = nil
         placePreviewFrame = nil
+        isPlaceTrashTargeted = false
+        isDeletionOverlayPresented = false
     }
 
     private func placeDragPreview(_ place: DraggedPlace) -> some View {
@@ -942,6 +968,8 @@ private struct TimeTableEditContent: View {
             Image(systemName: "trash")
                 .font(.system(size: 22, weight: .regular))
                 .foregroundStyle(DDColor.actionPrimary)
+                .scaleEffect(isPlaceTrashTargeted || activeDropTarget == .trash ? 1.15 : 1)
+                .animation(.easeInOut(duration: 0.15), value: isPlaceTrashTargeted || activeDropTarget == .trash)
                 .padding(.bottom, 25)
         }
         .frame(maxWidth: .infinity)

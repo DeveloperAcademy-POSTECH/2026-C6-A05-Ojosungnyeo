@@ -78,6 +78,14 @@ struct PlaceGroupingFeature: Reducer {
                 && recommendedGroups.allSatisfy { confirmedGroupIDs.contains($0.id) }
         }
 
+        var hasConfirmedRecommendedGroup: Bool {
+            recommendedGroups.contains { confirmedGroupIDs.contains($0.id) }
+        }
+
+        var confirmedRecommendedGroupCount: Int {
+            recommendedGroups.count { confirmedGroupIDs.contains($0.id) }
+        }
+
         init() {}
 
         init(
@@ -139,6 +147,7 @@ struct PlaceGroupingFeature: Reducer {
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
         case tabSelected(Tab)
+        case selectAllRecommendedGroupsTapped
         case memberTapped(String)
         case recommendedGroupTapped(String)
         case detail(PlaceGroupingDetailFeature.Action)
@@ -583,7 +592,7 @@ struct PlaceGroupingFeature: Reducer {
             case .detail:
                 return .none
             case .confirmButtonTapped:
-                guard state.haveAllRecommendedGroupsConfirmed else { return .none }
+                guard state.hasConfirmedRecommendedGroup else { return .none }
                 guard let source = state.sourcePlaceSelection else { return .none }
                 state.waitingForConfirmation = WaitingForConfirmationFeature.State(
                     tripID: source.tripID,
@@ -611,6 +620,24 @@ struct PlaceGroupingFeature: Reducer {
             case let .tabSelected(tab):
                 state.selectedTab = tab
                 return .none
+            case .selectAllRecommendedGroupsTapped:
+                let groupIDs = Set(state.recommendedGroups.map(\.id))
+                let shouldSelectAll = !state.haveAllRecommendedGroupsConfirmed
+                if shouldSelectAll {
+                    state.confirmedGroupIDs.formUnion(groupIDs)
+                } else {
+                    state.confirmedGroupIDs.subtract(groupIDs)
+                }
+                state.confirmedGroupIDsByMemberID[state.currentMemberID] = state.confirmedGroupIDs
+
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { _ in
+                    for groupID in groupIDs {
+                        try? await placeClient.setGroupConfirmation(
+                            tripID, groupID, shouldSelectAll, false
+                        )
+                    }
+                }
             }
         }
 

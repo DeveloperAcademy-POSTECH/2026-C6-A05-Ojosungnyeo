@@ -183,14 +183,20 @@ struct PlaceGroupingFeature: Reducer {
 
             case let .memberPlacesResponse(memberPins):
                 guard var source = state.sourcePlaceSelection else { return .none }
+                var hasPlaceSelectionChanged = false
                 for pins in memberPins {
-                    source.memberPlaces[pins.member] = pins.places
+                    if source.memberPlaces[pins.member, default: []] != pins.places {
+                        source.memberPlaces[pins.member] = pins.places
+                        hasPlaceSelectionChanged = true
+                    }
                     if let index = source.participants.firstIndex(where: {
                         $0.member == pins.member
-                    }) {
+                    }), source.participants[index].isConfirmed != pins.isConfirmed {
                         source.participants[index].isConfirmed = pins.isConfirmed
+                        hasPlaceSelectionChanged = true
                     }
                 }
+                guard hasPlaceSelectionChanged else { return .none }
                 state.sourcePlaceSelection = source
                 let refreshed = PlaceGroupingEngine.makeGroups(
                     from: source,
@@ -990,56 +996,65 @@ private enum PlaceGroupingEngine {
         while let seedIndex = remainingIndices.min() {
             var regionIndices = [seedIndex]
             remainingIndices.remove(seedIndex)
+            var searchIndex = 0
 
-            while regionIndices.count < maximumPlacesPerGroup {
-                let candidate = remainingIndices
+            while searchIndex < regionIndices.count {
+                let regionIndex = regionIndices[searchIndex]
+                let connectedIndices = remainingIndices
                     .filter { candidateIndex in
-                        regionIndices.allSatisfy { regionIndex in
-                            isSamePlace(
-                                places[regionIndex].place,
-                                places[candidateIndex].place
-                            ) || areWithinTravelLimit(
-                                places[regionIndex].place,
-                                places[candidateIndex].place,
-                                maximumDistance: maximumDistance,
-                                maximumTravelTime: maximumTravelTime,
-                                travelTimes: travelTimes
-                            )
-                        }
-                    }
-                    .min { lhs, rhs in
-                        let lhsDistance = maximumDistanceFromGroup(
-                            places[lhs].place,
-                            groupIndices: regionIndices,
-                            places: places
+                        isSamePlace(
+                            places[regionIndex].place,
+                            places[candidateIndex].place
+                        ) || areWithinTravelLimit(
+                            places[regionIndex].place,
+                            places[candidateIndex].place,
+                            maximumDistance: maximumDistance,
+                            maximumTravelTime: maximumTravelTime,
+                            travelTimes: travelTimes
                         )
-                        let rhsDistance = maximumDistanceFromGroup(
-                            places[rhs].place,
-                            groupIndices: regionIndices,
-                            places: places
-                        )
-                        if lhsDistance == rhsDistance { return lhs < rhs }
-                        return lhsDistance < rhsDistance
                     }
-
-                guard let candidate else { break }
-                regionIndices.append(candidate)
-                remainingIndices.remove(candidate)
+                    .sorted()
+                regionIndices.append(contentsOf: connectedIndices)
+                remainingIndices.subtract(connectedIndices)
+                searchIndex += 1
             }
 
-            result.append(regionIndices.map { places[$0] })
+            result.append(contentsOf: spatiallySplit(regionIndices.map { places[$0] }))
         }
         return result
     }
 
-    private static func maximumDistanceFromGroup(
-        _ candidate: PinnedPlace,
-        groupIndices: [Int],
-        places: [OwnedPlace]
-    ) -> Double {
-        groupIndices
-            .map { distance(candidate, places[$0].place) }
-            .max() ?? 0
+    /// 하나의 생활권에 장소가 많으면 먼저 가까운 위치끼리 균형 있게 나눈다.
+    /// 큰 원을 먼저 만들고 남은 장소로 작은 원을 만들어 원이 겹치는 현상을 방지한다.
+    private static func spatiallySplit(_ region: [OwnedPlace]) -> [[OwnedPlace]] {
+        guard region.count > maximumPlacesPerGroup else { return [region] }
+
+        let averageLatitude = region.map(\.place.latitude).reduce(0, +) / Double(region.count)
+        let latitudeSpan = (region.map(\.place.latitude).max() ?? 0)
+            - (region.map(\.place.latitude).min() ?? 0)
+        let longitudeSpan = ((region.map(\.place.longitude).max() ?? 0)
+            - (region.map(\.place.longitude).min() ?? 0))
+            * cos(averageLatitude * .pi / 180)
+        let sorted: [OwnedPlace]
+        if latitudeSpan >= longitudeSpan {
+            sorted = region.sorted {
+                if $0.place.latitude == $1.place.latitude {
+                    return $0.place.longitude < $1.place.longitude
+                }
+                return $0.place.latitude < $1.place.latitude
+            }
+        } else {
+            sorted = region.sorted {
+                if $0.place.longitude == $1.place.longitude {
+                    return $0.place.latitude < $1.place.latitude
+                }
+                return $0.place.longitude < $1.place.longitude
+            }
+        }
+
+        let splitIndex = sorted.count / 2
+        return spatiallySplit(Array(sorted[..<splitIndex]))
+            + spatiallySplit(Array(sorted[splitIndex...]))
     }
 
     private static func areWithinTravelLimit(
@@ -1054,7 +1069,9 @@ private enum PlaceGroupingEngine {
         }
         guard let forward = travelTimes.duration(from: lhs.id, to: rhs.id),
               let backward = travelTimes.duration(from: rhs.id, to: lhs.id)
-        else { return false }
+        else {
+            return distance(lhs, rhs) <= maximumDistance
+        }
         return max(forward, backward) <= maximumTravelTime
     }
 

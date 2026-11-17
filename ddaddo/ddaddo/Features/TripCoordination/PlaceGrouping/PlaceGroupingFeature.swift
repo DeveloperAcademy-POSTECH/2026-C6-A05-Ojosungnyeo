@@ -183,21 +183,24 @@ struct PlaceGroupingFeature: Reducer {
 
             case let .memberPlacesResponse(memberPins):
                 guard var source = state.sourcePlaceSelection else { return .none }
-                var hasPlaceSelectionChanged = false
+                var havePlacesChanged = false
+                var hasParticipantStatusChanged = false
                 for pins in memberPins {
-                    if source.memberPlaces[pins.member, default: []] != pins.places {
+                    if placeIdentitySet(source.memberPlaces[pins.member, default: []])
+                        != placeIdentitySet(pins.places) {
                         source.memberPlaces[pins.member] = pins.places
-                        hasPlaceSelectionChanged = true
+                        havePlacesChanged = true
                     }
                     if let index = source.participants.firstIndex(where: {
                         $0.member == pins.member
                     }), source.participants[index].isConfirmed != pins.isConfirmed {
                         source.participants[index].isConfirmed = pins.isConfirmed
-                        hasPlaceSelectionChanged = true
+                        hasParticipantStatusChanged = true
                     }
                 }
-                guard hasPlaceSelectionChanged else { return .none }
+                guard havePlacesChanged || hasParticipantStatusChanged else { return .none }
                 state.sourcePlaceSelection = source
+                guard havePlacesChanged else { return .none }
                 let refreshed = PlaceGroupingEngine.makeGroups(
                     from: source,
                     selection: state.transportationSelection
@@ -699,6 +702,10 @@ struct PlaceGroupingFeature: Reducer {
                 }
             }
         }
+    }
+
+    private func placeIdentitySet(_ places: [PinnedPlace]) -> Set<String> {
+        Set(places.map(\.id))
     }
 
     private func routeGroupingEffect(for state: inout State) -> Effect<Action> {

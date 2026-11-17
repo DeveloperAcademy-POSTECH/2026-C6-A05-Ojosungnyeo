@@ -188,7 +188,6 @@ struct HomeFeature: Reducer {
                 state.tripItinerary.timeTable.tripEndDate = source.tripEndDate
                 state.tripItinerary.timeTable.recommendationTripID = source.tripID
                 let recommendations = state.placeGrouping.recommendedGroups
-                    .filter { state.placeGrouping.confirmedGroupIDs.contains($0.id) }
                     .flatMap { group in
                         group.places.map { place in
                             let ownerIDs = source.memberPlaces.compactMap { member, places in

@@ -386,19 +386,24 @@ struct TimeTableFeature: Reducer {
                     state.pendingItinerarySnapshot = snapshot
                     return .none
                 }
-                state.recommendations = snapshot.recommendations.map {
-                    TimeTableRecommendation(
-                        id: $0.id,
-                        groupID: $0.groupID,
-                        placeID: $0.placeID,
-                        placeName: $0.placeName,
-                        category: $0.category,
-                        groupCategories: $0.groupCategories,
-                        memberIDs: $0.memberIDs,
-                        placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
-                        latitude: $0.latitude,
-                        longitude: $0.longitude
-                    )
+                // 일정에 배치하지 않은 추천 그룹도 편집 목록에 계속 남겨 둔다.
+                // 서버 리스너가 추천 저장보다 먼저 빈 스냅샷을 전달하더라도
+                // 현재 메모리의 추천 그룹을 지우지 않는다.
+                if !snapshot.recommendations.isEmpty || state.recommendations.isEmpty {
+                    state.recommendations = snapshot.recommendations.map {
+                        TimeTableRecommendation(
+                            id: $0.id,
+                            groupID: $0.groupID,
+                            placeID: $0.placeID,
+                            placeName: $0.placeName,
+                            category: $0.category,
+                            groupCategories: $0.groupCategories,
+                            memberIDs: $0.memberIDs,
+                            placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
+                            latitude: $0.latitude,
+                            longitude: $0.longitude
+                        )
+                    }
                 }
                 state.coursesByID = Dictionary(uniqueKeysWithValues: snapshot.courses.map { course in
                     let value = TimeTableCourse(

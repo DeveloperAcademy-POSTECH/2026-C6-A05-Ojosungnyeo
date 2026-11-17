@@ -929,8 +929,6 @@ private extension PlaceGroupingFeature.State {
 }
 
 private enum PlaceGroupingEngine {
-    private static let maximumPlacesPerGroup = 5
-
     struct Result {
         let members: [PlaceGroupingFeature.Member]
         let mapGroups: [MapPlaceGroup]
@@ -977,47 +975,36 @@ private enum PlaceGroupingEngine {
         )
         let regions = mergingOverlappingRegions(connected)
         let mapGroups = regions.enumerated().map { index, region in
-            let uniquePlaces = unique(region.map(\.place))
+            let places = unique(region.map(\.place))
             return MapPlaceGroup(
                 id: "region-\(index)",
                 name: courseName(
-                    places: uniquePlaces,
+                    places: places,
                     destination: state.destinationName,
                     index: index
                 ),
-                places: uniquePlaces,
+                places: places,
                 radius: enclosingRadius(of: region)
             )
         }
-
-        var recommendations: [PlaceGroupingFeature.RecommendedGroup] = []
-        for (regionIndex, region) in regions.enumerated() {
-            let placesByCategory = Dictionary(grouping: region) {
-                normalizedCategory($0.place.category)
-            }
-            for (categoryIndex, category) in placesByCategory.keys.sorted().enumerated() {
-                let categoryPlaces = placesByCategory[category, default: []]
-                for (courseIndex, course) in spatiallySplit(categoryPlaces).enumerated() {
-                    let places = unique(course.map(\.place))
-                    let memberIDs = Array(Set(
-                        course.flatMap(\.members).map(\.rawValue)
-                    )).sorted()
-                    recommendations.append(
-                        .init(
-                            id: "region-\(regionIndex)-course-\(categoryIndex)-\(courseIndex)",
-                            title: courseName(
-                                places: places,
-                                destination: state.destinationName,
-                                index: courseIndex
-                            ),
-                            participantSummary: "\(memberIDs.count)명",
-                            memberIDs: memberIDs,
-                            categories: [category],
-                            places: places
-                        )
-                    )
-                }
-            }
+        // 지도의 지역 원과 추천 그룹은 같은 ID와 같은 장소 목록을 사용한다.
+        // 취향은 그룹을 다시 쪼개지 않고 지역 그룹의 카테고리로 표시한다.
+        let recommendations = regions.enumerated().map { regionIndex, region in
+            let places = mapGroups[regionIndex].places
+            let memberIDs = Array(Set(
+                region.flatMap(\.members).map(\.rawValue)
+            )).sorted()
+            let categories = Array(Set(
+                places.map { normalizedCategory($0.category) }
+            )).sorted()
+            return PlaceGroupingFeature.RecommendedGroup(
+                id: mapGroups[regionIndex].id,
+                title: mapGroups[regionIndex].name,
+                participantSummary: "\(memberIDs.count)명",
+                memberIDs: memberIDs,
+                categories: categories,
+                places: places
+            )
         }
 
         return Result(
@@ -1067,40 +1054,7 @@ private enum PlaceGroupingEngine {
         return result
     }
 
-    /// 같은 지역·카테고리의 추천 코스가 5개를 넘으면 가까운 위치끼리 나눈다.
-    private static func spatiallySplit(_ region: [OwnedPlace]) -> [[OwnedPlace]] {
-        guard region.count > maximumPlacesPerGroup else { return [region] }
-
-        let averageLatitude = region.map(\.place.latitude).reduce(0, +) / Double(region.count)
-        let latitudeSpan = (region.map(\.place.latitude).max() ?? 0)
-            - (region.map(\.place.latitude).min() ?? 0)
-        let longitudeSpan = ((region.map(\.place.longitude).max() ?? 0)
-            - (region.map(\.place.longitude).min() ?? 0))
-            * cos(averageLatitude * .pi / 180)
-        let sorted: [OwnedPlace]
-        if latitudeSpan >= longitudeSpan {
-            sorted = region.sorted {
-                if $0.place.latitude == $1.place.latitude {
-                    return $0.place.longitude < $1.place.longitude
-                }
-                return $0.place.latitude < $1.place.latitude
-            }
-        } else {
-            sorted = region.sorted {
-                if $0.place.longitude == $1.place.longitude {
-                    return $0.place.latitude < $1.place.latitude
-                }
-                return $0.place.longitude < $1.place.longitude
-            }
-        }
-
-        let splitIndex = sorted.count / 2
-        return spatiallySplit(Array(sorted[..<splitIndex]))
-            + spatiallySplit(Array(sorted[splitIndex...]))
-    }
-
     /// 각 원이 모든 장소를 포함하게 계산한 뒤 서로 겹치는 원은 같은 생활권으로 합친다.
-    /// 장소 수 제한은 지역 원이 아니라 이후 생성되는 추천 코스에만 적용한다.
     private static func mergingOverlappingRegions(
         _ source: [[OwnedPlace]]
     ) -> [[OwnedPlace]] {
@@ -1235,10 +1189,13 @@ private enum PlaceGroupingEngine {
     }
 
     private static func regionCenter(_ region: [OwnedPlace]) -> CLLocation {
-        let count = Double(max(region.count, 1))
+        // 여러 명이 같은 장소를 선택해도 중심점이 특정 장소 쪽으로
+        // 치우치 않도록 지도에 표시하는 고유 장소를 기준으로 계산한다.
+        let places = unique(region.map(\.place))
+        let count = Double(max(places.count, 1))
         return CLLocation(
-            latitude: region.map(\.place.latitude).reduce(0, +) / count,
-            longitude: region.map(\.place.longitude).reduce(0, +) / count
+            latitude: places.map(\.latitude).reduce(0, +) / count,
+            longitude: places.map(\.longitude).reduce(0, +) / count
         )
     }
 

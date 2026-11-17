@@ -345,7 +345,11 @@ private struct TimeTableEditContent: View {
             LazyVStack(spacing: DDSpacing.large) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     HStack(alignment: .top, spacing: 20) {
-                        timelineMarker(index: index, count: rows.count)
+                        timelineMarker(
+                            index: index,
+                            count: rows.count,
+                            rowHeight: editRowHeight(row)
+                        )
                         rowCards(row)
                     }
                     .padding(.leading, DDSpacing.medium)
@@ -357,12 +361,12 @@ private struct TimeTableEditContent: View {
         .padding(.top, DDSpacing.large)
     }
 
-    private func timelineMarker(index: Int, count: Int) -> some View {
+    private func timelineMarker(index: Int, count: Int, rowHeight: CGFloat) -> some View {
         ZStack(alignment: .top) {
             if index < count - 1 {
                 Rectangle()
                     .fill(DDColor.textTertiary)
-                    .frame(width: 5, height: 87)
+                    .frame(width: 5, height: rowHeight + DDSpacing.large)
                     .offset(y: 7)
             }
             Text("\(index + 1)")
@@ -371,7 +375,7 @@ private struct TimeTableEditContent: View {
                 .frame(width: 15, height: 15)
                 .background(DDColor.actionPrimary, in: Circle())
         }
-        .frame(width: 16, height: 71, alignment: .top)
+        .frame(width: 16, height: rowHeight, alignment: .top)
     }
 
     @ViewBuilder
@@ -396,7 +400,7 @@ private struct TimeTableEditContent: View {
                 .frame(width: geometry.size.width, alignment: .leading)
                 .scrollIndicators(.hidden)
             }
-            .frame(height: 71)
+            .frame(height: editRowHeight(row))
         } else if let source = row.sources.first {
             sourceCard(source, rowID: row.id, width: nil)
         }
@@ -409,8 +413,15 @@ private struct TimeTableEditContent: View {
             if let schedule = store.draftPlacements.first(where: { $0.id == id }),
                let course = timeTableStore.coursesByID[schedule.courseID] {
                 let dragItem = DraggedItem.row(rowID, source)
-                editCard(title: course.title, subtitle: course.categorySummary,
-                         memberIDs: course.members.map(\.rawValue), width: width, drag: dragItem)
+                editablePlaceCard(
+                    title: course.title,
+                    subtitle: course.categorySummary,
+                    memberIDs: course.members.map(\.rawValue),
+                    placeNames: course.placeNames,
+                    width: width,
+                    drag: dragItem,
+                    placePayload: { index in "course:\(course.id):\(index)" }
+                )
                     .opacity(dragging == dragItem ? 0.3 : 1)
                     .saturation(dragging == dragItem ? 0.25 : 1)
             }
@@ -418,13 +429,154 @@ private struct TimeTableEditContent: View {
             let places = timeTableStore.recommendations.filter { $0.groupID == id }
             if let first = places.first {
                 let dragItem = DraggedItem.row(rowID, source)
-                editCard(title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
-                         subtitle: places.categorySummary, memberIDs: first.memberIDs,
-                         width: width, drag: dragItem)
+                editablePlaceCard(
+                    title: places.count > 1 ? "\(first.placeName) 외 \(places.count - 1)곳" : first.placeName,
+                    subtitle: places.categorySummary,
+                    memberIDs: first.memberIDs,
+                    placeNames: places.map(\.placeName),
+                    width: width,
+                    drag: dragItem,
+                    placePayload: { index in "recommendation:\(id):\(index)" }
+                )
                     .opacity(dragging == dragItem ? 0.3 : 1)
                     .saturation(dragging == dragItem ? 0.25 : 1)
             }
         }
+    }
+
+    private func editablePlaceCard(
+        title: String,
+        subtitle: String,
+        memberIDs: [String],
+        placeNames: [String],
+        width: CGFloat?,
+        drag: DraggedItem,
+        placePayload: @escaping (Int) -> String
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: DDSpacing.small) {
+                VStack(alignment: .leading, spacing: DDSpacing.xSmall) {
+                    HStack(spacing: DDSpacing.xSmall) {
+                        Text(title)
+                            .ddTypography(.bodyEmphasis16)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .lineLimit(1)
+                        if shouldDisplayMemberDots(for: memberIDs) {
+                            memberDots(memberIDs)
+                        }
+                    }
+
+                    Text(subtitle)
+                        .ddTypography(.labelEmphasis14)
+                        .foregroundStyle(DDColor.actionPrimary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+                dragHandle(drag)
+            }
+            .padding(.horizontal, DDSpacing.medium)
+            .frame(height: 71)
+
+            VStack(spacing: DDSpacing.small) {
+                ForEach(Array(placeNames.enumerated()), id: \.offset) { index, placeName in
+                    HStack(spacing: DDSpacing.medium) {
+                        Text("\(index + 1)")
+                            .ddTypography(.bodyEmphasis16)
+                            .foregroundStyle(DDColor.actionPrimary)
+                            .frame(width: 20)
+
+                        Text(placeName)
+                            .ddTypography(.bodyEmphasis16)
+                            .foregroundStyle(DDColor.textPrimary)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 0)
+
+                        placeDragHandle
+                    }
+                    .padding(.horizontal, DDSpacing.medium)
+                    .frame(height: 44)
+                    .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 14))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                    .draggable(placePayload(index))
+                    .dropDestination(for: String.self) { payloads, _ in
+                        guard let payload = payloads.first else { return false }
+                        return movePlace(payload: payload, before: index)
+                    }
+                }
+            }
+            .padding(.horizontal, DDSpacing.small)
+            .padding(.top, DDSpacing.small)
+            .padding(.bottom, 12)
+        }
+        .frame(width: width)
+        .frame(maxWidth: width == nil ? .infinity : nil)
+        .background(DDColor.surfaceElevated, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(DDColor.textTertiary, lineWidth: 1)
+        }
+        .background(dropFrame(dragFrameID(drag)))
+    }
+
+    private var placeDragHandle: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(spacing: 3) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Circle()
+                            .fill(Color(red: 222 / 255, green: 222 / 255, blue: 222 / 255))
+                            .frame(width: 4, height: 4)
+                    }
+                }
+            }
+        }
+        .frame(width: 44, height: 44, alignment: .trailing)
+        .allowsHitTesting(false)
+        .accessibilityLabel("장소 순서 변경")
+    }
+
+    private func movePlace(payload: String, before destinationIndex: Int) -> Bool {
+        let components = payload.split(separator: ":", maxSplits: 2).map(String.init)
+        guard components.count == 3,
+              let sourceIndex = Int(components[2]),
+              sourceIndex != destinationIndex
+        else { return false }
+
+        switch components[0] {
+        case "course":
+            guard let courseID = Int(components[1]) else { return false }
+            store.send(.coursePlaceMoved(
+                courseID,
+                sourceIndex: sourceIndex,
+                beforeIndex: destinationIndex
+            ))
+        case "recommendation":
+            store.send(.recommendationPlaceMoved(
+                components[1],
+                sourceIndex: sourceIndex,
+                beforeIndex: destinationIndex
+            ))
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func editRowHeight(_ row: TimeTableEditRow) -> CGFloat {
+        let placeCount = row.sources.map { source -> Int in
+            switch source {
+            case let .schedule(scheduleID):
+                guard let schedule = store.draftPlacements.first(where: { $0.id == scheduleID })
+                else { return 0 }
+                return timeTableStore.coursesByID[schedule.courseID]?.placeNames.count ?? 0
+            case let .recommendationGroup(groupID):
+                return timeTableStore.recommendations.filter { $0.groupID == groupID }.count
+            }
+        }.max() ?? 0
+        guard placeCount > 0 else { return 71 }
+        return 83 + CGFloat(placeCount) * 52
     }
 
     private func editCard(

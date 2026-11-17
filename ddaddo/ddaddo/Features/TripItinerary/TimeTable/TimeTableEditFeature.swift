@@ -36,6 +36,8 @@ struct TimeTableEditFeature: Reducer {
         var selectedMinuteOfDay: Int?
         var rowsByDay: [TripDay: [TimeTableEditRow]] = [:]
         var draftPlacements: [TimeTableSchedule] = []
+        var originalCoursesByID: [TimeTableCourse.ID: TimeTableCourse]?
+        var originalRecommendations: [TimeTableRecommendation]?
         var isSaving = false
         var isSaveUnavailableAlertPresented = false
         var saveErrorMessage = "일정을 저장하지 못했어요.\n잠시 후 다시 시도해 주세요."
@@ -72,6 +74,8 @@ struct TimeTableEditFeature: Reducer {
         case rowMovedToDay(TimeTableEditRow.ID, source: TimeTableEditRow.Source, day: TripDay)
         case rowMerged(TimeTableEditRow.ID, source: TimeTableEditRow.Source, into: TimeTableEditRow.ID)
         case recommendationMerged(String, into: TimeTableEditRow.ID)
+        case coursePlaceMoved(TimeTableCourse.ID, sourceIndex: Int, beforeIndex: Int)
+        case recommendationPlaceMoved(String, sourceIndex: Int, beforeIndex: Int)
         case deletionRequested(TripDay, rowID: TimeTableEditRow.ID, source: TimeTableEditRow.Source)
         case deletionCancelled
         case deletionConfirmed
@@ -93,6 +97,8 @@ struct TimeTableEditFeature: Reducer {
             case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
                  .groupAddButtonTapped, .timeSelectionDoneTapped,
                  .recommendationDropped, .scheduleRowMoved, .rowMovedToDay, .rowMerged, .recommendationMerged,
+                 .coursePlaceMoved,
+                 .recommendationPlaceMoved,
                  .delegate:
                 return .none
 

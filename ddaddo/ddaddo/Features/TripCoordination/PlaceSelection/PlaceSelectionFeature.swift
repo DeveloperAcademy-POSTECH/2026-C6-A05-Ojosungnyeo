@@ -83,6 +83,7 @@ struct PlaceSelectionFeature: Reducer {
         var remainingSeconds: Int
         var isTimerRunning = false
         var hasSelectionEnded = false
+        var hasStartedPlaceAnalysis = false
         var pendingPlaceConfirmation: Bool?
         var isEditingConfirmedPlaces = false
         var completionAlert: CompletionAlert?
@@ -377,6 +378,8 @@ struct PlaceSelectionFeature: Reducer {
         case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
+        case placeAnalysisStatusChanged(Bool)
+        case placeAnalysisStartFailed(String)
         case placePhotoResponse(String, [Data])
         case placeMutationFailed(String)
         case placeSyncErrorDismissed
@@ -427,14 +430,20 @@ struct PlaceSelectionFeature: Reducer {
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
                     state.completionAlert = .selectionTimeExpired
-                    return loadMemberPlacesEffect(tripID: state.tripID)
+                    return .merge(
+                        loadMemberPlacesEffect(tripID: state.tripID),
+                        observePlaceAnalysisEffect(tripID: state.tripID)
+                            .cancellable(id: "place-analysis-sync", cancelInFlight: true)
+                    )
                 }
 
                 let tripID = state.tripID
                 var effects: [Effect<Action>] = [
                     loadMemberPlacesEffect(tripID: tripID),
                     observeMemberPlacesEffect(tripID: tripID)
-                    .cancellable(id: "place-selection-sync", cancelInFlight: true)
+                        .cancellable(id: "place-selection-sync", cancelInFlight: true),
+                    observePlaceAnalysisEffect(tripID: tripID)
+                        .cancellable(id: "place-analysis-sync", cancelInFlight: true)
                 ]
                 if !state.isTimerRunning && !state.hasSelectionEnded {
                     state.isTimerRunning = true
@@ -454,7 +463,8 @@ struct PlaceSelectionFeature: Reducer {
                 state.isTimerRunning = false
                 return .merge(
                     .cancel(id: "place-selection-timer"),
-                    .cancel(id: "place-selection-sync")
+                    .cancel(id: "place-selection-sync"),
+                    .cancel(id: "place-analysis-sync")
                 )
 
             case .refreshMemberPlaces:
@@ -534,6 +544,16 @@ struct PlaceSelectionFeature: Reducer {
                 return photoEffects.isEmpty ? .none : .merge(photoEffects)
 
             case .memberPlacesFailed:
+                return .none
+
+            case let .placeAnalysisStatusChanged(hasStarted):
+                guard hasStarted, !state.hasStartedPlaceAnalysis else { return .none }
+                state.hasStartedPlaceAnalysis = true
+                state.completionAlert = nil
+                return .send(.delegate(.proceedToAnalysis))
+
+            case let .placeAnalysisStartFailed(message):
+                state.placeSyncErrorMessage = message
                 return .none
 
             case let .placePhotoResponse(placeID, photoData):
@@ -853,7 +873,15 @@ struct PlaceSelectionFeature: Reducer {
                     return .none
                 }
                 state.completionAlert = nil
-                return .send(.delegate(.proceedToAnalysis))
+                let tripID = state.tripID
+                return .run { send in
+                    do {
+                        try await placeClient.startPlaceAnalysis(tripID)
+                        await send(.placeAnalysisStatusChanged(true))
+                    } catch {
+                        await send(.placeAnalysisStartFailed(error.localizedDescription))
+                    }
+                }
 
             case .timerTicked:
                 guard state.remainingSeconds > 0 else { return .none }
@@ -999,6 +1027,19 @@ struct PlaceSelectionFeature: Reducer {
                 }
             } catch {
                 await send(.memberPlacesFailed)
+            }
+        }
+    }
+
+    private func observePlaceAnalysisEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observePlaceAnalysis(tripID)
+        return .run { send in
+            do {
+                for try await hasStarted in stream {
+                    await send(.placeAnalysisStatusChanged(hasStarted))
+                }
+            } catch {
+                await send(.placeAnalysisStartFailed(error.localizedDescription))
             }
         }
     }

@@ -63,6 +63,12 @@ enum DevelopmentMockTripService {
         "하르딘"
     ]
 
+    /// 부스에서 직접 조작하지 않는 Dev 계정은 그룹 조율도 완료한 상태로 유지합니다.
+    private static let preconfirmedGroupingNicknames: Set<String> = [
+        "테이",
+        "하르딘"
+    ]
+
     static func reset() async throws {
         guard FirebaseApp.app()?.options.projectID == "ddaddodev" else {
             throw DevelopmentMockTripError.developmentBuildRequired
@@ -129,22 +135,28 @@ enum DevelopmentMockTripService {
                 let places = resolvedPlacesByTripID[trip.id]?[index] ?? []
                 let isPlaceSelectionConfirmed = preconfirmedPlaceSelectionNicknames
                     .contains(resolvedMember.member.nickname)
+                let isGroupingConfirmed = preconfirmedGroupingNicknames
+                    .contains(resolvedMember.member.nickname)
+                var participantData: [String: Any] = [
+                    "slotIndex": index,
+                    "uid": resolvedMember.uid,
+                    "name": resolvedMember.member.nickname,
+                    "avatarName": resolvedMember.member.avatar.rawValue,
+                    "role": index == 0 ? "owner" : "member",
+                    "status": "joined",
+                    "selectedPlaces": places,
+                    "placeSelectionConfirmed": isPlaceSelectionConfirmed,
+                    "groupingConfirmed": isGroupingConfirmed,
+                    "confirmedGroupIDs": [],
+                    "joinedGroupIDs": [],
+                    "joinedAt": FieldValue.serverTimestamp(),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ]
+                if isGroupingConfirmed {
+                    participantData["groupingConfirmedAt"] = FieldValue.serverTimestamp()
+                }
                 batch.setData(
-                    [
-                        "slotIndex": index,
-                        "uid": resolvedMember.uid,
-                        "name": resolvedMember.member.nickname,
-                        "avatarName": resolvedMember.member.avatar.rawValue,
-                        "role": index == 0 ? "owner" : "member",
-                        "status": "joined",
-                        "selectedPlaces": places,
-                        "placeSelectionConfirmed": isPlaceSelectionConfirmed,
-                        "groupingConfirmed": false,
-                        "confirmedGroupIDs": [],
-                        "joinedGroupIDs": [],
-                        "joinedAt": FieldValue.serverTimestamp(),
-                        "updatedAt": FieldValue.serverTimestamp()
-                    ],
+                    participantData,
                     forDocument: tripReference
                         .collection("participants")
                         .document(resolvedMember.uid)

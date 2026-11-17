@@ -27,9 +27,26 @@ struct RouteOverviewView: View {
                     Spacer(minLength: 0)
                 }
 
-                itineraryPanel(
-                    fullHeight: max(560, proxy.size.height - 143)
-                )
+                if let place = store.selectedPlaceDetails {
+                    SelectedPlaceBottomSheet(
+                        place: place,
+                        isLoading: store.isPlaceDetailsLoading,
+                        canAdd: false,
+                        isAlreadyAdded: true,
+                        fallbackImageName: nil,
+                        showsAddButton: false,
+                        bottomSafeAreaInset: 34 + tabBarCoveredHeight,
+                        closeButtonTapped: {
+                            store.send(.placeDetailsDismissed)
+                        },
+                        addButtonTapped: {}
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+                } else {
+                    itineraryPanel(
+                        fullHeight: max(560, proxy.size.height - 143)
+                    )
+                }
             }
         }
         .onAppear {
@@ -45,7 +62,10 @@ struct RouteOverviewView: View {
             selectedMembers: store.selectedMembers,
             selectedMemberOrder: store.selectedMemberOrder,
             currentMember: store.currentMember,
-            memberOrder: store.memberOrder
+            memberOrder: store.memberOrder,
+            onMarkerTapped: { stop in
+                store.send(.mapMarkerTapped(stop))
+            }
         )
             .ignoresSafeArea()
     }

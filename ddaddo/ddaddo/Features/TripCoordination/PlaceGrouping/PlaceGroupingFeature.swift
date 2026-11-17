@@ -938,12 +938,13 @@ private enum PlaceGroupingEngine {
             }
         }
         let ownedPlaces = mergingSamePlaces(selectedPlaces)
-        let regions = connectedRegions(
+        let connected = connectedRegions(
             ownedPlaces,
             maximumDistance: maximumDistance(for: selection),
             maximumTravelTime: TimeInterval(selection.duration.rawValue * 60),
             travelTimes: travelTimes
         )
+        let regions = mergingUndersizedRegions(connected)
         let mapGroups = regions.enumerated().map { index, region in
             let uniquePlaces = unique(region.map(\.place))
             return MapPlaceGroup(
@@ -954,7 +955,7 @@ private enum PlaceGroupingEngine {
                     index: index
                 ),
                 places: uniquePlaces,
-                radius: max(800, regionRadius(uniquePlaces) + 500)
+                radius: displayRadius(for: index, regions: regions)
             )
         }
 
@@ -1064,6 +1065,39 @@ private enum PlaceGroupingEngine {
             + spatiallySplit(Array(sorted[splitIndex...]))
     }
 
+    /// 이동시간 행렬에 일부 경로가 없거나 경계값을 조금 넘더라도 한 장소짜리 그룹이
+    /// 연속해서 생기지 않도록 가장 가까운 생활권과 다시 묶는다. 합친 결과도 5개를
+    /// 넘으면 위치를 기준으로 균형 있게 재분할한다.
+    private static func mergingUndersizedRegions(
+        _ source: [[OwnedPlace]]
+    ) -> [[OwnedPlace]] {
+        var regions = source.filter { !$0.isEmpty }
+
+        while regions.count > 1,
+              let sourceIndex = regions.firstIndex(where: { $0.count == 1 }) {
+            let preferredTargets = regions.indices.filter {
+                $0 != sourceIndex && regions[$0].count < 3
+            }
+            let targetCandidates = preferredTargets.isEmpty
+                ? regions.indices.filter { $0 != sourceIndex }
+                : preferredTargets
+            guard let targetIndex = targetCandidates.min(by: {
+                distanceBetweenRegions(regions[sourceIndex], regions[$0])
+                    < distanceBetweenRegions(regions[sourceIndex], regions[$1])
+            }) else { break }
+
+            let combined = regions[sourceIndex] + regions[targetIndex]
+            let replacement = spatiallySplit(combined)
+            let upperIndex = max(sourceIndex, targetIndex)
+            let lowerIndex = min(sourceIndex, targetIndex)
+            regions.remove(at: upperIndex)
+            regions.remove(at: lowerIndex)
+            regions.insert(contentsOf: replacement, at: lowerIndex)
+        }
+
+        return regions
+    }
+
     private static func areWithinTravelLimit(
         _ lhs: PinnedPlace,
         _ rhs: PinnedPlace,
@@ -1079,7 +1113,9 @@ private enum PlaceGroupingEngine {
         else {
             return distance(lhs, rhs) <= maximumDistance
         }
-        return max(forward, backward) <= maximumTravelTime
+        // 대중교통 경로는 방향에 따라 환승 결과가 크게 달라질 수 있으므로,
+        // 두 방향 중 실제로 조건을 만족하는 경로가 하나라도 있으면 같은 생활권으로 본다.
+        return min(forward, backward) <= maximumTravelTime
     }
 
     /// 같은 Google Place를 여러 명이 선택해도 장소 하나와 하나의 추천 그룹으로 취급한다.
@@ -1148,6 +1184,40 @@ private enum PlaceGroupingEngine {
         return places.map {
             center.distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude))
         }.max() ?? 800
+    }
+
+    private static func displayRadius(
+        for index: Int,
+        regions: [[OwnedPlace]]
+    ) -> Double {
+        let places = unique(regions[index].map(\.place))
+        let naturalRadius = places.count == 1
+            ? 350
+            : max(350, regionRadius(places) + 200)
+        let distances = regions.indices
+            .filter { $0 != index }
+            .map { distanceBetweenRegions(regions[index], regions[$0]) }
+        guard let nearestCenterDistance = distances.min() else {
+            return naturalRadius
+        }
+
+        // 이웃 원과 시각적으로 겹치지 않도록 두 중심 거리의 42% 안으로 제한한다.
+        return max(8, min(naturalRadius, nearestCenterDistance * 0.42))
+    }
+
+    private static func distanceBetweenRegions(
+        _ lhs: [OwnedPlace],
+        _ rhs: [OwnedPlace]
+    ) -> Double {
+        regionCenter(lhs).distance(from: regionCenter(rhs))
+    }
+
+    private static func regionCenter(_ region: [OwnedPlace]) -> CLLocation {
+        let count = Double(max(region.count, 1))
+        return CLLocation(
+            latitude: region.map(\.place.latitude).reduce(0, +) / count,
+            longitude: region.map(\.place.longitude).reduce(0, +) / count
+        )
     }
 
     private static func unique(_ places: [PinnedPlace]) -> [PinnedPlace] {

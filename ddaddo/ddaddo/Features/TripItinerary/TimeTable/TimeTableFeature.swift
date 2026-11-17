@@ -457,6 +457,8 @@ struct TimeTableFeature: Reducer {
             case .editButtonTapped:
                 state.pendingItinerarySnapshot = nil
                 state.edit = TimeTableEditFeature.State()
+                state.edit.originalCoursesByID = state.coursesByID
+                state.edit.originalRecommendations = state.recommendations
                 #if DEBUG
                 if state.isLocalPreview, state.recommendationTripID == nil,
                    let saved = state.savedPreviewRowsByDay {
@@ -585,6 +587,12 @@ struct TimeTableFeature: Reducer {
             case .edit(.backButtonTapped):
                 let pendingSnapshot = state.pendingItinerarySnapshot
                 state.pendingItinerarySnapshot = nil
+                if let originalCoursesByID = state.edit.originalCoursesByID {
+                    state.coursesByID = originalCoursesByID
+                }
+                if let originalRecommendations = state.edit.originalRecommendations {
+                    state.recommendations = originalRecommendations
+                }
                 state.isEditing = false
                 state.edit = TimeTableEditFeature.State()
                 guard let pendingSnapshot else { return .none }
@@ -676,6 +684,50 @@ struct TimeTableFeature: Reducer {
                         await send(.itinerarySaveFailed(error.localizedDescription))
                     }
                 }
+
+            case let .edit(.coursePlaceMoved(courseID, sourceIndex, beforeIndex)):
+                guard let course = state.coursesByID[courseID],
+                      course.placeNames.indices.contains(sourceIndex),
+                      course.placeNames.indices.contains(beforeIndex),
+                      sourceIndex != beforeIndex
+                else { return .none }
+
+                var placeNames = course.placeNames
+                placeNames.moveElement(from: sourceIndex, before: beforeIndex)
+                var places = course.places
+                if places.count == course.placeNames.count {
+                    places.moveElement(from: sourceIndex, before: beforeIndex)
+                }
+                var categories = course.categories
+                if categories.count == course.placeNames.count {
+                    categories.moveElement(from: sourceIndex, before: beforeIndex)
+                }
+                state.coursesByID[courseID] = TimeTableCourse(
+                    id: course.id,
+                    title: course.title,
+                    placeCount: placeNames.count,
+                    placeNames: placeNames,
+                    categories: categories,
+                    members: course.members,
+                    durationMinutes: course.durationMinutes,
+                    places: places
+                )
+                return .none
+
+            case let .edit(.recommendationPlaceMoved(groupID, sourceIndex, beforeIndex)):
+                let recommendationIndices = state.recommendations.indices.filter {
+                    state.recommendations[$0].groupID == groupID
+                }
+                guard recommendationIndices.indices.contains(sourceIndex),
+                      recommendationIndices.indices.contains(beforeIndex),
+                      sourceIndex != beforeIndex
+                else { return .none }
+                var values = recommendationIndices.map { state.recommendations[$0] }
+                values.moveElement(from: sourceIndex, before: beforeIndex)
+                for (index, recommendationIndex) in recommendationIndices.enumerated() {
+                    state.recommendations[recommendationIndex] = values[index]
+                }
+                return .none
 
             case let .edit(.scheduleTapped(id)):
                 guard let schedule = state.edit.draftPlacements.first(where: {
@@ -863,6 +915,16 @@ struct TimeTableFeature: Reducer {
         return state
     }
     #endif
+}
+
+private extension Array {
+    mutating func moveElement(from sourceIndex: Int, before destinationIndex: Int) {
+        guard indices.contains(sourceIndex), indices.contains(destinationIndex),
+              sourceIndex != destinationIndex else { return }
+        let element = remove(at: sourceIndex)
+        let insertionIndex = Swift.min(destinationIndex, endIndex)
+        insert(element, at: insertionIndex)
+    }
 }
 
 struct TimeTableRecommendation: Equatable, Identifiable {

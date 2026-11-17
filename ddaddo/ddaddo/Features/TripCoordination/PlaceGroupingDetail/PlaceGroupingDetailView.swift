@@ -728,7 +728,9 @@ private struct PlaceDraggableRow: View {
 
             Spacer(minLength: 0)
 
-            dragHandle
+            if isEditable {
+                dragHandle
+            }
         }
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58)

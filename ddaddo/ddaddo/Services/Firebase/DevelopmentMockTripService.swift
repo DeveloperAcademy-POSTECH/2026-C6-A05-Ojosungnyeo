@@ -86,6 +86,8 @@ enum DevelopmentMockTripService {
             resolvedPlacesByTripID[trip.id] = try await resolvePlaces(for: trip)
         }
 
+        try await deleteExistingSeedData(database: database, trips: trips)
+
         let batch = database.batch()
         let allTripIDs = trips.map(\.id)
         let expiresAt = Date().addingTimeInterval(72 * 60 * 60)
@@ -192,6 +194,33 @@ enum DevelopmentMockTripService {
         try await batch.commit()
     }
 
+    private static func deleteExistingSeedData(
+        database: Firestore,
+        trips: [Trip]
+    ) async throws {
+        for trip in trips {
+            let tripReference = database.collection("trips").document(trip.id)
+            let participants = try await tripReference.collection("participants").getDocuments()
+            let itinerary = try await tripReference.collection("itinerary").getDocuments()
+            let batch = database.batch()
+
+            for participant in participants.documents {
+                let places = try await participant.reference.collection("places").getDocuments()
+                for place in places.documents {
+                    batch.deleteDocument(place.reference)
+                }
+                batch.deleteDocument(participant.reference)
+            }
+            for itineraryDocument in itinerary.documents {
+                batch.deleteDocument(itineraryDocument.reference)
+            }
+
+            batch.deleteDocument(tripReference)
+            batch.deleteDocument(database.collection("inviteCodes").document(trip.inviteCode))
+            try await batch.commit()
+        }
+    }
+
     private static func resolveMembers(database: Firestore) async throws -> [ResolvedMember] {
         var result: [ResolvedMember] = []
         for member in members {
@@ -236,13 +265,18 @@ enum DevelopmentMockTripService {
                     continue
                 }
 
-                let value = try await resolvePlace(
-                    place,
-                    destination: trip.destination,
-                    placesService: placesService
-                )
-                cache[cacheKey] = value
-                memberPlaces.append(value)
+                do {
+                    let value = try await resolvePlace(
+                        place,
+                        destination: trip.destination,
+                        placesService: placesService
+                    )
+                    cache[cacheKey] = value
+                    memberPlaces.append(value)
+                } catch {
+                    // Dev 시드는 실제 Google Places 좌표를 확인한 장소만 저장합니다.
+                    continue
+                }
             }
             result.append(memberPlaces)
         }
@@ -358,28 +392,28 @@ private extension DevelopmentMockTripService {
         maximumTravelMinutes: 30,
         memberPlaces: [
             places([
-                ("센소지", "문화", "2 Chome-3-1 Asakusa, Taito City, Tokyo"),
-                ("갓파바시 도구거리", "쇼핑", "3 Chome-18-2 Matsugaya, Taito City, Tokyo"),
-                ("기요스미 정원", "자연", "3 Chome-3-9 Kiyosumi, Koto City, Tokyo"),
-                ("시부야 스카이", "전망", "Shibuya Scramble Square, Tokyo")
+                ("센소지", "문화", "Senso-ji Asakusa"),
+                ("나카미세 거리", "간식·쇼핑", "Nakamise-dori Asakusa"),
+                ("일본과학미래관", "과학 체험", "Miraikan Odaiba"),
+                ("도쿄 조이폴리스", "게임·VR", "Tokyo Joypolis Odaiba")
             ]),
             places([
-                ("닌텐도 도쿄", "쇼핑", "Shibuya PARCO 6F, Tokyo"),
-                ("포켓몬센터 시부야", "쇼핑", "Shibuya PARCO 6F, Tokyo"),
-                ("지브리 미술관", "문화", "1 Chome-1-83 Shimorenjaku, Mitaka, Tokyo"),
-                ("나카노 브로드웨이", "쇼핑", "5 Chome-52-15 Nakano, Tokyo")
+                ("센소지", "문화", "Senso-ji Asakusa"),
+                ("나카미세 거리", "간식·쇼핑", "Nakamise-dori Asakusa"),
+                ("라포레 하라주쿠", "패션", "Laforet Harajuku"),
+                ("키디랜드 하라주쿠점", "캐릭터 굿즈", "Kiddy Land Harajuku")
             ]),
             places([
-                ("네즈 미술관", "문화", "6 Chome-5-1 Minamiaoyama, Minato City, Tokyo"),
-                ("오모테산도", "쇼핑", "Omotesando Hills, Tokyo"),
-                ("21_21 디자인 사이트", "문화", "Tokyo Midtown Garden, Akasaka, Tokyo"),
-                ("다이칸야마 T-SITE", "카페·서점", "16-15 Sarugakucho, Shibuya, Tokyo")
+                ("센소지", "문화", "Senso-ji Asakusa"),
+                ("나카미세 거리", "간식·쇼핑", "Nakamise-dori Asakusa"),
+                ("일본과학미래관", "과학 체험", "Miraikan Odaiba"),
+                ("도쿄 조이폴리스", "게임·VR", "Tokyo Joypolis Odaiba")
             ]),
             places([
-                ("츠키지 장외시장", "맛집", "4 Chome Tsukiji, Chuo City, Tokyo"),
-                ("센소지", "문화", "2 Chome-3-1 Asakusa, Taito City, Tokyo"),
-                ("아메요코 시장", "맛집·쇼핑", "6 Chome-10-7 Ueno, Taito City, Tokyo"),
-                ("하모니카 요코초", "맛집", "1 Chome-1-3 Kichijoji Honcho, Tokyo")
+                ("센소지", "문화", "Senso-ji Asakusa"),
+                ("나카미세 거리", "간식·쇼핑", "Nakamise-dori Asakusa"),
+                ("라포레 하라주쿠", "패션", "Laforet Harajuku"),
+                ("키디랜드 하라주쿠점", "캐릭터 굿즈", "Kiddy Land Harajuku")
             ])
         ]
     )
@@ -393,27 +427,35 @@ private extension DevelopmentMockTripService {
         startDate: makeDate(year: 2026, month: 12, day: 3),
         endDate: makeDate(year: 2026, month: 12, day: 6),
         transportation: Transportation.publicTransit.rawValue,
-        maximumTravelMinutes: 15,
+        maximumTravelMinutes: 30,
         memberPlaces: [
             places([
-                ("상하이박물관", "문화", "201 Renmin Avenue, Shanghai"), ("예원", "문화", "168 Fuyou Road, Shanghai"),
-                ("와이탄", "관광지", "Zhongshan East 1st Road, Shanghai"), ("푸싱공원", "자연", "516 Fuxing Middle Road, Shanghai"),
-                ("록번드 미술관", "문화", "20 Huqiu Road, Shanghai"), ("상하이타워", "전망", "501 Yincheng Middle Road, Shanghai")
+                ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
+                ("와이바이두 다리", "건축", "Waibaidu Bridge Shanghai"),
+                ("팡성교", "전망", "Fangsheng Bridge Zhujiajiao"),
+                ("청대 우체국", "역사", "Qing Dynasty Post Office Zhujiajiao")
             ]),
             places([
-                ("난징동루", "쇼핑", "Nanjing East Road, Shanghai"), ("신천지", "쇼핑", "245 Madang Road, Shanghai"),
-                ("톈즈팡", "쇼핑", "Lane 210, Taikang Road, Shanghai"), ("상하이 IFC몰", "쇼핑", "8 Century Avenue, Shanghai"),
-                ("예원상성", "쇼핑", "265 Fangbang Middle Road, Shanghai"), ("우캉루", "관광지", "Wukang Road, Shanghai")
+                ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
+                ("와이바이두 다리", "건축", "Waibaidu Bridge Shanghai"),
+                ("상하이 디즈니랜드", "테마파크", "Shanghai Disneyland"),
+                ("디즈니타운", "쇼핑·맛집", "Disneytown Shanghai Disney Resort"),
+                ("월드 오브 디즈니 스토어", "굿즈", "World of Disney Store Shanghai Disney Resort"),
+                ("위싱 스타 파크", "호숫가 산책", "Wishing Star Park Shanghai Disney Resort")
             ]),
             places([
-                ("상하이박물관", "문화", "201 Renmin Avenue, Shanghai"), ("록번드 미술관", "문화", "20 Huqiu Road, Shanghai"),
-                ("파워스테이션 오브 아트", "문화", "678 Miaojiang Road, Shanghai"), ("서안미술관", "문화", "2600 Longteng Avenue, Shanghai"),
-                ("M50 창의원", "문화", "50 Moganshan Road, Shanghai"), ("우캉루", "관광지", "Wukang Road, Shanghai")
+                ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
+                ("와이바이두 다리", "건축", "Waibaidu Bridge Shanghai"),
+                ("팡성교", "전망", "Fangsheng Bridge Zhujiajiao"),
+                ("청대 우체국", "역사", "Qing Dynasty Post Office Zhujiajiao")
             ]),
             places([
-                ("예원상성", "맛집", "265 Fangbang Middle Road, Shanghai"), ("황허루", "맛집", "Huanghe Road, Shanghai"),
-                ("윈난난루 미식거리", "맛집", "Yunnan South Road, Shanghai"), ("톈즈팡", "카페", "Lane 210, Taikang Road, Shanghai"),
-                ("난징동루", "쇼핑", "Nanjing East Road, Shanghai"), ("신천지", "맛집", "245 Madang Road, Shanghai")
+                ("와이탄 전망대", "전망", "The Bund Viewing Platform Shanghai"),
+                ("와이바이두 다리", "건축", "Waibaidu Bridge Shanghai"),
+                ("상하이 디즈니랜드", "테마파크", "Shanghai Disneyland"),
+                ("디즈니타운", "쇼핑·맛집", "Disneytown Shanghai Disney Resort"),
+                ("월드 오브 디즈니 스토어", "굿즈", "World of Disney Store Shanghai Disney Resort"),
+                ("위싱 스타 파크", "호숫가 산책", "Wishing Star Park Shanghai Disney Resort")
             ])
         ]
     )
@@ -427,19 +469,27 @@ private extension DevelopmentMockTripService {
         startDate: makeDate(year: 2027, month: 4, day: 12),
         endDate: makeDate(year: 2027, month: 4, day: 18),
         transportation: Transportation.publicTransit.rawValue,
-        maximumTravelMinutes: 60,
+        maximumTravelMinutes: 45,
         memberPlaces: [
             places([
-                ("메트로폴리탄 미술관", "문화", "1000 5th Ave, New York, NY"), ("뉴욕 공립도서관", "문화", "476 5th Ave, New York, NY"),
-                ("센트럴 파크", "자연", "Central Park, New York, NY"), ("탑 오브 더 록", "전망", "30 Rockefeller Plaza, New York, NY"),
-                ("MoMA", "문화", "11 W 53rd St, New York, NY"), ("휘트니 미술관", "문화", "99 Gansevoort St, New York, NY"),
-                ("모건 라이브러리", "문화", "225 Madison Ave, New York, NY"), ("하이라인", "건축·자연", "91 Gansevoort St, New York, NY")
+                ("메트 클로이스터스", "중세미술", "The Met Cloisters New York"),
+                ("포트 트라이언 공원", "전망", "Fort Tryon Park New York"),
+                ("다이크먼 팜하우스 박물관", "지역사", "Dyckman Farmhouse Museum New York"),
+                ("인우드 힐 공원", "자연", "Inwood Hill Park New York"),
+                ("뉴욕 아쿠아리움", "해양생물", "New York Aquarium Coney Island"),
+                ("코니아일랜드 보드워크", "바닷가 산책", "Riegelmann Boardwalk at Stillwell Avenue Brooklyn"),
+                ("패러슈트 점프", "랜드마크", "Parachute Jump Coney Island"),
+                ("코니아일랜드 박물관", "지역사", "Coney Island Museum Brooklyn")
             ]),
             places([
-                ("닌텐도 뉴욕", "쇼핑", "10 Rockefeller Plaza, New York, NY"), ("소호", "쇼핑", "Broadway & Prince St, New York, NY"),
-                ("5번가", "쇼핑", "5th Ave & W 50th St, New York, NY"), ("허드슨 야드", "쇼핑", "20 Hudson Yards, New York, NY"),
-                ("첼시 마켓", "맛집", "75 9th Ave, New York, NY"), ("에식스 마켓", "맛집", "88 Essex St, New York, NY"),
-                ("카츠 델리카트슨", "맛집", "205 E Houston St, New York, NY"), ("타임아웃 마켓", "맛집", "55 Water St, Brooklyn, NY")
+                ("메트 클로이스터스", "중세미술", "The Met Cloisters New York"),
+                ("포트 트라이언 공원", "전망", "Fort Tryon Park New York"),
+                ("유나이티드 팰리스", "공연·건축", "United Palace Washington Heights New York"),
+                ("포트 워싱턴 퍼블릭 하우스", "맛집", "Fort Washington Public House New York"),
+                ("뉴욕 아쿠아리움", "해양생물", "New York Aquarium Coney Island"),
+                ("코니아일랜드 보드워크", "바닷가 산책", "Riegelmann Boardwalk at Stillwell Avenue Brooklyn"),
+                ("루나 파크", "놀이공원", "Luna Park in Coney Island"),
+                ("네이선스 페이머스 본점", "맛집", "Nathan's Famous 1310 Surf Avenue Brooklyn")
             ])
         ]
     )
@@ -453,35 +503,51 @@ private extension DevelopmentMockTripService {
         startDate: makeDate(year: 2027, month: 5, day: 10),
         endDate: makeDate(year: 2027, month: 5, day: 16),
         transportation: Transportation.publicTransit.rawValue,
-        maximumTravelMinutes: 60,
+        maximumTravelMinutes: 30,
         memberPlaces: [
             places([
-                ("루브르박물관", "문화", "Rue de Rivoli, Paris"), ("생트샤펠", "문화", "10 Boulevard du Palais, Paris"),
-                ("오르세 미술관", "문화", "Esplanade Valéry Giscard d’Estaing, Paris"), ("뤽상부르공원", "자연", "Rue de Médicis, Paris"),
-                ("튈르리 정원", "자연", "Place de la Concorde, Paris"), ("로댕 미술관", "문화", "77 Rue de Varenne, Paris"),
-                ("오페라 가르니에", "문화", "Place de l’Opéra, Paris"), ("개선문", "관광지", "Place Charles de Gaulle, Paris"),
-                ("에펠탑", "전망", "5 Avenue Anatole France, Paris")
+                ("카르나발레 박물관", "박물관", "Musee Carnavalet Paris"),
+                ("보주 광장", "산책", "Place des Vosges Paris"),
+                ("라스 뒤 팔라펠", "맛집", "L'As du Fallafel Paris"),
+                ("루이비통 재단 미술관", "현대미술", "Fondation Louis Vuitton Paris"),
+                ("아클리마타시옹 정원", "놀이공원", "Jardin d'Acclimatation Paris"),
+                ("바가텔 공원", "정원", "Parc de Bagatelle Paris"),
+                ("프레 카틀랑 정원", "산책", "Jardin du Pre Catelan Paris"),
+                ("샬레 데 질", "호숫가 식사", "Le Chalet des Iles Bois de Boulogne Paris"),
+                ("오퇴유 온실 정원", "식물원", "Jardin des Serres d'Auteuil Paris")
             ]),
             places([
-                ("마레 지구", "쇼핑", "Place des Vosges, Paris"), ("사마리텐 백화점", "쇼핑", "9 Rue de la Monnaie, Paris"),
-                ("갤러리 라파예트 오스만", "쇼핑", "40 Boulevard Haussmann, Paris"), ("프랭탕 오스만", "쇼핑", "64 Boulevard Haussmann, Paris"),
-                ("생투앙 벼룩시장", "쇼핑", "110 Rue des Rosiers, Saint-Ouen-sur-Seine"), ("르 봉 마르셰", "쇼핑", "24 Rue de Sèvres, Paris"),
-                ("팔레 루아얄", "관광지", "8 Rue de Montpensier, Paris"), ("몽토르게이 거리", "맛집", "Rue Montorgueil, Paris"),
-                ("샹젤리제 거리", "쇼핑", "Avenue des Champs-Élysées, Paris")
+                ("카르나발레 박물관", "박물관", "Musee Carnavalet Paris"),
+                ("보주 광장", "산책", "Place des Vosges Paris"),
+                ("라스 뒤 팔라펠", "맛집", "L'As du Fallafel Paris"),
+                ("과학산업관", "과학 체험", "Cite des sciences et de l'industrie Paris"),
+                ("라 제오드", "영화·건축", "La Geode Paris"),
+                ("파리 필하모니", "공연", "Philharmonie de Paris"),
+                ("그랑드 알 드 라 빌레트", "전시", "Grande Halle de la Villette Paris"),
+                ("빌레트 공원", "산책", "Parc de la Villette Paris"),
+                ("붐붐 빌레트 푸드홀", "맛집", "Boom Boom Villette Paris")
             ]),
             places([
-                ("루브르박물관", "문화", "Rue de Rivoli, Paris"), ("오르세 미술관", "문화", "Esplanade Valéry Giscard d’Estaing, Paris"),
-                ("오랑주리 미술관", "문화", "Jardin des Tuileries, Paris"), ("루이비통 재단 미술관", "문화", "8 Avenue du Mahatma Gandhi, Paris"),
-                ("피카소 미술관", "문화", "5 Rue de Thorigny, Paris"), ("부르스 드 코메르스", "문화", "2 Rue de Viarmes, Paris"),
-                ("팔레 드 도쿄", "문화", "13 Avenue du Président Wilson, Paris"), ("카르나발레 박물관", "문화", "23 Rue de Sévigné, Paris"),
-                ("메르시", "쇼핑", "111 Boulevard Beaumarchais, Paris")
+                ("카르나발레 박물관", "박물관", "Musee Carnavalet Paris"),
+                ("보주 광장", "산책", "Place des Vosges Paris"),
+                ("라스 뒤 팔라펠", "맛집", "L'As du Fallafel Paris"),
+                ("루이비통 재단 미술관", "현대미술", "Fondation Louis Vuitton Paris"),
+                ("아클리마타시옹 정원", "놀이공원", "Jardin d'Acclimatation Paris"),
+                ("바가텔 공원", "정원", "Parc de Bagatelle Paris"),
+                ("프레 카틀랑 정원", "산책", "Jardin du Pre Catelan Paris"),
+                ("샬레 데 질", "호숫가 식사", "Le Chalet des Iles Bois de Boulogne Paris"),
+                ("오퇴유 온실 정원", "식물원", "Jardin des Serres d'Auteuil Paris")
             ]),
             places([
-                ("마레 지구", "맛집", "Place des Vosges, Paris"), ("앙팡루주 시장", "맛집", "39 Rue de Bretagne, Paris"),
-                ("몽토르게이 거리", "맛집", "Rue Montorgueil, Paris"), ("생제르맹 카페거리", "카페", "Boulevard Saint-Germain, Paris"),
-                ("생마르탱 운하", "카페", "Quai de Valmy, Paris"), ("바스티유 시장", "맛집", "Boulevard Richard-Lenoir, Paris"),
-                ("무프타르 거리", "맛집", "Rue Mouffetard, Paris"), ("클레르 거리", "맛집", "Rue Cler, Paris"),
-                ("몽마르트르 아베스 거리", "카페", "Rue des Abbesses, Paris")
+                ("카르나발레 박물관", "박물관", "Musee Carnavalet Paris"),
+                ("보주 광장", "산책", "Place des Vosges Paris"),
+                ("라스 뒤 팔라펠", "맛집", "L'As du Fallafel Paris"),
+                ("과학산업관", "과학 체험", "Cite des sciences et de l'industrie Paris"),
+                ("라 제오드", "영화·건축", "La Geode Paris"),
+                ("파리 필하모니", "공연", "Philharmonie de Paris"),
+                ("그랑드 알 드 라 빌레트", "전시", "Grande Halle de la Villette Paris"),
+                ("빌레트 공원", "산책", "Parc de la Villette Paris"),
+                ("붐붐 빌레트 푸드홀", "맛집", "Boom Boom Villette Paris")
             ])
         ]
     )
@@ -494,32 +560,48 @@ private extension DevelopmentMockTripService {
         destination: "시드니",
         startDate: makeDate(year: 2027, month: 3, day: 16),
         endDate: makeDate(year: 2027, month: 3, day: 21),
-        transportation: Transportation.car.rawValue,
+        transportation: Transportation.publicTransit.rawValue,
         maximumTravelMinutes: 30,
         memberPlaces: [
             places([
-                ("시드니 오페라하우스", "문화", "Bennelong Point, Sydney NSW"), ("로열 보타닉 가든", "자연", "Mrs Macquaries Road, Sydney NSW"),
-                ("NSW 주립미술관", "문화", "Art Gallery Road, Sydney NSW"), ("미세스 맥쿼리스 포인트", "전망", "1d Mrs Macquaries Road, Sydney NSW"),
-                ("본다이 비치", "자연", "Queen Elizabeth Drive, Bondi Beach NSW"), ("맨리 비치", "자연", "North Steyne, Manly NSW"),
-                ("시드니 현대미술관", "문화", "140 George Street, The Rocks NSW"), ("NSW 주립도서관", "문화", "1 Shakespeare Place, Sydney NSW")
+                ("시드니 오페라하우스", "랜드마크", "Sydney Opera House"),
+                ("시드니 현대미술관", "현대미술", "Museum of Contemporary Art Australia Sydney"),
+                ("더 록스 마켓", "쇼핑·먹거리", "The Rocks Markets Sydney"),
+                ("맨리 비치", "해변", "Manly Beach Sydney"),
+                ("셸리 비치", "자연", "Shelly Beach Manly NSW"),
+                ("맨리 미술관·박물관", "전시", "Manly Art Gallery & Museum"),
+                ("페어리 바워 풀", "수변 전망", "Fairy Bower Pool Manly"),
+                ("맨리 코르소", "상점가", "The Corso Manly")
             ]),
             places([
-                ("퀸 빅토리아 빌딩", "쇼핑", "455 George Street, Sydney NSW"), ("패딩턴 마켓", "쇼핑", "395 Oxford Street, Paddington NSW"),
-                ("더 갤러리즈", "쇼핑", "500 George Street, Sydney NSW"), ("뉴타운 킹 스트리트", "쇼핑", "King Street, Newtown NSW"),
-                ("더 록스 마켓", "쇼핑", "George Street, The Rocks NSW"), ("맨리 코르소", "쇼핑", "The Corso, Manly NSW"),
-                ("본다이 정션", "쇼핑", "500 Oxford Street, Bondi Junction NSW"), ("더 그라운즈 오브 알렉산드리아", "카페", "7a/2 Huntley Street, Alexandria NSW")
+                ("시드니 오페라하우스", "랜드마크", "Sydney Opera House"),
+                ("시드니 현대미술관", "현대미술", "Museum of Contemporary Art Australia Sydney"),
+                ("더 록스 마켓", "쇼핑·먹거리", "The Rocks Markets Sydney"),
+                ("웨스트필드 패러매타", "쇼핑", "Westfield Parramatta"),
+                ("패러매타 스퀘어", "맛집", "Parramatta Square NSW"),
+                ("처치 스트리트 잇 스트리트", "맛집", "Eat Street Church Street Parramatta"),
+                ("패러매타 리버사이드 시어터", "공연", "Riverside Theatres Parramatta"),
+                ("패러매타 공원", "산책", "Parramatta Park NSW")
             ]),
             places([
-                ("시드니 현대미술관", "문화", "140 George Street, The Rocks NSW"), ("화이트 래빗 갤러리", "문화", "30 Balfour Street, Chippendale NSW"),
-                ("캐리지웍스", "문화", "245 Wilson Street, Eveleigh NSW"), ("NSW 주립도서관", "문화", "1 Shakespeare Place, Sydney NSW"),
-                ("NSW 주립미술관", "문화", "Art Gallery Road, Sydney NSW"), ("시드니 오페라하우스", "문화", "Bennelong Point, Sydney NSW"),
-                ("차우착윙 박물관", "문화", "University Place, Camperdown NSW"), ("파워하우스 뮤지엄", "문화", "500 Harris Street, Ultimo NSW")
+                ("시드니 오페라하우스", "랜드마크", "Sydney Opera House"),
+                ("시드니 현대미술관", "현대미술", "Museum of Contemporary Art Australia Sydney"),
+                ("더 록스 마켓", "쇼핑·먹거리", "The Rocks Markets Sydney"),
+                ("맨리 비치", "해변", "Manly Beach Sydney"),
+                ("셸리 비치", "자연", "Shelly Beach Manly NSW"),
+                ("맨리 미술관·박물관", "전시", "Manly Art Gallery & Museum"),
+                ("페어리 바워 풀", "수변 전망", "Fairy Bower Pool Manly"),
+                ("맨리 코르소", "상점가", "The Corso Manly")
             ]),
             places([
-                ("시드니 피시마켓", "맛집", "Pyrmont Bridge Road and Bank Street, Sydney NSW"), ("더 그라운즈 오브 알렉산드리아", "카페", "7a/2 Huntley Street, Alexandria NSW"),
-                ("스파이스 앨리", "맛집", "Kensington Street, Chippendale NSW"), ("맨리 워프", "맛집", "Belgrave Street, Manly NSW"),
-                ("더 록스 마켓", "맛집", "George Street, The Rocks NSW"), ("뉴타운 킹 스트리트", "맛집", "King Street, Newtown NSW"),
-                ("본다이 파머스 마켓", "맛집", "2–4 Wellington Street, Bondi NSW")
+                ("시드니 오페라하우스", "랜드마크", "Sydney Opera House"),
+                ("시드니 현대미술관", "현대미술", "Museum of Contemporary Art Australia Sydney"),
+                ("더 록스 마켓", "쇼핑·먹거리", "The Rocks Markets Sydney"),
+                ("웨스트필드 패러매타", "쇼핑", "Westfield Parramatta"),
+                ("패러매타 스퀘어", "맛집", "Parramatta Square NSW"),
+                ("처치 스트리트 잇 스트리트", "맛집", "Eat Street Church Street Parramatta"),
+                ("패러매타 리버사이드 시어터", "공연", "Riverside Theatres Parramatta"),
+                ("패러매타 공원", "산책", "Parramatta Park NSW")
             ])
         ]
     )
@@ -536,34 +618,34 @@ private extension DevelopmentMockTripService {
         maximumTravelMinutes: 30,
         memberPlaces: [
             places([
-                ("밴쿠버 공립도서관 중앙관", "문화", "350 West Georgia Street, Vancouver, BC, Canada"),
-                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "1689 Johnston Street, Vancouver, BC, Canada"),
-                ("UBC 캠퍼스 메인 몰", "산책", "Main Mall, University of British Columbia, Vancouver, BC, Canada"),
-                ("UBC 인류학박물관", "문화", "6393 NW Marine Drive, Vancouver, BC, Canada"),
-                ("스탠리 파크", "자연", "Stanley Park, Vancouver, BC, Canada"),
-                ("잉글리시 베이 비치", "자연", "Beach Avenue & Denman Street, Vancouver, BC, Canada"),
-                ("캐나다 플레이스", "전망", "999 Canada Place, Vancouver, BC, Canada"),
-                ("쉽야즈 크리스마스 마켓", "축제", "125 Victory Ship Way, North Vancouver, BC, Canada")
+                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "Granville Island Public Market Vancouver"),
+                ("넷 로프트", "공예·쇼핑", "Net Loft Granville Island Vancouver"),
+                ("UBC 인류학박물관", "박물관", "Museum of Anthropology at UBC Vancouver"),
+                ("니토베 기념정원", "정원", "Nitobe Memorial Garden UBC Vancouver"),
+                ("비티 생물다양성 박물관", "과학·자연", "Beaty Biodiversity Museum UBC Vancouver"),
+                ("스티브스턴 피셔맨스 워프", "해산물", "Steveston Fisherman's Wharf Richmond BC"),
+                ("걸프 오브 조지아 캐너리", "어업 역사", "Gulf of Georgia Cannery Richmond BC"),
+                ("브리타니아 조선소", "수변 산책·역사", "Britannia Shipyards National Historic Site Richmond BC")
             ]),
             places([
-                ("밴쿠버 공립도서관 중앙관", "문화", "350 West Georgia Street, Vancouver, BC, Canada"),
-                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "1689 Johnston Street, Vancouver, BC, Canada"),
-                ("넷 로프트", "쇼핑", "1666 Johnston Street, Vancouver, BC, Canada"),
-                ("롭슨 스트리트", "쇼핑", "Robson Street, Vancouver, BC, Canada"),
-                ("UBC 북스토어", "쇼핑", "6200 University Boulevard, Vancouver, BC, Canada"),
-                ("개스타운 워터 스트리트", "쇼핑", "Water Street, Vancouver, BC, Canada"),
-                ("론즈데일 키 마켓", "맛집", "123 Carrie Cates Court, North Vancouver, BC, Canada"),
-                ("쉽야즈 크리스마스 마켓", "축제", "125 Victory Ship Way, North Vancouver, BC, Canada")
+                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "Granville Island Public Market Vancouver"),
+                ("넷 로프트", "공예·쇼핑", "Net Loft Granville Island Vancouver"),
+                ("론즈데일 키 마켓", "맛집·쇼핑", "Lonsdale Quay Market North Vancouver"),
+                ("폴리곤 갤러리", "사진·전시", "The Polygon Gallery North Vancouver"),
+                ("쉽야즈", "수변 광장", "The Shipyards North Vancouver"),
+                ("스티브스턴 피셔맨스 워프", "해산물", "Steveston Fisherman's Wharf Richmond BC"),
+                ("걸프 오브 조지아 캐너리", "어업 역사", "Gulf of Georgia Cannery Richmond BC"),
+                ("브리타니아 조선소", "수변 산책·역사", "Britannia Shipyards National Historic Site Richmond BC")
             ]),
             places([
-                ("밴쿠버 공립도서관 중앙관", "문화", "350 West Georgia Street, Vancouver, BC, Canada"),
-                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "1689 Johnston Street, Vancouver, BC, Canada"),
-                ("UBC 인류학박물관", "문화", "6393 NW Marine Drive, Vancouver, BC, Canada"),
-                ("스탠리 파크", "자연", "Stanley Park, Vancouver, BC, Canada"),
-                ("개스타운 증기시계", "관광", "305 Water Street, Vancouver, BC, Canada"),
-                ("개스타운 워터 스트리트", "쇼핑", "Water Street, Vancouver, BC, Canada"),
-                ("론즈데일 키 마켓", "맛집", "123 Carrie Cates Court, North Vancouver, BC, Canada"),
-                ("쉽야즈 크리스마스 마켓", "축제", "125 Victory Ship Way, North Vancouver, BC, Canada")
+                ("그랜빌 아일랜드 퍼블릭 마켓", "맛집", "Granville Island Public Market Vancouver"),
+                ("넷 로프트", "공예·쇼핑", "Net Loft Granville Island Vancouver"),
+                ("UBC 인류학박물관", "박물관", "Museum of Anthropology at UBC Vancouver"),
+                ("니토베 기념정원", "정원", "Nitobe Memorial Garden UBC Vancouver"),
+                ("비티 생물다양성 박물관", "과학·자연", "Beaty Biodiversity Museum UBC Vancouver"),
+                ("론즈데일 키 마켓", "맛집·쇼핑", "Lonsdale Quay Market North Vancouver"),
+                ("폴리곤 갤러리", "사진·전시", "The Polygon Gallery North Vancouver"),
+                ("쉽야즈", "수변 광장", "The Shipyards North Vancouver")
             ])
         ]
     )

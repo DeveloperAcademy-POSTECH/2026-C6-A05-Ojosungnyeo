@@ -443,14 +443,10 @@ enum FirebaseTripService {
 
         let database = Firestore.firestore()
         let tripReference = database.collection("trips").document(request.tripID)
-        let participantDocument = try await tripReference
-            .collection("participants")
-            .document(userID)
-            .getDocument()
-        guard participantDocument.exists,
-              participantDocument.get("status") as? String == "joined" else {
-            throw TripServiceError.notTripParticipant
-        }
+        _ = try await normalizedParticipantReference(
+            tripReference: tripReference,
+            userID: userID
+        )
 
         let courseData: [[String: Any]] = request.courses.map { course in
             [
@@ -523,14 +519,10 @@ enum FirebaseTripService {
         }
 
         let tripReference = Firestore.firestore().collection("trips").document(tripID)
-        let participant = try await tripReference
-            .collection("participants")
-            .document(userID)
-            .getDocument()
-        guard participant.exists,
-              participant.get("status") as? String == "joined" else {
-            throw TripServiceError.notTripParticipant
-        }
+        _ = try await normalizedParticipantReference(
+            tripReference: tripReference,
+            userID: userID
+        )
 
         let values: [[String: Any]] = recommendations.map {
             [
@@ -683,6 +675,49 @@ enum FirebaseTripService {
             schedules: schedules,
             recommendations: recommendations
         )
+    }
+
+    /// 예전 슬롯 형식의 참가자 문서를 현재 인증 UID 문서로 정규화한다.
+    /// Firestore 규칙이 `participants/{uid}`를 기준으로 검사해도
+    /// 모든 기기에서 동일하게 일정을 저장할 수 있게 한다.
+    private static func normalizedParticipantReference(
+        tripReference: DocumentReference,
+        userID: String
+    ) async throws -> DocumentReference {
+        let participants = tripReference.collection("participants")
+        let uidReference = participants.document(userID)
+        let uidDocument = try await uidReference.getDocument()
+        if uidDocument.exists,
+           uidDocument.get("status") as? String == "joined" {
+            return uidReference
+        }
+
+        let legacyDocuments = try await participants
+            .whereField("uid", isEqualTo: userID)
+            .getDocuments()
+            .documents
+        guard let legacyParticipant = legacyDocuments.first(where: {
+            $0.get("status") as? String == "joined"
+        }) else {
+            throw TripServiceError.notTripParticipant
+        }
+
+        var participantData = legacyParticipant.data()
+        participantData["uid"] = userID
+        participantData["status"] = "joined"
+        participantData["updatedAt"] = FieldValue.serverTimestamp()
+        try await uidReference.setData(participantData, merge: true)
+
+        if legacyParticipant.reference.path != uidReference.path {
+            try? await legacyParticipant.reference.setData(
+                [
+                    "status": "migrated",
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
+        }
+        return uidReference
     }
 
     private static func makeInviteURL(code: String, expiresAt: Date) -> URL {

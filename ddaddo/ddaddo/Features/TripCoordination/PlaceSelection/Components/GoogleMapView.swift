@@ -120,7 +120,10 @@ struct GoogleMapView: UIViewRepresentable {
             signature = "\(selectedCoordinate.latitude),\(selectedCoordinate.longitude)"
         } else if !placeGroups.isEmpty {
             signature = placeGroups.map { group in
-                "\(group.id):\(group.name):\(group.places.map(\.id).joined(separator: ","))"
+                let places = group.places.map {
+                    "\($0.id)@\($0.latitude),\($0.longitude)"
+                }.joined(separator: ",")
+                return "\(group.id):\(group.name):\(group.radius):\(places)"
             }.joined(separator: "|")
         } else {
             signature = "numbered:\(showsPinnedPlaceNumbers):"
@@ -194,6 +197,7 @@ struct GoogleMapView: UIViewRepresentable {
         coordinator: Coordinator
     ) {
         var bounds = GMSCoordinateBounds()
+        var renderedPlaceIDs: Set<String> = []
 
         for group in placeGroups {
             let center = CLLocationCoordinate2D(
@@ -211,12 +215,14 @@ struct GoogleMapView: UIViewRepresentable {
                     latitude: place.latitude,
                     longitude: place.longitude
                 )
-                addMarker(
-                    at: coordinate,
-                    place: place,
-                    to: mapView,
-                    coordinator: coordinator
-                )
+                if renderedPlaceIDs.insert(place.id).inserted {
+                    addMarker(
+                        at: coordinate,
+                        place: place,
+                        to: mapView,
+                        coordinator: coordinator
+                    )
+                }
                 bounds = bounds.includingCoordinate(coordinate)
             }
 

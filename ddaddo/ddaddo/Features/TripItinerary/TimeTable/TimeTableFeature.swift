@@ -464,6 +464,9 @@ struct TimeTableFeature: Reducer {
                 state.edit = TimeTableEditFeature.State()
                 state.edit.originalCoursesByID = state.coursesByID
                 state.edit.originalRecommendations = state.recommendations
+                state.edit.coursePlaceIDsByID = state.coursesByID.mapValues { course in
+                    course.placeNames.map { _ in UUID() }
+                }
                 #if DEBUG
                 if state.isLocalPreview, state.recommendationTripID == nil,
                    let saved = state.savedPreviewRowsByDay {
@@ -603,6 +606,82 @@ struct TimeTableFeature: Reducer {
                 guard let pendingSnapshot else { return .none }
                 return .send(.itineraryLoaded(pendingSnapshot))
 
+            case .edit(.deletionConfirmed):
+                guard case let .place(target)? = state.edit.pendingDeletion else { return .none }
+                switch target {
+                case let .course(scheduleID, courseID, placeID):
+                    guard let course = state.coursesByID[courseID],
+                          course.placeNames.count > 1,
+                          let scheduleIndex = state.edit.draftPlacements.firstIndex(where: {
+                              $0.id == scheduleID && $0.courseID == courseID
+                          }),
+                          let ids = state.edit.coursePlaceIDsByID[courseID],
+                          ids.count == course.placeNames.count,
+                          let index = ids.firstIndex(of: placeID)
+                    else { return .none }
+
+                    var placeNames = course.placeNames
+                    placeNames.remove(at: index)
+                    var places = course.places
+                    var categories = course.categories
+                    if places.count == course.placeNames.count {
+                        places.remove(at: index)
+                        categories = places.map(\.category).reduce(into: [String]()) { result, category in
+                            guard !category.isEmpty, !result.contains(category) else { return }
+                            result.append(category)
+                        }
+                    } else if categories.count == course.placeNames.count {
+                        categories.remove(at: index)
+                    }
+                    let groupedTitleSuffix = " 외 \(course.placeNames.count - 1)곳"
+                    let title = placeNames.count == 1
+                        ? placeNames[0]
+                        : course.title.hasSuffix(groupedTitleSuffix)
+                            ? "\(placeNames[0]) 외 \(placeNames.count - 1)곳"
+                            : course.title
+                    let isShared = state.edit.draftPlacements.contains {
+                        $0.id != scheduleID && $0.courseID == courseID
+                    }
+                    let targetCourseID = isShared
+                        ? (state.coursesByID.keys.max() ?? courseID) + 1 : courseID
+                    state.coursesByID[targetCourseID] = TimeTableCourse(
+                        id: targetCourseID,
+                        title: title,
+                        placeCount: placeNames.count,
+                        placeNames: placeNames,
+                        categories: categories,
+                        members: course.members,
+                        durationMinutes: course.durationMinutes,
+                        places: places
+                    )
+                    var remainingIDs = ids
+                    remainingIDs.remove(at: index)
+                    state.edit.coursePlaceIDsByID[targetCourseID] = remainingIDs
+                    if isShared {
+                        let schedule = state.edit.draftPlacements[scheduleIndex]
+                        state.edit.draftPlacements[scheduleIndex] = TimeTableSchedule(
+                            id: schedule.id,
+                            courseID: targetCourseID,
+                            day: schedule.day,
+                            timing: schedule.timing,
+                            branchGroupID: schedule.branchGroupID,
+                            recommendationGroupID: schedule.recommendationGroupID,
+                            orderIndex: schedule.orderIndex
+                        )
+                    }
+
+                case let .recommendation(groupID, recommendationID):
+                    let indices = state.recommendations.indices.filter {
+                        state.recommendations[$0].groupID == groupID
+                    }
+                    guard indices.count > 1,
+                          let index = indices.first(where: {
+                              state.recommendations[$0].id == recommendationID
+                          }) else { return .none }
+                    state.recommendations.remove(at: index)
+                }
+                return .none
+
             case .edit(.saveButtonTapped):
                 #if DEBUG
                 if state.isLocalPreview, state.recommendationTripID == nil {
@@ -699,6 +778,11 @@ struct TimeTableFeature: Reducer {
 
                 var placeNames = course.placeNames
                 placeNames.moveElement(from: sourceIndex, before: beforeIndex)
+                if var ids = state.edit.coursePlaceIDsByID[courseID],
+                   ids.count == course.placeNames.count {
+                    ids.moveElement(from: sourceIndex, before: beforeIndex)
+                    state.edit.coursePlaceIDsByID[courseID] = ids
+                }
                 var places = course.places
                 if places.count == course.placeNames.count {
                     places.moveElement(from: sourceIndex, before: beforeIndex)

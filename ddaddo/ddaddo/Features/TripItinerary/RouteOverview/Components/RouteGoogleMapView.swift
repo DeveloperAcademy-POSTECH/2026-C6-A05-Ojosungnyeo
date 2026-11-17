@@ -14,14 +14,26 @@ struct RouteGoogleMapView: UIViewRepresentable {
     let selectedMemberOrder: [TripMember]
     let currentMember: TripMember
     let memberOrder: [TripMember]
+    let onMarkerTapped: (RouteStop) -> Void
 
     final class Coordinator: NSObject, GMSMapViewDelegate {
         var signature = ""
         var numberedMarkers: [NumberedMarker] = []
         var markerScale: CGFloat = -1
+        var onMarkerTapped: (RouteStop) -> Void
+
+        init(onMarkerTapped: @escaping (RouteStop) -> Void) {
+            self.onMarkerTapped = onMarkerTapped
+        }
 
         func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
             updateMarkerScale(for: position.zoom)
+        }
+
+        func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
+            guard let stop = marker.userData as? RouteStopMarkerPayload else { return false }
+            onMarkerTapped(stop.value)
+            return true
         }
 
         func updateMarkerScale(for zoom: Float) {
@@ -49,7 +61,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(onMarkerTapped: onMarkerTapped)
     }
 
     func makeUIView(context: Context) -> UIView {
@@ -76,6 +88,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
     func updateUIView(_ view: UIView, context: Context) {
         guard let mapView = view as? GMSMapView else { return }
+        context.coordinator.onMarkerTapped = onMarkerTapped
         updateRoute(on: mapView, coordinator: context.coordinator)
     }
 
@@ -142,6 +155,7 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
             let marker = GMSMarker(position: coordinate)
             marker.groundAnchor = CGPoint(x: 0.5, y: 0.82)
+            marker.userData = RouteStopMarkerPayload(value: stop)
             marker.map = mapView
             let groupedMembers = groupedStops.reduce(into: Set<TripMember>()) { members, stop in
                 members.formUnion(stop.members)
@@ -162,6 +176,14 @@ struct RouteGoogleMapView: UIViewRepresentable {
 
         mapView.padding = UIEdgeInsets(top: 140, left: 44, bottom: 320, right: 28)
         mapView.animate(with: GMSCameraUpdate.fit(bounds, withPadding: 64))
+    }
+
+    private final class RouteStopMarkerPayload: NSObject {
+        let value: RouteStop
+
+        init(value: RouteStop) {
+            self.value = value
+        }
     }
 
     private func markerStyle(for members: Set<TripMember>) -> (assetName: String, badgeColor: UIColor) {

@@ -14,6 +14,7 @@ struct SelectedPlaceBottomSheet: View {
     let canAdd: Bool
     let isAlreadyAdded: Bool
     let fallbackImageName: String?
+    let showsAddButton: Bool
     let bottomSafeAreaInset: CGFloat
     let closeButtonTapped: () -> Void
     let addButtonTapped: () -> Void
@@ -26,6 +27,7 @@ struct SelectedPlaceBottomSheet: View {
         canAdd: Bool,
         isAlreadyAdded: Bool,
         fallbackImageName: String?,
+        showsAddButton: Bool = true,
         bottomSafeAreaInset: CGFloat = 34,
         closeButtonTapped: @escaping () -> Void,
         addButtonTapped: @escaping () -> Void
@@ -35,6 +37,7 @@ struct SelectedPlaceBottomSheet: View {
         self.canAdd = canAdd
         self.isAlreadyAdded = isAlreadyAdded
         self.fallbackImageName = fallbackImageName
+        self.showsAddButton = showsAddButton
         self.bottomSafeAreaInset = bottomSafeAreaInset
         self.closeButtonTapped = closeButtonTapped
         self.addButtonTapped = addButtonTapped
@@ -64,14 +67,16 @@ struct SelectedPlaceBottomSheet: View {
 
                 Spacer(minLength: DDSpacing.small)
 
-                Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
-                    .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
-                    .foregroundStyle(canAdd ? DDColor.textOnPrimary : DDColor.textTertiary)
-                    .padding(.horizontal, 12)
-                    .frame(height: 28)
-                    .background(canAdd ? DDColor.actionPrimary : DDColor.surfaceControl)
-                    .clipShape(.capsule)
-                    .disabled(!canAdd)
+                if showsAddButton {
+                    Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
+                        .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
+                        .foregroundStyle(canAdd ? DDColor.textOnPrimary : DDColor.textTertiary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 28)
+                        .background(canAdd ? DDColor.actionPrimary : DDColor.surfaceControl)
+                        .clipShape(.capsule)
+                        .disabled(!canAdd)
+                }
             }
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, 20)

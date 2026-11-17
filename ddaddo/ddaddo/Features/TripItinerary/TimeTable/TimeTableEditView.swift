@@ -221,13 +221,6 @@ private struct TimeTableEditContent: View {
         .onPreferenceChange(TimeTableDropFramesKey.self) { dropFrames = $0 }
         .overlay {
             GeometryReader { proxy in
-                insertionIndicatorsOverlay
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-            }
-            .allowsHitTesting(false)
-        }
-        .overlay {
-            GeometryReader { proxy in
                 ZStack {
                     if let dragging, let dragLocation {
                         dragPreview(dragging)
@@ -243,6 +236,13 @@ private struct TimeTableEditContent: View {
                     }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+            .allowsHitTesting(false)
+        }
+        .overlay {
+            GeometryReader { proxy in
+                insertionIndicatorsOverlay
+                    .frame(width: proxy.size.width, height: proxy.size.height)
             }
             .allowsHitTesting(false)
         }
@@ -867,7 +867,8 @@ private struct TimeTableEditContent: View {
                     .allowsHitTesting(false)
             }
         } else if let targetedRowID,
-           targetedRowID != draggedRowID,
+           (targetedRowID != draggedRowID ||
+            (rows.first(where: { $0.id == targetedRowID })?.sources.count ?? 0) > 1),
            let frame = dropFrames["row:\(targetedRowID)"] {
             insertionIndicator
                 .frame(width: insertionIndicatorWidth(for: frame))
@@ -897,12 +898,10 @@ private struct TimeTableEditContent: View {
             }
         } else if case let .merge(rowID) = activeDropTarget,
                   canMergeDraggedItem(into: rowID),
-                  let targetRow = rows.first(where: { $0.id == rowID }),
-                  let lastSource = targetRow.sources.last,
-                  let frame = dropFrames[dragFrameID(.row(rowID, lastSource))] {
+                  let frame = dropFrames["row:\(rowID)"] {
             parallelInsertionIndicator
                 .frame(height: max(0, frame.height - DDSpacing.large))
-                .position(x: frame.maxX + DDSpacing.small, y: frame.midY)
+                .position(x: frame.maxX - DDSpacing.small, y: frame.midY)
                 .zIndex(2)
                 .allowsHitTesting(false)
         }

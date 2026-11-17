@@ -12,6 +12,8 @@ struct PlaceClient: DependencyKey, Sendable {
     var fetchDetails: @Sendable (PlaceSearchResult) async throws -> PlaceDetails
     var fetchMemberPlaces: @Sendable (String) async throws -> [MemberPlacePins]
     var observeMemberPlaces: @Sendable (String) -> AsyncThrowingStream<[MemberPlacePins], Error>
+    var startPlaceAnalysis: @Sendable (String) async throws -> Void
+    var observePlaceAnalysis: @Sendable (String) -> AsyncThrowingStream<Bool, Error>
     var savePlace: @Sendable (String, PinnedPlace) async throws -> Void
     var deletePlace: @Sendable (String, String) async throws -> Void
     var replacePlaces: @Sendable (String, [PinnedPlace]) async throws -> Void
@@ -39,6 +41,12 @@ struct PlaceClient: DependencyKey, Sendable {
             },
             observeMemberPlaces: { tripID in
                 FirebasePlaceSelectionService.observeMemberPlaces(tripID: tripID)
+            },
+            startPlaceAnalysis: { tripID in
+                try await FirebasePlaceSelectionService.startPlaceAnalysis(tripID: tripID)
+            },
+            observePlaceAnalysis: { tripID in
+                FirebasePlaceSelectionService.observePlaceAnalysis(tripID: tripID)
             },
             savePlace: { tripID, place in
                 try await FirebasePlaceSelectionService.savePlace(place, tripID: tripID)
@@ -126,6 +134,8 @@ struct PlaceClient: DependencyKey, Sendable {
         },
         fetchMemberPlaces: { _ in [] },
         observeMemberPlaces: { _ in AsyncThrowingStream { $0.finish() } },
+        startPlaceAnalysis: { _ in },
+        observePlaceAnalysis: { _ in AsyncThrowingStream { $0.finish() } },
         savePlace: { _, _ in },
         deletePlace: { _, _ in },
         replacePlaces: { _, _ in },

@@ -790,6 +790,8 @@ private extension PlaceGroupingFeature.State {
 }
 
 private enum PlaceGroupingEngine {
+    private static let maximumPlacesPerGroup = 5
+
     struct Result {
         let members: [PlaceGroupingFeature.Member]
         let mapGroups: [MapPlaceGroup]
@@ -882,25 +884,59 @@ private enum PlaceGroupingEngine {
         _ places: [OwnedPlace],
         maximumDistance: Double
     ) -> [[OwnedPlace]] {
-        var visited = Set<Int>()
+        var remainingIndices = Set(places.indices)
         var result: [[OwnedPlace]] = []
-        for start in places.indices where !visited.contains(start) {
-            var queue = [start]
-            visited.insert(start)
-            var region: [OwnedPlace] = []
-            while let index = queue.popLast() {
-                region.append(places[index])
-                for candidate in places.indices where !visited.contains(candidate) {
-                    if isSamePlace(places[index].place, places[candidate].place)
-                        || distance(places[index].place, places[candidate].place) <= maximumDistance {
-                        visited.insert(candidate)
-                        queue.append(candidate)
+
+        while let seedIndex = remainingIndices.min() {
+            var regionIndices = [seedIndex]
+            remainingIndices.remove(seedIndex)
+
+            while regionIndices.count < maximumPlacesPerGroup {
+                let candidate = remainingIndices
+                    .filter { candidateIndex in
+                        regionIndices.allSatisfy { regionIndex in
+                            isSamePlace(
+                                places[regionIndex].place,
+                                places[candidateIndex].place
+                            ) || distance(
+                                places[regionIndex].place,
+                                places[candidateIndex].place
+                            ) <= maximumDistance
+                        }
                     }
-                }
+                    .min { lhs, rhs in
+                        let lhsDistance = maximumDistanceFromGroup(
+                            places[lhs].place,
+                            groupIndices: regionIndices,
+                            places: places
+                        )
+                        let rhsDistance = maximumDistanceFromGroup(
+                            places[rhs].place,
+                            groupIndices: regionIndices,
+                            places: places
+                        )
+                        if lhsDistance == rhsDistance { return lhs < rhs }
+                        return lhsDistance < rhsDistance
+                    }
+
+                guard let candidate else { break }
+                regionIndices.append(candidate)
+                remainingIndices.remove(candidate)
             }
-            result.append(region)
+
+            result.append(regionIndices.map { places[$0] })
         }
         return result
+    }
+
+    private static func maximumDistanceFromGroup(
+        _ candidate: PinnedPlace,
+        groupIndices: [Int],
+        places: [OwnedPlace]
+    ) -> Double {
+        groupIndices
+            .map { distance(candidate, places[$0].place) }
+            .max() ?? 0
     }
 
     /// 같은 Google Place를 여러 명이 선택해도 장소 하나와 하나의 추천 그룹으로 취급한다.

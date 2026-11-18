@@ -374,13 +374,49 @@ enum FirebaseTripService {
                     else { return nil }
 
                     let destination = (document.get("destinations") as? [[String: Any]])?.first
+                    let progress: UpcomingTripSnapshot.Progress
+                    let joinedAvatarNames: [String]
+                    #if DEBUG
+                    if document.get("isDevelopmentSeed") as? Bool == true,
+                       let cachedAvatarNames = document.get("developmentJoinedAvatarNames") as? [String] {
+                        joinedAvatarNames = cachedAvatarNames
+                        if document.get("status") as? String == "itinerary" {
+                            progress = .itinerary
+                        } else {
+                            let hasFinishedPlaceSelection = document
+                                .get("developmentAllPlaceSelectionsConfirmed") as? Bool ?? false
+                            progress = hasFinishedPlaceSelection ? .placeGrouping : .placeSelection
+                        }
+                    } else {
+                        let participants = try await document.reference
+                            .collection("participants")
+                            .order(by: "slotIndex")
+                            .getDocuments()
+                            .documents
+                            .filter { $0.get("status") as? String == "joined" }
+                        joinedAvatarNames = participants.compactMap {
+                            $0.get("avatarName") as? String
+                        }
+                        if document.get("status") as? String == "itinerary" {
+                            progress = .itinerary
+                        } else {
+                            let hasFinishedPlaceSelection = !participants.isEmpty
+                                && participants.allSatisfy {
+                                    $0.get("placeSelectionConfirmed") as? Bool == true
+                                }
+                            progress = hasFinishedPlaceSelection ? .placeGrouping : .placeSelection
+                        }
+                    }
+                    #else
                     let participants = try await document.reference
                         .collection("participants")
                         .order(by: "slotIndex")
                         .getDocuments()
                         .documents
                         .filter { $0.get("status") as? String == "joined" }
-                    let progress: UpcomingTripSnapshot.Progress
+                    joinedAvatarNames = participants.compactMap {
+                        $0.get("avatarName") as? String
+                    }
                     if document.get("status") as? String == "itinerary" {
                         progress = .itinerary
                     } else {
@@ -390,6 +426,7 @@ enum FirebaseTripService {
                             }
                         progress = hasFinishedPlaceSelection ? .placeGrouping : .placeSelection
                     }
+                    #endif
                     return UpcomingTripSnapshot(
                         tripID: document.documentID,
                         destinationName: destination?["name"] as? String ?? "여행",
@@ -397,7 +434,7 @@ enum FirebaseTripService {
                         startDate: startDate,
                         endDate: endDate,
                         progress: progress,
-                        joinedAvatarNames: participants.compactMap { $0.get("avatarName") as? String }
+                        joinedAvatarNames: joinedAvatarNames
                     )
                 }
             }

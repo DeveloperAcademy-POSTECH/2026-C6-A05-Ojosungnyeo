@@ -54,12 +54,12 @@ enum DevelopmentMockTripService {
         Member(
             nickname: "하르딘",
             nicknameKey: "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039",
-            avatar: .tae
+            avatar: .juni
         ),
         Member(
             nickname: "주니",
             nicknameKey: "94220151a77fe8912c14b07a291e9df4ea598d63838cea9b077a068974cdea71",
-            avatar: .juni
+            avatar: .tae
         ),
         Member(
             nickname: "세니",

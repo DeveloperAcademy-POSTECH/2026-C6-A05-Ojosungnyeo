@@ -9,6 +9,7 @@ import Foundation
 struct UpcomingTripsFeature: Reducer {
     enum Delegate: Equatable {
         case returnHome
+        case proceedToPlaceSelection(PlaceSelectionFeature.State)
         case proceedToAnalysis(PlaceSelectionFeature.State)
         case proceedToGrouping(PlaceSelectionFeature.State)
     }
@@ -266,8 +267,12 @@ struct UpcomingTripsFeature: Reducer {
                 guard let trip = state.trips.first(where: { $0.id == tripID }) else {
                     return .none
                 }
+                #if DEBUG
+                state.pendingTripProgress = .placeSelection
+                #else
                 guard trip.progress != .itinerary else { return .none }
                 state.pendingTripProgress = trip.progress
+                #endif
                 return .run { send in
                     await send(
                         .tripInvitationResponse(
@@ -282,9 +287,15 @@ struct UpcomingTripsFeature: Reducer {
                 let waitingState = WaitingForParticipantsFeature.State(snapshot: snapshot)
                 switch progress {
                 case .placeSelection:
+                    #if DEBUG
+                    return .send(
+                        .delegate(.proceedToPlaceSelection(waitingState.placeSelection))
+                    )
+                    #else
                     state.waitingForParticipants = waitingState
                     state.isWaitingForParticipantsPresented = true
                     return .none
+                    #endif
                 case .placeGrouping:
                     return .send(.delegate(.proceedToGrouping(waitingState.placeSelection)))
                 case .itinerary, .none:

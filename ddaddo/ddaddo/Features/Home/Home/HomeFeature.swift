@@ -46,6 +46,7 @@ struct HomeFeature: Reducer {
         var isTripItineraryPresented = false
         var placeSelection = PlaceSelectionFeature.State()
         var isPlaceSelectionPresented = false
+        var isDirectPlaceSelectionFromUpcoming = false
         var pendingPlaceSelectionTripID: String?
         var placeGrouping = PlaceGroupingFeature.State()
         var isPlaceAnalysisLoading = false
@@ -156,7 +157,9 @@ struct HomeFeature: Reducer {
             case .placeSelection(.delegate(.returnToInvitation)):
                 state.isPlaceSelectionPresented = false
                 state.isUpcomingTripsPresented = true
-                state.upcomingTrips.isWaitingForParticipantsPresented = true
+                state.upcomingTrips.isWaitingForParticipantsPresented =
+                    !state.isDirectPlaceSelectionFromUpcoming
+                state.isDirectPlaceSelectionFromUpcoming = false
                 state.pendingPlaceSelectionTripID = nil
                 return .cancel(id: "place-selection-trip-request")
             case .placeSelection(.delegate(.proceedToAnalysis)):
@@ -301,7 +304,15 @@ struct HomeFeature: Reducer {
             case .upcomingTrips(.delegate(.returnHome)):
                 state.isUpcomingTripsPresented = false
                 return .none
+            case let .upcomingTrips(.delegate(.proceedToPlaceSelection(placeSelection))):
+                state.placeSelection = placeSelection
+                state.isUpcomingTripsPresented = false
+                state.upcomingTrips.isWaitingForParticipantsPresented = false
+                state.isDirectPlaceSelectionFromUpcoming = true
+                state.isPlaceSelectionPresented = true
+                return .none
             case let .upcomingTrips(.delegate(.proceedToAnalysis(placeSelection))):
+                state.isDirectPlaceSelectionFromUpcoming = false
                 state.placeSelection = placeSelection
                 state.placeGrouping = PlaceGroupingFeature.State(
                     placeSelection: placeSelection
@@ -312,6 +323,7 @@ struct HomeFeature: Reducer {
                 state.isPlaceAnalysisLoading = true
                 return .none
             case let .upcomingTrips(.delegate(.proceedToGrouping(placeSelection))):
+                state.isDirectPlaceSelectionFromUpcoming = false
                 state.placeSelection = placeSelection
                 if state.placeGrouping.sourcePlaceSelection?.tripID == placeSelection.tripID {
                     state.placeGrouping.sourcePlaceSelection = placeSelection

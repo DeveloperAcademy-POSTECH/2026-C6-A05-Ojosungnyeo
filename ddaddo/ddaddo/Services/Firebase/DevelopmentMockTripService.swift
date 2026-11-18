@@ -125,12 +125,14 @@ enum DevelopmentMockTripService {
             )
         }
 
-        try await deleteExistingSeedData(database: database, trips: trips)
-
         let batch = database.batch()
         let allTripIDs = trips.map(\.id)
         let replacedTripIDs = Set(allTripIDs + obsoleteTripIDs)
         let expiresAt = Date().addingTimeInterval(72 * 60 * 60)
+
+        for tripID in obsoleteTripIDs {
+            batch.deleteDocument(database.collection("trips").document(tripID))
+        }
 
         for trip in trips {
             let tripReference = database.collection("trips").document(trip.id)
@@ -249,53 +251,6 @@ enum DevelopmentMockTripService {
         try await batch.commit()
     }
 
-    private static func deleteExistingSeedData(
-        database: Firestore,
-        trips: [Trip]
-    ) async throws {
-        for trip in trips {
-            let tripReference = database.collection("trips").document(trip.id)
-            let participants = try await tripReference.collection("participants").getDocuments()
-            let itinerary = try await tripReference.collection("itinerary").getDocuments()
-            let batch = database.batch()
-
-            for participant in participants.documents {
-                let places = try await participant.reference.collection("places").getDocuments()
-                for place in places.documents {
-                    batch.deleteDocument(place.reference)
-                }
-                batch.deleteDocument(participant.reference)
-            }
-            for itineraryDocument in itinerary.documents {
-                batch.deleteDocument(itineraryDocument.reference)
-            }
-
-            batch.deleteDocument(tripReference)
-            batch.deleteDocument(database.collection("inviteCodes").document(trip.inviteCode))
-            try await batch.commit()
-        }
-
-        for tripID in obsoleteTripIDs {
-            let tripReference = database.collection("trips").document(tripID)
-            let participants = try await tripReference.collection("participants").getDocuments()
-            let itinerary = try await tripReference.collection("itinerary").getDocuments()
-            let batch = database.batch()
-
-            for participant in participants.documents {
-                let places = try await participant.reference.collection("places").getDocuments()
-                for place in places.documents {
-                    batch.deleteDocument(place.reference)
-                }
-                batch.deleteDocument(participant.reference)
-            }
-            for itineraryDocument in itinerary.documents {
-                batch.deleteDocument(itineraryDocument.reference)
-            }
-            batch.deleteDocument(tripReference)
-            try await batch.commit()
-        }
-    }
-
     private static func resolveMembers(database: Firestore) async throws -> [ResolvedMember] {
         var result: [ResolvedMember] = []
         for member in members {
@@ -365,7 +320,11 @@ enum DevelopmentMockTripService {
         trips: [Trip]
     ) async throws -> [String: [String: Any]] {
         var cache: [String: [String: Any]] = [:]
-        for trip in trips {
+        var cachedDestinations: Set<String> = []
+        let representativeTrips = trips.filter {
+            cachedDestinations.insert($0.destination).inserted
+        }
+        for trip in representativeTrips {
             let participants = try await database
                 .collection("trips")
                 .document(trip.id)

@@ -14,7 +14,6 @@ enum FirebaseService {
     }
 
     static func configure() {
-        guard FirebaseApp.app() == nil else { return }
         guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else {
             return
         }

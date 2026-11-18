@@ -80,10 +80,19 @@ enum DevelopmentMockTripService {
         let database = Firestore.firestore()
         let resolvedMembers = try await resolveMembers(database: database)
         let trips = mockTrips
+        // 리셋 전 시드에 이미 저장된 Google Place ID와 좌표를 재사용한다.
+        // 기존 데이터에 없는 장소만 Google Places에 다시 요청한다.
+        let existingPlaceCache = try await loadExistingPlaceCache(
+            database: database,
+            trips: trips
+        )
         var resolvedPlacesByTripID: [String: [[[String: Any]]]] = [:]
 
         for trip in trips {
-            resolvedPlacesByTripID[trip.id] = try await resolvePlaces(for: trip)
+            resolvedPlacesByTripID[trip.id] = try await resolvePlaces(
+                for: trip,
+                existingPlaceCache: existingPlaceCache
+            )
         }
 
         try await deleteExistingSeedData(database: database, trips: trips)
@@ -249,15 +258,18 @@ enum DevelopmentMockTripService {
         return result
     }
 
-    private static func resolvePlaces(for trip: Trip) async throws -> [[[String: Any]]] {
+    private static func resolvePlaces(
+        for trip: Trip,
+        existingPlaceCache: [String: [String: Any]]
+    ) async throws -> [[[String: Any]]] {
         let placesService = GooglePlacesService()
-        var cache: [String: [String: Any]] = [:]
+        var cache = existingPlaceCache
         var result: [[[String: Any]]] = []
 
         for places in trip.memberPlaces {
             var memberPlaces: [[String: Any]] = []
             for place in places {
-                let cacheKey = "\(place.name)|\(place.address)"
+                let cacheKey = placeCacheKey(name: place.name, address: place.address)
                 if let cached = cache[cacheKey] {
                     var value = cached
                     value["category"] = place.category
@@ -281,6 +293,37 @@ enum DevelopmentMockTripService {
             result.append(memberPlaces)
         }
         return result
+    }
+
+    private static func loadExistingPlaceCache(
+        database: Firestore,
+        trips: [Trip]
+    ) async throws -> [String: [String: Any]] {
+        var cache: [String: [String: Any]] = [:]
+        for trip in trips {
+            let participants = try await database
+                .collection("trips")
+                .document(trip.id)
+                .collection("participants")
+                .getDocuments()
+            for participant in participants.documents {
+                let places = participant.get("selectedPlaces") as? [[String: Any]] ?? []
+                for place in places {
+                    guard let name = place["name"] as? String,
+                          let address = place["description"] as? String,
+                          place["id"] as? String != nil,
+                          place["latitude"] as? Double != nil,
+                          place["longitude"] as? Double != nil
+                    else { continue }
+                    cache[placeCacheKey(name: name, address: address)] = place
+                }
+            }
+        }
+        return cache
+    }
+
+    private static func placeCacheKey(name: String, address: String) -> String {
+        "\(name)|\(address)"
     }
 
     private static func resolvePlace(

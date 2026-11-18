@@ -164,6 +164,10 @@ enum DevelopmentMockTripService {
                     "expiresAt": Timestamp(date: expiresAt),
                     "status": "waiting",
                     "isDevelopmentSeed": true,
+                    "developmentJoinedAvatarNames": tripMembers.map { $0.member.avatar.rawValue },
+                    "developmentAllPlaceSelectionsConfirmed": tripMembers.allSatisfy {
+                        preconfirmedPlaceSelectionNicknames.contains($0.member.nickname)
+                    },
                     "createdAt": FieldValue.serverTimestamp(),
                     "updatedAt": FieldValue.serverTimestamp()
                 ],

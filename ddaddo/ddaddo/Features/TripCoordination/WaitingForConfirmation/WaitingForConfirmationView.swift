@@ -17,9 +17,13 @@ struct WaitingForConfirmationView: View {
             confirmationGuide
             confirmationStatus
             Spacer(minLength: 0)
-            bottomAction
         }
         .padding(.horizontal, DDSpacing.large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            DDBottomActionArea {
+                bottomAction
+            }
+        }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .task {
@@ -31,8 +35,11 @@ struct WaitingForConfirmationView: View {
     }
 
     private var navigationBar: some View {
-        ZStack {
-            VStack(spacing: 0) {
+        DDNavigationHeader(
+            height: 51,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
@@ -42,22 +49,10 @@ struct WaitingForConfirmationView: View {
                     .foregroundStyle(DDColor.textSecondary)
             }
 
-            HStack {
-                Button {
-                    store.send(.backButtonTapped)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 24, weight: .regular))
-                        .foregroundStyle(DDColor.textPrimary)
-                        .frame(width: 44, height: 44, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Spacer(minLength: 0)
-            }
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
 
     private var confirmationGuide: some View {
@@ -168,7 +163,6 @@ struct WaitingForConfirmationView: View {
             .buttonStyle(.plain)
             .disabled(!store.haveAllMembersConfirmed)
         }
-        .padding(.bottom, 11)
     }
 }
 

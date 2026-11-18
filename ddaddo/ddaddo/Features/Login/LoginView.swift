@@ -13,79 +13,90 @@ struct LoginView: View {
     let store: StoreOf<LoginFeature>
 
     var body: some View {
-        GeometryReader { proxy in
-            let scale = min(
-                proxy.size.width / Layout.designWidth,
-                proxy.size.height / Layout.designHeight
-            )
-
-            ZStack(alignment: .topLeading) {
-                Color.black
-
-                moonSurface
-                mascot
-
-                LinearGradient(
-                    colors: [
-                        Color(red: 168 / 255, green: 165 / 255, blue: 164 / 255)
-                            .opacity(0.3),
-                        Color.black.opacity(0.3)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
+        ZStack {
+            GeometryReader { proxy in
+                let scale = min(
+                    proxy.size.width / Layout.designWidth,
+                    proxy.size.height / Layout.designHeight
                 )
-                .frame(width: Layout.designWidth, height: 178)
-                .offset(y: 696)
 
-                VStack(spacing: 10) {
-                    Image("DDLoginLogo_KR")
-                        .resizable()
-                        .frame(width: 165, height: 91)
+                ZStack(alignment: .topLeading) {
+                    Color.black
 
-                    Image("DDLoginLogo_EN")
-                        .resizable()
-                        .frame(width: 92, height: 19)
-                }
-                .frame(width: 176)
-                .offset(x: 113, y: 138)
-                .accessibilityHidden(true)
+                    moonSurface
+                    mascot
 
-                if let errorMessage = store.errorMessage {
-                    Text(errorMessage)
-                        .ddTypography(.label14)
-                        .foregroundStyle(DDColor.statusCritical)
-                        .multilineTextAlignment(.center)
-                        .frame(width: 342)
-                        .offset(x: 30, y: 700)
-                }
+                    LinearGradient(
+                        colors: [
+                            Color(red: 168 / 255, green: 165 / 255, blue: 164 / 255)
+                                .opacity(0.3),
+                            Color.black.opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(width: Layout.designWidth, height: 178)
+                    .offset(y: 696)
 
-                ZStack {
-                    AppleSignInButton {
-                        store.send(.appleSignInButtonTapped)
+                    VStack(spacing: 10) {
+                        Image("DDLoginLogo_KR")
+                            .resizable()
+                            .frame(width: 165, height: 91)
+
+                        Image("DDLoginLogo_EN")
+                            .resizable()
+                            .frame(width: 92, height: 19)
                     }
-                    .opacity(store.isSigningIn ? 0.55 : 1)
-
-                    if store.isSigningIn {
-                        ProgressView()
-                            .tint(.white)
-                    }
+                    .frame(width: 176)
+                    .offset(x: 113, y: 138)
+                    .accessibilityHidden(true)
                 }
-                .frame(width: 342, height: 54)
-                .disabled(store.isSigningIn)
-                .accessibilityLabel("Apple로 로그인")
-                .offset(x: 30, y: 732)
+                .frame(width: Layout.designWidth, height: Layout.designHeight)
+                .scaleEffect(scale, anchor: .top)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
+                .clipped()
             }
-            .frame(width: Layout.designWidth, height: Layout.designHeight)
-            .scaleEffect(scale, anchor: .top)
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity,
-                alignment: .top
-            )
-            .clipped()
+            .ignoresSafeArea()
+
+            VStack {
+                Spacer(minLength: 0)
+                DDBottomActionArea(backgroundColor: .clear) {
+                    VStack(spacing: DDSpacing.large) {
+                        if let errorMessage = store.errorMessage {
+                            Text(errorMessage)
+                                .ddTypography(.label14)
+                                .foregroundStyle(DDColor.statusCritical)
+                                .multilineTextAlignment(.center)
+                        }
+
+                        signInButton
+                    }
+                }
+            }
         }
-        .ignoresSafeArea()
         .preferredColorScheme(.dark)
+    }
+
+    private var signInButton: some View {
+        ZStack {
+            AppleSignInButton {
+                store.send(.appleSignInButtonTapped)
+            }
+            .opacity(store.isSigningIn ? 0.55 : 1)
+
+            if store.isSigningIn {
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 54)
+        .disabled(store.isSigningIn)
+        .accessibilityLabel("Apple로 로그인")
     }
 
     private var moonSurface: some View {

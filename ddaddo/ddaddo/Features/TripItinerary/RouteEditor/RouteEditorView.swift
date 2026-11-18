@@ -27,12 +27,17 @@ struct RouteEditorView: View {
                     .onTapGesture {
                         store.send(.daySelectionDismissed)
                     }
+            }
 
+            if store.isDaySelectionPresented {
                 daySelectionSheet
                     .transition(.move(edge: .bottom))
             }
         }
-        .animation(.easeOut(duration: 0.2), value: store.isDaySelectionPresented)
+        .animation(
+            .easeOut(duration: 0.2),
+            value: store.isDaySelectionPresented
+        )
         .preferredColorScheme(.dark)
     }
 
@@ -70,7 +75,7 @@ struct RouteEditorView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 15)
+                .padding(.horizontal, DDSpacing.large)
 
                 Spacer()
             }
@@ -78,7 +83,7 @@ struct RouteEditorView: View {
             SelectedPlaceBottomSheet(
                 place: place,
                 isLoading: store.isPlaceDetailsLoading,
-                canAdd: true,
+                canAdd: !store.isPlaceDetailsLoading,
                 isAlreadyAdded: false,
                 fallbackImageName: nil,
                 closeButtonTapped: {
@@ -93,10 +98,13 @@ struct RouteEditorView: View {
     }
 
     private var daySelectionSheet: some View {
-        VStack(spacing: DDSpacing.medium) {
+        VStack(alignment: .leading, spacing: 0) {
             Capsule()
                 .fill(DDColor.actionSecondary)
                 .frame(width: 142, height: 4)
+                .frame(maxWidth: .infinity)
+                .padding(.top, DDSpacing.medium)
+                .padding(.bottom, DDSpacing.medium)
 
             HStack {
                 Text("며칠째에 추가할까요?")
@@ -115,49 +123,158 @@ struct RouteEditorView: View {
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.horizontal, DDSpacing.large)
 
-            LazyVGrid(
-                columns: Array(
-                    repeating: GridItem(.flexible(), spacing: DDSpacing.small),
-                    count: 5
-                ),
-                alignment: .leading,
-                spacing: DDSpacing.small
-            ) {
-                ForEach(store.availableDays) { day in
-                    Button {
-                        store.send(.daySelected(day))
-                    } label: {
-                        Text(day.rawValue)
-                            .ddTypography(.labelEmphasis14)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(
-                                day == store.availableDays.first
-                                    ? DDColor.borderDefault
-                                    : Color.clear
-                            )
-                            .clipShape(.capsule)
-                            .overlay {
-                                Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
-                            }
+            ScrollView(.horizontal) {
+                HStack(spacing: DDSpacing.small) {
+                    ForEach(store.availableDays) { day in
+                        Button {
+                            store.send(.daySelected(day))
+                        } label: {
+                            Text(day.rawValue)
+                                .ddTypography(.labelEmphasis14)
+                                .foregroundStyle(DDColor.textPrimary)
+                                .frame(width: 64, height: 40)
+                                .background(
+                                    day == store.selectedDay
+                                        ? DDColor.borderDefault
+                                        : Color.clear
+                                )
+                                .clipShape(.capsule)
+                                .overlay {
+                                    Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, DDSpacing.large)
+            }
+            .scrollIndicators(.hidden)
+            .padding(.top, DDSpacing.small)
+
+            Text("누구랑 여행할까요?")
+                .ddTypography(.heading18)
+                .foregroundStyle(DDColor.textPrimary)
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.top, DDSpacing.large)
+
+            HStack(spacing: DDSpacing.small) {
+                Button {
+                    store.send(.aloneButtonTapped)
+                } label: {
+                    Text("혼자")
+                        .ddTypography(.labelEmphasis14)
+                        .foregroundStyle(DDColor.textPrimary)
+                        .frame(width: 64, height: 40)
+                        .background(Color.clear)
+                        .clipShape(.capsule)
+                        .overlay {
+                            Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(store.selectedDay == nil)
+
+                Button {
+                    store.send(.withFriendsButtonTapped)
+                } label: {
+                    Text("친구랑")
+                        .ddTypography(.labelEmphasis14)
+                        .foregroundStyle(DDColor.textPrimary)
+                        .frame(width: 72, height: 40)
+                        .background(
+                            store.isFriendSelectionPresented
+                                ? DDColor.borderDefault
+                                : Color.clear
+                        )
+                        .clipShape(.capsule)
+                        .overlay {
+                            Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(store.selectedDay == nil || store.availableFriends.isEmpty)
+            }
+            .padding(.horizontal, DDSpacing.large)
+            .padding(.top, DDSpacing.medium)
+
+            if store.isFriendSelectionPresented {
+                HStack {
+                    Text("함께 갈 친구를 골라주세요")
+                        .ddTypography(.labelEmphasis14)
+                        .foregroundStyle(DDColor.textPrimary)
+
+                    Spacer(minLength: 0)
+
+                    Text("1명 선택")
+                        .ddTypography(.label14)
+                        .foregroundStyle(DDColor.textSecondary)
+                }
+                .padding(.horizontal, DDSpacing.large)
+                .padding(.top, DDSpacing.large)
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: DDSpacing.medium) {
+                        ForEach(store.availableFriends) { member in
+                            friendButton(member)
+                        }
+                    }
+                    .padding(.horizontal, DDSpacing.large)
+                }
+                .scrollIndicators(.hidden)
+                .padding(.top, DDSpacing.small)
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, DDSpacing.medium)
         .frame(maxWidth: .infinity)
-        .frame(height: 222)
+        .frame(height: 562)
         .background(DDColor.surfaceElevated)
         .clipShape(.rect(topLeadingRadius: 28, topTrailingRadius: 28))
+        .ddBottomSheetBorder(cornerRadius: 28)
         .frame(maxHeight: .infinity, alignment: .bottom)
         .ddFillBottomSheetToScreenEdge(color: DDColor.surfaceElevated)
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func friendButton(_ member: TripMember) -> some View {
+        let isSelected = store.selectedFriends.contains(member)
+
+        return Button {
+            store.send(.friendTapped(member))
+        } label: {
+            VStack(spacing: DDSpacing.small) {
+                ZStack(alignment: .topTrailing) {
+                    DDMiniHeadAvatar(character: member.avatar, size: 64)
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    isSelected ? DDColor.actionPrimary : Color.clear,
+                                    lineWidth: 3
+                                )
+                        }
+
+                    if isSelected {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(DDColor.textOnPrimary)
+                            .frame(width: 20, height: 20)
+                            .background(DDColor.actionPrimary, in: Circle())
+                    }
+                }
+
+                Text(member.accessibilityName)
+                    .ddTypography(.labelEmphasis14)
+                    .foregroundStyle(
+                        isSelected ? DDColor.textPrimary : DDColor.textSecondary
+                    )
+            }
+            .frame(width: 72)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(member.accessibilityName) 선택")
+        .accessibilityValue(isSelected ? "선택됨" : "선택 안 됨")
     }
 }
 
@@ -168,7 +285,7 @@ private struct RouteEditorSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchBar
-                .padding(.horizontal, 15)
+                .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, DDSpacing.xLarge)
 
             ScrollView {

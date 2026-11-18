@@ -14,6 +14,7 @@ struct SelectedPlaceBottomSheet: View {
     let canAdd: Bool
     let isAlreadyAdded: Bool
     let fallbackImageName: String?
+    let showsAddButton: Bool
     let bottomSafeAreaInset: CGFloat
     let closeButtonTapped: () -> Void
     let addButtonTapped: () -> Void
@@ -26,6 +27,7 @@ struct SelectedPlaceBottomSheet: View {
         canAdd: Bool,
         isAlreadyAdded: Bool,
         fallbackImageName: String?,
+        showsAddButton: Bool = true,
         bottomSafeAreaInset: CGFloat = 34,
         closeButtonTapped: @escaping () -> Void,
         addButtonTapped: @escaping () -> Void
@@ -35,6 +37,7 @@ struct SelectedPlaceBottomSheet: View {
         self.canAdd = canAdd
         self.isAlreadyAdded = isAlreadyAdded
         self.fallbackImageName = fallbackImageName
+        self.showsAddButton = showsAddButton
         self.bottomSafeAreaInset = bottomSafeAreaInset
         self.closeButtonTapped = closeButtonTapped
         self.addButtonTapped = addButtonTapped
@@ -64,14 +67,16 @@ struct SelectedPlaceBottomSheet: View {
 
                 Spacer(minLength: DDSpacing.small)
 
-                Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
-                    .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
-                    .foregroundStyle(canAdd ? DDColor.textOnPrimary : DDColor.textTertiary)
-                    .padding(.horizontal, 12)
-                    .frame(height: 28)
-                    .background(canAdd ? DDColor.actionPrimary : DDColor.surfaceControl)
-                    .clipShape(.capsule)
-                    .disabled(!canAdd)
+                if showsAddButton {
+                    Button(isAlreadyAdded ? "추가됨" : "추가하기", action: addButtonTapped)
+                        .font(.custom("Pretendard-Bold", size: 14, relativeTo: .subheadline))
+                        .foregroundStyle(canAdd ? DDColor.textOnPrimary : DDColor.textTertiary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 28)
+                        .background(canAdd ? DDColor.actionPrimary : DDColor.surfaceControl)
+                        .clipShape(.capsule)
+                        .disabled(!canAdd)
+                }
             }
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, 20)
@@ -120,6 +125,7 @@ struct SelectedPlaceBottomSheet: View {
                 photoStrip
                     .padding(.top, DDSpacing.small)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, DDSpacing.large)
             .padding(.top, 60)
 
@@ -132,15 +138,7 @@ struct SelectedPlaceBottomSheet: View {
         .frame(maxWidth: .infinity)
         .frame(height: 355 + bottomSafeAreaInset)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-                .stroke(DDColor.borderDefault, lineWidth: 1)
-        }
+        .ddBottomSheetBorder()
         .overlay(alignment: .bottom) {
             if isCopyToastPresented {
                 Text("주소가 복사되었어요")
@@ -250,4 +248,47 @@ struct SelectedPlaceBottomSheet: View {
             .frame(height: 154)
         }
     }
+}
+
+#Preview("로딩 전후 정렬") {
+    @Previewable @State var isLoading = true
+
+    let photos = ["DDPlaceStussyTokyo", "DDPlaceTokyoMarket"].compactMap {
+        UIImage(named: $0)?.jpegData(compressionQuality: 0.8)
+    }
+    let place = PlaceDetails(
+        id: "preview-place",
+        name: "치이카와 파크",
+        address: isLoading
+            ? "일본 도쿄도 도시마구 히가시이케부쿠로 3 Chome-3-5"
+            : "일본 〒170-0013 Tokyo, Toshima City, Higashiikebukuro, 3-chome-3-5 サンシャインシティ アネックス B1F",
+        category: isLoading ? "장소" : "테마파크",
+        rating: isLoading ? 0 : 4.1,
+        ratingCount: isLoading ? 0 : 1022,
+        latitude: 35.7306,
+        longitude: 139.7196,
+        photoData: isLoading ? [] : photos
+    )
+
+    ZStack(alignment: .bottom) {
+        DDColor.surfaceElevated.ignoresSafeArea()
+
+        VStack {
+            Toggle("로딩 중", isOn: $isLoading)
+                .padding(DDSpacing.large)
+            Spacer()
+        }
+
+        SelectedPlaceBottomSheet(
+            place: place,
+            isLoading: isLoading,
+            canAdd: !isLoading,
+            isAlreadyAdded: false,
+            fallbackImageName: nil,
+            closeButtonTapped: {},
+            addButtonTapped: {}
+        )
+        .ignoresSafeArea(edges: .bottom)
+    }
+    .preferredColorScheme(.dark)
 }

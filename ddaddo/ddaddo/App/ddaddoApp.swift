@@ -18,9 +18,10 @@ struct ddaddoApp: App {
     init() {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
+        let isRunningForPreviews = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         let isTimeTableMock = arguments.contains("-timeTableMock")
         let isTimeTableEditMock = arguments.contains("-debugTimeTableEdit")
-        if !isTimeTableMock && !isTimeTableEditMock {
+        if !isRunningForPreviews && !isTimeTableMock && !isTimeTableEditMock {
             GoogleMapsService.configure()
             FirebaseService.configure()
         }

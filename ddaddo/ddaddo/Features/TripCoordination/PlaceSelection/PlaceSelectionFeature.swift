@@ -7,9 +7,17 @@
 
 import ComposableArchitecture
 import CoreGraphics
+import CoreLocation
 import Foundation
 
 struct PlaceSelectionFeature: Reducer {
+    private static let destinationValidationRadius: CLLocationDistance = 200_000
+
+    struct DestinationCoordinate: Equatable {
+        let latitude: Double
+        let longitude: Double
+    }
+
     enum Delegate: Equatable {
         case proceedToAnalysis
         case returnToInvitation
@@ -75,10 +83,15 @@ struct PlaceSelectionFeature: Reducer {
         var remainingSeconds: Int
         var isTimerRunning = false
         var hasSelectionEnded = false
+        var hasStartedPlaceAnalysis = false
+        var pendingPlaceConfirmation: Bool?
         var isEditingConfirmedPlaces = false
         var completionAlert: CompletionAlert?
         var pendingDeletionPlaceID: String?
         var placeSyncErrorMessage: String?
+        var destinationCoordinate: DestinationCoordinate?
+        var destinationValidationMessage: String?
+        var canOverrideDestinationValidation = false
         var requestedPhotoPlaceIDs: Set<String> = []
         var hasRestoredSavedPlacesPresentation = false
         var placeSearch = PlaceSearchFeature.State()
@@ -143,12 +156,16 @@ struct PlaceSelectionFeature: Reducer {
 
         var canEditDisplayedPlaces: Bool {
             isViewingCurrentUser && !isCurrentUserConfirmed && !hasSelectionEnded
+                && pendingPlaceConfirmation == nil
         }
 
         var canConfirmPlaceSelection: Bool {
-            !memberPlaces[currentMember, default: []].isEmpty
-                && !isCurrentUserConfirmed
-                && !hasSelectionEnded
+            canEditDisplayedPlaces && !memberPlaces[currentMember, default: []].isEmpty
+        }
+
+        var canCancelPlaceConfirmation: Bool {
+            isViewingCurrentUser && isCurrentUserConfirmed && !hasSelectionEnded
+                && pendingPlaceConfirmation == nil
         }
 
         var isCurrentUserConfirmed: Bool {
@@ -163,9 +180,9 @@ struct PlaceSelectionFeature: Reducer {
         var completionAlertMessage: String {
             switch completionAlert {
             case .allMembersConfirmed:
-                return "\(participants.count)명 모두 장소핀을 확정했어요.\n이제 함께 갈 장소를 묶어볼까요?"
+                return "\(participants.count)명 모두 장소핀을 확정했어요.\n확정된 장소로 추천 그룹을 만들어 드릴게요."
             case .selectionTimeExpired:
-                return "지금까지 확정된 장소핀으로\n다음 그룹핑 단계를 시작해 볼까요?"
+                return "지금까지 확정된 장소핀으로\n추천 그룹을 만들어 드릴게요."
             case nil:
                 return ""
             }
@@ -209,7 +226,9 @@ struct PlaceSelectionFeature: Reducer {
 
         var canAddSelectedPlace: Bool {
             selectedPlace != nil
+                && !isPlaceDetailsLoading
                 && isViewingCurrentUser
+                && canEditDisplayedPlaces
                 && !isSelectedPlaceAlreadyAdded
                 && memberPlaces[currentMember, default: []].count < maximumPlaceCount
         }
@@ -258,8 +277,7 @@ struct PlaceSelectionFeature: Reducer {
         var timerText: String {
             let hours = remainingSeconds / 3_600
             let minutes = remainingSeconds % 3_600 / 60
-            let seconds = remainingSeconds % 60
-            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+            return String(format: "%02d:%02d", hours, minutes)
         }
 
         private static let mockParticipants: [Participant] = [
@@ -360,9 +378,13 @@ struct PlaceSelectionFeature: Reducer {
         case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
+        case placeAnalysisStatusChanged(Bool)
+        case placeAnalysisStartFailed(String)
         case placePhotoResponse(String, [Data])
         case placeMutationFailed(String)
         case placeSyncErrorDismissed
+        case destinationValidationCancelButtonTapped
+        case destinationValidationConfirmButtonTapped
         case backButtonTapped
         case searchFieldTapped
         case searchTextChanged(String)
@@ -381,12 +403,14 @@ struct PlaceSelectionFeature: Reducer {
         case movePinnedPlace(sourceID: String, beforeID: String?)
         case memberProfileTapped(TripMember)
         case confirmButtonTapped
+        case placeConfirmationSucceeded(Bool)
+        case placeConfirmationFailed(String)
         case confirmedPlacesEditButtonTapped
         case deleteConfirmedPlaceButtonTapped(String)
         case completionAlertConfirmButtonTapped
         case timerTicked
         case moveCriteriaButtonTapped
-        case placeDetailsResponse(PlaceDetails)
+        case placeDetailsResponse(PlaceDetails, DestinationCoordinate)
         case placeDetailsFailed
         case searchDismissed
         case placeSearch(PlaceSearchFeature.Action)
@@ -406,14 +430,20 @@ struct PlaceSelectionFeature: Reducer {
                     state.isBottomSheetExpanded = true
                     state.isSearchPresented = false
                     state.completionAlert = .selectionTimeExpired
-                    return loadMemberPlacesEffect(tripID: state.tripID)
+                    return .merge(
+                        loadMemberPlacesEffect(tripID: state.tripID),
+                        observePlaceAnalysisEffect(tripID: state.tripID)
+                            .cancellable(id: "place-analysis-sync", cancelInFlight: true)
+                    )
                 }
 
                 let tripID = state.tripID
                 var effects: [Effect<Action>] = [
                     loadMemberPlacesEffect(tripID: tripID),
                     observeMemberPlacesEffect(tripID: tripID)
-                    .cancellable(id: "place-selection-sync", cancelInFlight: true)
+                        .cancellable(id: "place-selection-sync", cancelInFlight: true),
+                    observePlaceAnalysisEffect(tripID: tripID)
+                        .cancellable(id: "place-analysis-sync", cancelInFlight: true)
                 ]
                 if !state.isTimerRunning && !state.hasSelectionEnded {
                     state.isTimerRunning = true
@@ -433,7 +463,8 @@ struct PlaceSelectionFeature: Reducer {
                 state.isTimerRunning = false
                 return .merge(
                     .cancel(id: "place-selection-timer"),
-                    .cancel(id: "place-selection-sync")
+                    .cancel(id: "place-selection-sync"),
+                    .cancel(id: "place-analysis-sync")
                 )
 
             case .refreshMemberPlaces:
@@ -467,8 +498,10 @@ struct PlaceSelectionFeature: Reducer {
                     if let index = state.participants.firstIndex(where: {
                         $0.member == pins.member
                     }) {
-                        state.participants[index].isConfirmed =
-                            state.participants[index].isConfirmed || pins.isConfirmed
+                        if !state.participants[index].isCurrentUser
+                            || state.pendingPlaceConfirmation == nil {
+                            state.participants[index].isConfirmed = pins.isConfirmed
+                        }
                     }
                 }
 
@@ -495,6 +528,7 @@ struct PlaceSelectionFeature: Reducer {
                 photoEffects = placesNeedingPhotos.values.map(loadPlacePhotoEffect)
 
                 if state.isCurrentUserConfirmed,
+                   state.pendingPlaceConfirmation == nil,
                    state.haveAllParticipantsJoinedAndConfirmed,
                    !state.hasSelectionEnded,
                    state.completionAlert == nil {
@@ -510,6 +544,16 @@ struct PlaceSelectionFeature: Reducer {
                 return photoEffects.isEmpty ? .none : .merge(photoEffects)
 
             case .memberPlacesFailed:
+                return .none
+
+            case let .placeAnalysisStatusChanged(hasStarted):
+                guard hasStarted, !state.hasStartedPlaceAnalysis else { return .none }
+                state.hasStartedPlaceAnalysis = true
+                state.completionAlert = nil
+                return .send(.delegate(.proceedToAnalysis))
+
+            case let .placeAnalysisStartFailed(message):
+                state.placeSyncErrorMessage = message
                 return .none
 
             case let .placePhotoResponse(placeID, photoData):
@@ -538,10 +582,31 @@ struct PlaceSelectionFeature: Reducer {
                 state.placeSyncErrorMessage = nil
                 return .none
 
+            case .destinationValidationCancelButtonTapped:
+                state.destinationValidationMessage = nil
+                state.canOverrideDestinationValidation = false
+                state.selectedPlace = nil
+                state.searchText = ""
+                state.isMemberPlacesSheetPresented = true
+                return .none
+
+            case .destinationValidationConfirmButtonTapped:
+                let shouldAddPlace = state.canOverrideDestinationValidation
+                state.destinationValidationMessage = nil
+                state.canOverrideDestinationValidation = false
+                if shouldAddPlace {
+                    return .send(.addSelectedPlaceButtonTapped)
+                }
+                return .none
+
             case .backButtonTapped:
                 return .send(.delegate(.returnToInvitation))
 
             case .searchFieldTapped:
+                guard !state.isCurrentUserConfirmed,
+                      !state.hasSelectionEnded,
+                      state.pendingPlaceConfirmation == nil
+                else { return .none }
                 state.selectedMember = state.currentMember
                 let shouldResetSearch = state.selectedPlace == nil
                 if shouldResetSearch {
@@ -558,6 +623,10 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .searchButtonTapped:
+                guard !state.isCurrentUserConfirmed,
+                      !state.hasSelectionEnded,
+                      state.pendingPlaceConfirmation == nil
+                else { return .none }
                 state.selectedMember = state.currentMember
                 state.selectedPinnedPlace = nil
                 state.placeSearch = PlaceSearchFeature.State()
@@ -674,7 +743,7 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case let .deletePinnedPlaceButtonTapped(placeID):
-                guard state.isViewingCurrentUser else { return .none }
+                guard state.canEditDisplayedPlaces else { return .none }
                 state.pendingDeletionPlaceID = placeID
                 return .none
 
@@ -683,7 +752,7 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case .deleteConfirmationConfirmTapped:
-                guard state.isViewingCurrentUser,
+                guard state.canEditDisplayedPlaces,
                       let placeID = state.pendingDeletionPlaceID
                 else { return .none }
                 state.pendingDeletionPlaceID = nil
@@ -706,7 +775,7 @@ struct PlaceSelectionFeature: Reducer {
                 }
 
             case let .movePinnedPlace(sourceID, beforeID):
-                guard state.isViewingCurrentUser else { return .none }
+                guard state.canEditDisplayedPlaces else { return .none }
                 var places = state.memberPlaces[state.currentMember, default: []]
                 guard sourceID != beforeID,
                       let sourceIndex = places.firstIndex(where: { $0.id == sourceID })
@@ -717,6 +786,9 @@ struct PlaceSelectionFeature: Reducer {
                     places.firstIndex(where: { $0.id == beforeID })
                 } ?? places.endIndex
                 places.insert(place, at: destinationIndex)
+                guard places != state.memberPlaces[state.currentMember, default: []] else {
+                    return .none
+                }
                 state.memberPlaces[state.currentMember] = places
 
                 let tripID = state.tripID
@@ -742,29 +814,42 @@ struct PlaceSelectionFeature: Reducer {
                 return loadMemberPlacesEffect(tripID: state.tripID)
 
             case .confirmButtonTapped:
-                guard state.canConfirmPlaceSelection else { return .none }
+                guard state.canConfirmPlaceSelection || state.canCancelPlaceConfirmation else {
+                    return .none
+                }
+                let isConfirmed = !state.isCurrentUserConfirmed
+                state.pendingPlaceConfirmation = isConfirmed
+                state.pendingDeletionPlaceID = nil
+                return setPlaceConfirmationEffect(tripID: state.tripID, isConfirmed: isConfirmed)
+
+            case let .placeConfirmationSucceeded(isConfirmed):
+                guard state.pendingPlaceConfirmation == isConfirmed else { return .none }
+                state.pendingPlaceConfirmation = nil
                 guard let index = state.participants.firstIndex(where: \.isCurrentUser) else {
                     return .none
                 }
 
-                state.participants[index].isConfirmed = true
+                state.participants[index].isConfirmed = isConfirmed
+                state.selectedMember = state.currentMember
                 state.selectedPlace = nil
                 state.selectedPinnedPlace = nil
                 state.searchText = ""
-                state.isMemberPlacesSheetPresented = false
+                state.isMemberPlacesSheetPresented = !isConfirmed
                 state.isBottomSheetExpanded = true
                 state.isEditingConfirmedPlaces = false
 
-                if state.haveAllParticipantsJoinedAndConfirmed {
+                if isConfirmed && state.haveAllParticipantsJoinedAndConfirmed {
                     state.isTimerRunning = false
                     state.hasSelectionEnded = true
                     state.completionAlert = .allMembersConfirmed
-                    return .merge(
-                        confirmPlacesEffect(tripID: state.tripID),
-                        .cancel(id: "place-selection-timer")
-                    )
+                    return .cancel(id: "place-selection-timer")
                 }
-                return confirmPlacesEffect(tripID: state.tripID)
+                return .none
+
+            case let .placeConfirmationFailed(message):
+                state.pendingPlaceConfirmation = nil
+                state.placeSyncErrorMessage = message
+                return loadMemberPlacesEffect(tripID: state.tripID)
 
             case .confirmedPlacesEditButtonTapped:
                 guard state.isShowingConfirmedPlaces else { return .none }
@@ -772,7 +857,9 @@ struct PlaceSelectionFeature: Reducer {
                 return .none
 
             case let .deleteConfirmedPlaceButtonTapped(placeID):
-                guard state.isEditingConfirmedPlaces else { return .none }
+                guard state.canEditDisplayedPlaces, state.isEditingConfirmedPlaces else {
+                    return .none
+                }
                 for member in state.memberPlaces.keys {
                     state.memberPlaces[member, default: []].removeAll { $0.id == placeID }
                 }
@@ -786,7 +873,15 @@ struct PlaceSelectionFeature: Reducer {
                     return .none
                 }
                 state.completionAlert = nil
-                return .send(.delegate(.proceedToAnalysis))
+                let tripID = state.tripID
+                return .run { send in
+                    do {
+                        try await placeClient.startPlaceAnalysis(tripID)
+                        await send(.placeAnalysisStatusChanged(true))
+                    } catch {
+                        await send(.placeAnalysisStartFailed(error.localizedDescription))
+                    }
+                }
 
             case .timerTicked:
                 guard state.remainingSeconds > 0 else { return .none }
@@ -804,15 +899,37 @@ struct PlaceSelectionFeature: Reducer {
             case .moveCriteriaButtonTapped:
                 return .none
 
-            case let .placeDetailsResponse(details):
+            case let .placeDetailsResponse(details, destinationCoordinate):
                 guard state.selectedPinnedPlace == nil else { return .none }
+                state.destinationCoordinate = destinationCoordinate
                 state.selectedPlace = details
                 state.isPlaceDetailsLoading = false
+
+                let destinationLocation = CLLocation(
+                    latitude: destinationCoordinate.latitude,
+                    longitude: destinationCoordinate.longitude
+                )
+                let placeLocation = CLLocation(
+                    latitude: details.latitude,
+                    longitude: details.longitude
+                )
+                guard destinationLocation.distance(from: placeLocation)
+                        <= Self.destinationValidationRadius
+                else {
+                    state.canOverrideDestinationValidation = true
+                    state.destinationValidationMessage = "\(state.destinationName) 여행지와 먼 장소예요. 그래도 추가할까요?"
+                    return .none
+                }
                 return .none
 
             case .placeDetailsFailed:
                 guard state.selectedPinnedPlace == nil else { return .none }
                 state.isPlaceDetailsLoading = false
+                state.selectedPlace = nil
+                state.searchText = ""
+                state.isMemberPlacesSheetPresented = true
+                state.canOverrideDestinationValidation = false
+                state.destinationValidationMessage = "장소의 위치를 확인하지 못했어요. 다른 장소를 선택해 주세요."
                 return .none
 
             case .searchDismissed, .placeSearch(.delegate(.close)):
@@ -836,9 +953,43 @@ struct PlaceSelectionFeature: Reducer {
                     longitude: 139.6500,
                     photoData: []
                 )
+                let destinationName = state.destinationName
+                let cachedDestinationCoordinate = state.destinationCoordinate
                 return .run { send in
                     do {
-                        await send(.placeDetailsResponse(try await placeClient.fetchDetails(result)))
+                        let details = try await placeClient.fetchDetails(result)
+                        let destinationCoordinate: DestinationCoordinate
+                        if let cachedDestinationCoordinate {
+                            destinationCoordinate = cachedDestinationCoordinate
+                        } else {
+                            let destinationQueries = [
+                                destinationName,
+                                "\(destinationName) city center",
+                                "\(destinationName) 도시 중심",
+                                "\(destinationName) country"
+                            ]
+                            var resolvedDestinationDetails: PlaceDetails?
+                            for query in destinationQueries {
+                                if case .some = resolvedDestinationDetails { break }
+                                guard let results = try? await placeClient.autocomplete(query) else {
+                                    continue
+                                }
+                                for result in results.prefix(5) {
+                                    if let details = try? await placeClient.fetchDetails(result) {
+                                        resolvedDestinationDetails = details
+                                        break
+                                    }
+                                }
+                            }
+                            guard let destinationDetails = resolvedDestinationDetails else {
+                                throw PlaceSelectionValidationError.destinationNotFound
+                            }
+                            destinationCoordinate = DestinationCoordinate(
+                                latitude: destinationDetails.latitude,
+                                longitude: destinationDetails.longitude
+                            )
+                        }
+                        await send(.placeDetailsResponse(details, destinationCoordinate))
                     } catch {
                         await send(.placeDetailsFailed)
                     }
@@ -880,6 +1031,19 @@ struct PlaceSelectionFeature: Reducer {
         }
     }
 
+    private func observePlaceAnalysisEffect(tripID: String) -> Effect<Action> {
+        let stream = placeClient.observePlaceAnalysis(tripID)
+        return .run { send in
+            do {
+                for try await hasStarted in stream {
+                    await send(.placeAnalysisStatusChanged(hasStarted))
+                }
+            } catch {
+                await send(.placeAnalysisStartFailed(error.localizedDescription))
+            }
+        }
+    }
+
     private func loadPlacePhotoEffect(_ place: PinnedPlace) -> Effect<Action> {
         .run { send in
             do {
@@ -912,13 +1076,18 @@ struct PlaceSelectionFeature: Reducer {
         )
     }
 
-    private func confirmPlacesEffect(tripID: String) -> Effect<Action> {
+    private func setPlaceConfirmationEffect(tripID: String, isConfirmed: Bool) -> Effect<Action> {
         .run { send in
             do {
-                try await placeClient.confirmPlaces(tripID)
+                try await placeClient.setPlaceSelectionConfirmation(tripID, isConfirmed)
+                await send(.placeConfirmationSucceeded(isConfirmed))
             } catch {
-                await send(.placeMutationFailed(error.localizedDescription))
+                await send(.placeConfirmationFailed(error.localizedDescription))
             }
         }
     }
+}
+
+private enum PlaceSelectionValidationError: Error {
+    case destinationNotFound
 }

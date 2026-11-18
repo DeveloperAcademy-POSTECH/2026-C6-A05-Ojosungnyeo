@@ -10,12 +10,16 @@ import CoreGraphics
 import Foundation
 
 struct RouteOverviewFeature: Reducer {
+    @Dependency(\.placeClient) var placeClient
+
     @ObservableState
     struct State: Equatable {
         var selectedDay = TripDay.day1
         var selectedMembers: Set<TripMember> = []
         var selectedMemberOrder: [TripMember] = []
         var expandedStopIDs: Set<RouteStop.ID> = []
+        var selectedPlaceDetails: PlaceDetails?
+        var isPlaceDetailsLoading = false
         var selectedPlaceID: RoutePlace.ID? = RoutePlace.mockPlaces[1].id
         var stopsByDay = RouteStop.stopsByDay
         let places = RoutePlace.mockPlaces
@@ -89,6 +93,10 @@ struct RouteOverviewFeature: Reducer {
         case daySelected(TripDay)
         case memberTapped(TripMember)
         case stopDisclosureTapped(RouteStop.ID)
+        case mapMarkerTapped(RouteStop)
+        case placeDetailsResponse(PlaceDetails)
+        case placeDetailsFailed
+        case placeDetailsDismissed
         case placeChanged(RoutePlace.ID?)
         case addressCopyButtonTapped(String)
     }
@@ -126,6 +134,80 @@ struct RouteOverviewFeature: Reducer {
                     state.expandedStopIDs.insert(stopID)
                 }
                 return .none
+
+            case let .mapMarkerTapped(stop):
+                let placeName = stop.name
+                let latitude = stop.latitude
+                let longitude = stop.longitude
+                state.selectedPlaceDetails = PlaceDetails(
+                    id: "route-\(stop.id)",
+                    name: stop.name,
+                    address: "장소 상세 정보를 불러오는 중이에요.",
+                    category: stop.category,
+                    rating: 0,
+                    ratingCount: 0,
+                    latitude: stop.latitude,
+                    longitude: stop.longitude,
+                    photoData: []
+                )
+                state.isPlaceDetailsLoading = true
+                return .run { send in
+                    do {
+                        let results = try await placeClient.autocomplete(placeName)
+                        var closestDetails: PlaceDetails?
+                        var closestDistance = Double.greatestFiniteMagnitude
+
+                        for result in results.prefix(5) {
+                            guard let details = try? await placeClient.fetchDetails(result) else {
+                                continue
+                            }
+                            let latitudeDistance = details.latitude - latitude
+                            let longitudeDistance = details.longitude - longitude
+                            let distance = latitudeDistance * latitudeDistance
+                                + longitudeDistance * longitudeDistance
+                            if distance < closestDistance {
+                                closestDistance = distance
+                                closestDetails = details
+                            }
+                        }
+
+                        if let closestDetails {
+                            await send(.placeDetailsResponse(closestDetails))
+                        } else {
+                            await send(.placeDetailsFailed)
+                        }
+                    } catch {
+                        await send(.placeDetailsFailed)
+                    }
+                }
+                .cancellable(id: "route-place-details", cancelInFlight: true)
+
+            case let .placeDetailsResponse(details):
+                state.selectedPlaceDetails = details
+                state.isPlaceDetailsLoading = false
+                return .none
+
+            case .placeDetailsFailed:
+                state.isPlaceDetailsLoading = false
+                if let place = state.selectedPlaceDetails {
+                    state.selectedPlaceDetails = PlaceDetails(
+                        id: place.id,
+                        name: place.name,
+                        address: "상세 주소를 불러올 수 없어요.",
+                        category: place.category,
+                        rating: place.rating,
+                        ratingCount: place.ratingCount,
+                        latitude: place.latitude,
+                        longitude: place.longitude,
+                        photoData: place.photoData
+                    )
+                }
+                return .none
+
+            case .placeDetailsDismissed:
+                state.selectedPlaceDetails = nil
+                state.isPlaceDetailsLoading = false
+                return .cancel(id: "route-place-details")
 
             case let .placeChanged(placeID):
                 guard let placeID else { return .none }
@@ -196,7 +278,9 @@ struct RouteStop: Equatable, Identifiable {
     }
 
     var mapStops: [RouteStop] {
-        guard !places.isEmpty else { return [self] }
+        // 서버 일정은 실제 장소 상세 좌표가 있을 때만 지도에 표시한다.
+        // 로컬 프리뷰 데이터만 기존 대표 좌표를 사용할 수 있다.
+        guard !places.isEmpty else { return scheduleID == nil ? [self] : [] }
         return places.enumerated().map { index, place in
             RouteStop(
                 id: 1_000_000 + id * 10_000 + index,

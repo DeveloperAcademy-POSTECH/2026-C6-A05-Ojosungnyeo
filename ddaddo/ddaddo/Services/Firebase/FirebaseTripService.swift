@@ -200,7 +200,8 @@ enum FirebaseTripService {
                 name: name,
                 avatarName: avatar.rawValue,
                 hasJoined: document.get("status") as? String == "joined",
-                isCurrentUser: document.get("uid") as? String == currentUserID
+                isCurrentUser: document.get("uid") as? String == currentUserID,
+                isPlaceSelectionConfirmed: document.get("placeSelectionConfirmed") as? Bool ?? false
             )
         }.prefix(4))
 
@@ -373,15 +374,16 @@ enum FirebaseTripService {
                     else { return nil }
 
                     let destination = (document.get("destinations") as? [[String: Any]])?.first
+                    let participants = try await document.reference
+                        .collection("participants")
+                        .order(by: "slotIndex")
+                        .getDocuments()
+                        .documents
+                        .filter { $0.get("status") as? String == "joined" }
                     let progress: UpcomingTripSnapshot.Progress
                     if document.get("status") as? String == "itinerary" {
                         progress = .itinerary
                     } else {
-                        let participants = try await document.reference
-                            .collection("participants")
-                            .getDocuments()
-                            .documents
-                            .filter { $0.get("status") as? String == "joined" }
                         let hasFinishedPlaceSelection = !participants.isEmpty
                             && participants.allSatisfy {
                                 $0.get("placeSelectionConfirmed") as? Bool == true
@@ -394,7 +396,8 @@ enum FirebaseTripService {
                         countryName: destination?["country"] as? String ?? "",
                         startDate: startDate,
                         endDate: endDate,
-                        progress: progress
+                        progress: progress,
+                        joinedAvatarNames: participants.compactMap { $0.get("avatarName") as? String }
                     )
                 }
             }
@@ -440,14 +443,10 @@ enum FirebaseTripService {
 
         let database = Firestore.firestore()
         let tripReference = database.collection("trips").document(request.tripID)
-        let participantDocument = try await tripReference
-            .collection("participants")
-            .document(userID)
-            .getDocument()
-        guard participantDocument.exists,
-              participantDocument.get("status") as? String == "joined" else {
-            throw TripServiceError.notTripParticipant
-        }
+        _ = try await normalizedParticipantReference(
+            tripReference: tripReference,
+            userID: userID
+        )
 
         let courseData: [[String: Any]] = request.courses.map { course in
             [
@@ -477,6 +476,12 @@ enum FirebaseTripService {
             if let branchGroupID = schedule.branchGroupID {
                 data["branchGroupID"] = branchGroupID
             }
+            if let recommendationGroupID = schedule.recommendationGroupID {
+                data["recommendationGroupID"] = recommendationGroupID
+            }
+            if let orderIndex = schedule.orderIndex {
+                data["orderIndex"] = orderIndex
+            }
             return data
         }
 
@@ -488,7 +493,8 @@ enum FirebaseTripService {
                 "updatedBy": userID,
                 "updatedAt": FieldValue.serverTimestamp()
             ],
-            forDocument: tripReference.collection("itinerary").document("current")
+            forDocument: tripReference.collection("itinerary").document("current"),
+            merge: true
         )
         batch.setData(
             [
@@ -499,6 +505,50 @@ enum FirebaseTripService {
             merge: true
         )
         try await batch.commit()
+    }
+
+    static func saveRecommendations(
+        tripID: String,
+        recommendations: [TripRecommendationSnapshot]
+    ) async throws {
+        guard FirebaseService.isConfigured else {
+            throw TripServiceError.firebaseNotConfigured
+        }
+        guard let userID = Auth.auth().currentUser?.uid else {
+            throw TripServiceError.unauthenticated
+        }
+
+        let tripReference = Firestore.firestore().collection("trips").document(tripID)
+        _ = try await normalizedParticipantReference(
+            tripReference: tripReference,
+            userID: userID
+        )
+
+        let values: [[String: Any]] = recommendations.map {
+            [
+                "id": $0.id,
+                "groupID": $0.groupID,
+                "placeID": $0.placeID,
+                "placeName": $0.placeName,
+                "category": $0.category,
+                "groupCategories": $0.groupCategories,
+                "memberIDs": $0.memberIDs,
+                "placeOwnerMemberIDs": $0.placeOwnerMemberIDs,
+                "latitude": $0.latitude,
+                "longitude": $0.longitude
+            ]
+        }
+        try await tripReference
+            .collection("itinerary")
+            .document("current")
+            .setData(
+                [
+                    "recommendations": values,
+                    "recommendationsUpdatedBy": userID,
+                    "recommendationsUpdatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
     }
 
     static func fetchItinerary(tripID: String) async throws -> TripItinerarySnapshot? {
@@ -593,10 +643,81 @@ enum FirebaseTripService {
                 courseID: courseID,
                 day: day,
                 startMinuteOfDay: startMinute,
-                branchGroupID: data["branchGroupID"] as? Int
+                branchGroupID: data["branchGroupID"] as? Int,
+                recommendationGroupID: data["recommendationGroupID"] as? String,
+                orderIndex: data["orderIndex"] as? Int
             )
         }
-        return TripItinerarySnapshot(courses: courses, schedules: schedules)
+        let recommendations: [TripRecommendationSnapshot] =
+            (document.get("recommendations") as? [[String: Any]] ?? []).compactMap { data in
+                guard let id = data["id"] as? String,
+                      let groupID = data["groupID"] as? String,
+                      let placeID = data["placeID"] as? String,
+                      let placeName = data["placeName"] as? String,
+                      let latitude = data["latitude"] as? Double,
+                      let longitude = data["longitude"] as? Double
+                else { return nil }
+                return TripRecommendationSnapshot(
+                    id: id,
+                    groupID: groupID,
+                    placeID: placeID,
+                    placeName: placeName,
+                    category: data["category"] as? String ?? "",
+                    groupCategories: data["groupCategories"] as? [String] ?? [],
+                    memberIDs: data["memberIDs"] as? [String] ?? [],
+                    placeOwnerMemberIDs: data["placeOwnerMemberIDs"] as? [String] ?? [],
+                    latitude: latitude,
+                    longitude: longitude
+                )
+            }
+        return TripItinerarySnapshot(
+            courses: courses,
+            schedules: schedules,
+            recommendations: recommendations
+        )
+    }
+
+    /// 예전 슬롯 형식의 참가자 문서를 현재 인증 UID 문서로 정규화한다.
+    /// Firestore 규칙이 `participants/{uid}`를 기준으로 검사해도
+    /// 모든 기기에서 동일하게 일정을 저장할 수 있게 한다.
+    private static func normalizedParticipantReference(
+        tripReference: DocumentReference,
+        userID: String
+    ) async throws -> DocumentReference {
+        let participants = tripReference.collection("participants")
+        let uidReference = participants.document(userID)
+        let uidDocument = try await uidReference.getDocument()
+        if uidDocument.exists,
+           uidDocument.get("status") as? String == "joined" {
+            return uidReference
+        }
+
+        let legacyDocuments = try await participants
+            .whereField("uid", isEqualTo: userID)
+            .getDocuments()
+            .documents
+        guard let legacyParticipant = legacyDocuments.first(where: {
+            $0.get("status") as? String == "joined"
+        }) else {
+            throw TripServiceError.notTripParticipant
+        }
+
+        var participantData = legacyParticipant.data()
+        participantData["uid"] = userID
+        participantData["status"] = "joined"
+        participantData["updatedAt"] = FieldValue.serverTimestamp()
+        try await uidReference.setData(participantData, merge: true)
+
+        if legacyParticipant.reference.path != uidReference.path {
+            try? await legacyParticipant.reference.setData(
+                [
+                    "status": "migrated",
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
+        }
+        return uidReference
     }
 
     private static func makeInviteURL(code: String, expiresAt: Date) -> URL {
@@ -626,7 +747,7 @@ enum TripServiceError: LocalizedError {
         case .firebaseNotConfigured: "Firebase 설정을 확인해 주세요."
         case .unauthenticated: "로그인이 필요합니다."
         case .tripNotFound: "여행 정보를 찾을 수 없습니다."
-        case .invalidInviteCode: "유효하지 않은 초대 코드입니다."
+        case .invalidInviteCode: "초대 코드가 유효하지 않아요."
         case .expiredInviteCode: "초대 코드의 유효 기간이 지났습니다."
         case .tripIsFull: "이미 모든 친구가 참여한 여행입니다."
         case .inviteCodeGenerationFailed: "초대 코드를 만들지 못했습니다. 다시 시도해 주세요."

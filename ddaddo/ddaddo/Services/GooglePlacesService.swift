@@ -63,7 +63,9 @@ final class GooglePlacesService: @unchecked Sendable {
                 }
 
                 guard let place else {
-                    continuation.resume(returning: Self.fallbackDetails(for: result))
+                    continuation.resume(
+                        throwing: GooglePlacesServiceError.placeDetailsUnavailable(result.name)
+                    )
                     return
                 }
 
@@ -109,20 +111,6 @@ final class GooglePlacesService: @unchecked Sendable {
         }
     }
 
-    private static func fallbackDetails(for result: PlaceSearchResult) -> PlaceDetails {
-        PlaceDetails(
-            id: result.id,
-            name: result.name,
-            address: result.address,
-            category: "장소",
-            rating: 0,
-            ratingCount: 0,
-            latitude: 35.6764,
-            longitude: 139.6500,
-            photoData: []
-        )
-    }
-
     private static func categoryName(for types: [String]?) -> String {
         let placeTypes = Set(types ?? [])
         let categories: [(name: String, types: Set<String>)] = [
@@ -162,5 +150,16 @@ final class GooglePlacesService: @unchecked Sendable {
             }
         }
         return "장소"
+    }
+}
+
+private enum GooglePlacesServiceError: LocalizedError {
+    case placeDetailsUnavailable(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .placeDetailsUnavailable(placeName):
+            "\(placeName)의 상세 장소 정보를 가져오지 못했어요."
+        }
     }
 }

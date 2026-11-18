@@ -7,9 +7,32 @@
 
 import ComposableArchitecture
 import SwiftUI
+import UIKit
+
+private func placeGroupingWindowBottomSafeAreaInset() -> CGFloat {
+    UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .filter { $0.activationState == .foregroundActive }
+        .flatMap(\.windows)
+        .first(where: \.isKeyWindow)?
+        .safeAreaInsets.bottom ?? 0
+}
 
 struct PlaceGroupingView: View {
     let store: StoreOf<PlaceGroupingFeature>
+    @GestureState private var isSheetDragging = false
+    @State private var sheetDragTranslation: CGFloat = 0
+    @State private var sheetDetent: PlaceGroupingSheetLayout.Detent
+    @State private var bottomSafeAreaInset = placeGroupingWindowBottomSafeAreaInset()
+    @State private var confirmationGuideHeight: CGFloat = 16
+
+    init(
+        store: StoreOf<PlaceGroupingFeature>,
+        initialSheetDetent: PlaceGroupingSheetLayout.Detent = .medium
+    ) {
+        self.store = store
+        _sheetDetent = State(initialValue: initialSheetDetent)
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -27,7 +50,18 @@ struct PlaceGroupingView: View {
                 Spacer(minLength: 0)
             }
 
-            bottomSheet
+            GeometryReader { geometry in
+                bottomSheet(
+                    layout: PlaceGroupingSheetLayout(
+                        availableHeight: geometry.size.height,
+                        bottomSafeAreaInset: bottomSafeAreaInset,
+                        confirmationGuideHeight: store.selectedTab == .recommendedGroups
+                            ? confirmationGuideHeight : 0
+                    )
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
+            .ignoresSafeArea(edges: .bottom)
 
             if store.isDetailPresented {
                 PlaceGroupingDetailView(
@@ -55,13 +89,9 @@ struct PlaceGroupingView: View {
             }
 
             if store.isCriteriaChangeConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .zIndex(6)
-
-                DDConfirmationAlert(
-                    title: "알림",
-                    message: "변경하면 현재 추천된 그룹이 달라져요.\n그래도 변경하시겠어요?",
+                DDAlertOverlay(
+                    title: "이동 수단을 변경할까요?",
+                    message: "변경하면 다시 분석해 추천 그룹이 달라져요.\n그래도 변경하시겠어요?",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
                     onCancel: {
@@ -71,8 +101,25 @@ struct PlaceGroupingView: View {
                         store.send(.criteriaChangeConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
                 .zIndex(7)
+            }
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: PlaceGroupingBottomSafeAreaInsetKey.self,
+                    value: geometry.safeAreaInsets.bottom
+                )
+            }
+        }
+        .onPreferenceChange(PlaceGroupingBottomSafeAreaInsetKey.self) {
+            bottomSafeAreaInset = max($0, placeGroupingWindowBottomSafeAreaInset())
+        }
+        .onChange(of: isSheetDragging) { _, isDragging in
+            if !isDragging && sheetDragTranslation != 0 {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    sheetDragTranslation = 0
+                }
             }
         }
         .animation(
@@ -103,25 +150,13 @@ struct PlaceGroupingView: View {
             guard !Task.isCancelled else { return }
             store.send(.cancellationNoticeDismissed)
         }
-        .sheet(
-            isPresented: Binding(
-                get: { store.isTransportationSheetPresented },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.transportationSheetDismissed)
-                    }
-                }
-            )
-        ) {
-            TripSetUpTransportationView(
-                store: store.scope(
-                    state: \.transportationSheet,
-                    action: \.transportationSheet
-                )
-            )
-            .presentationDetents([.height(524)])
-            .presentationDragIndicator(.hidden)
+        .overlay {
+            if store.isTransportationSheetPresented {
+                transportationOverlay
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.22), value: store.isTransportationSheetPresented)
         .preferredColorScheme(.dark)
         .task {
             store.send(.onAppear)
@@ -131,41 +166,44 @@ struct PlaceGroupingView: View {
         }
     }
 
+    private var transportationOverlay: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.55)
+
+                TripSetUpTransportationView(
+                    store: store.scope(
+                        state: \.transportationSheet,
+                        action: \.transportationSheet
+                    )
+                )
+                .frame(width: geometry.size.width + 2)
+                .frame(height: TripSetUpTransportationView.sheetHeight, alignment: .top)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .ignoresSafeArea()
+    }
+
     private var tripHeader: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
+        DDNavigationHeader(
+            accessibilityLabel: "예정된 여행으로 돌아가기",
+            height: 51,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
 
                 Text(store.tripDates)
                     .ddTypography(.label14)
-                    .multilineTextAlignment(.center)
                     .foregroundStyle(Color(red: 214 / 255, green: 214 / 255, blue: 214 / 255))
-                    .frame(width: 200, height: 20, alignment: .top)
+                    .frame(height: 20, alignment: .topLeading)
             }
-
-            HStack {
-                Button {
-                    store.send(.backButtonTapped)
-                } label: {
-                    ZStack(alignment: .topLeading) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 25, weight: .regular))
-                            .padding(.top, 4)
-                    }
-                    .frame(width: 44, height: 44, alignment: .topLeading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("예정된 여행으로 돌아가기")
-
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(DDColor.textPrimary)
-            .padding(.horizontal, DDSpacing.large)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var travelCriteria: some View {
@@ -190,8 +228,10 @@ struct PlaceGroupingView: View {
         .padding(.horizontal, DDSpacing.large)
     }
 
-    private var bottomSheet: some View {
-        VStack(spacing: 0) {
+    private func bottomSheet(layout: PlaceGroupingSheetLayout) -> some View {
+        let height = layout.height(for: sheetDetent, dragTranslation: sheetDragTranslation)
+
+        return VStack(spacing: 0) {
             Capsule()
                 .fill(Color(red: 85 / 255, green: 85 / 255, blue: 85 / 255))
                 .frame(width: 142, height: 5)
@@ -200,38 +240,73 @@ struct PlaceGroupingView: View {
 
             tabSelector
                 .padding(.horizontal, DDSpacing.large)
-                .padding(.bottom, 14)
+                .padding(.bottom, store.selectedTab == .recommendedGroups ? DDSpacing.small : 14)
 
-            if store.selectedTab == .preferences {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(store.members) { member in
-                            memberCard(member)
-                        }
+            if store.selectedTab == .recommendedGroups {
+                recommendedGroupSelectionHeader
+                    .onGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.size.height
+                    } action: { height in
+                        confirmationGuideHeight = height
                     }
-                    .padding(.horizontal, DDSpacing.large)
-                    .padding(.bottom, 34)
-                }
-                .scrollIndicators(.hidden)
-            } else {
-                recommendedGroups
             }
+
+            Group {
+                if store.selectedTab == .preferences {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(store.members) { member in
+                                memberCard(member)
+                            }
+                        }
+                        .padding(.horizontal, DDSpacing.large)
+                        .padding(.bottom, 34)
+                    }
+                    .scrollIndicators(.hidden)
+                } else {
+                    recommendedGroups
+                }
+            }
+            .opacity(height > layout.collapsedHeight ? 1 : 0)
+            .allowsHitTesting(height > layout.collapsedHeight)
         }
-        .frame(height: 413, alignment: .top)
+        .frame(height: height, alignment: .top)
         .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay(alignment: .top) {
-            UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40)
-                .stroke(
-                    Color(red: 74 / 255, green: 74 / 255, blue: 74 / 255),
-                    lineWidth: 1
-                )
-                .frame(height: 535)
-        }
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge(
             color: Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)
         )
         .ignoresSafeArea(edges: .bottom)
+        .overlay(alignment: .top) {
+            Color.clear
+                .contentShape(.rect)
+                .frame(height: 35)
+                .gesture(sheetDragGesture(layout: layout))
+        }
+    }
+
+    private func sheetDragGesture(layout: PlaceGroupingSheetLayout) -> some Gesture {
+        DragGesture(minimumDistance: 5, coordinateSpace: .global)
+            .updating($isSheetDragging) { _, isDragging, transaction in
+                transaction.disablesAnimations = true
+                isDragging = true
+            }
+            .onChanged { value in
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    sheetDragTranslation = value.translation.height
+                }
+            }
+            .onEnded { value in
+                let projectedHeight = layout.height(for: sheetDetent)
+                    - value.predictedEndTranslation.height
+                withAnimation(.easeOut(duration: 0.22)) {
+                    sheetDetent = layout.nearestDetent(to: projectedHeight)
+                    sheetDragTranslation = 0
+                }
+            }
     }
 
     private var tabSelector: some View {
@@ -265,6 +340,55 @@ struct PlaceGroupingView: View {
                 .clipShape(.capsule)
         }
         .buttonStyle(.plain)
+    }
+
+    private var recommendedGroupSelectionHeader: some View {
+        HStack(spacing: DDSpacing.xLarge) {
+            Text("지역 그룹")
+                .ddTypography(.heading18)
+                .foregroundStyle(DDColor.textPrimary)
+
+            Text("\(store.confirmedRecommendedGroupCount)/\(store.recommendedGroups.count) 선택")
+                .ddTypography(.body16)
+                .foregroundStyle(DDColor.textSecondary)
+
+            Spacer(minLength: 0)
+
+            Button {
+                store.send(.selectAllRecommendedGroupsTapped)
+            } label: {
+                HStack(spacing: DDSpacing.small) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                store.haveAllRecommendedGroupsConfirmed
+                                    ? DDColor.actionPrimary
+                                    : DDColor.surfaceControl
+                            )
+
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(
+                                store.haveAllRecommendedGroupsConfirmed
+                                    ? DDColor.textOnPrimary
+                                    : DDColor.textSecondary
+                            )
+                    }
+                    .frame(width: 24, height: 24)
+
+                    Text("전체 선택")
+                        .ddTypography(.bodyEmphasis16)
+                        .foregroundStyle(DDColor.textPrimary)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(store.recommendedGroups.isEmpty)
+        }
+        .padding(.leading, DDSpacing.large)
+        .padding(.trailing, 28)
+        .frame(maxWidth: .infinity, minHeight: 52)
     }
 
     private func memberCard(_ member: PlaceGroupingFeature.Member) -> some View {
@@ -353,23 +477,62 @@ struct PlaceGroupingView: View {
                 .padding(.bottom, 12)
             }
             .scrollIndicators(.hidden)
+            .padding(.horizontal, DDBottomActionLayout.horizontalInset)
 
-            DDCTAButton(
-                title: "지역 그룹 확정하기",
-                isEnabled: store.haveAllRecommendedGroupsConfirmed
+            DDBottomActionArea(
+                topSpacing: DDSpacing.small,
+                bottomSafeAreaInset: bottomSafeAreaInset,
+                backgroundColor: .clear
             ) {
-                store.send(.confirmButtonTapped)
+                DDCTAButton(
+                    title: "지역 그룹 확정하기",
+                    isEnabled: store.hasConfirmedRecommendedGroup
+                ) {
+                    store.send(.confirmButtonTapped)
+                }
             }
-            .padding(.top, 8)
-            .padding(.bottom, 34)
         }
-        .padding(.horizontal, DDSpacing.large)
     }
 }
-#Preview {
+
+private struct PlaceGroupingBottomSafeAreaInsetKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+#Preview("기본 높이") {
+    PlaceGroupingView(store: placeGroupingPreviewStore(state: PlaceGroupingFeature.State()))
+        .id("default-sheet-preview")
+}
+
+#Preview("추천 그룹 많음 · 드래그") {
+    PlaceGroupingView(store: placeGroupingPreviewStore(state: PlaceGroupingPreviewData.manyGroupsState))
+        .id("draggable-sheet-preview")
+}
+
+#Preview("추천 그룹 많음 · 전체") {
     PlaceGroupingView(
-        store: Store(initialState: PlaceGroupingFeature.State()) {
-            PlaceGroupingFeature()
-        }
+        store: placeGroupingPreviewStore(state: PlaceGroupingPreviewData.manyGroupsState),
+        initialSheetDetent: .expanded
     )
+    .id("expanded-sheet-preview")
+}
+
+#Preview("접힌 높이 · 확정 안내") {
+    PlaceGroupingView(
+        store: placeGroupingPreviewStore(state: PlaceGroupingPreviewData.manyGroupsState),
+        initialSheetDetent: .collapsed
+    )
+    .id("collapsed-sheet-preview")
+}
+
+private func placeGroupingPreviewStore(state: PlaceGroupingFeature.State) -> StoreOf<PlaceGroupingFeature> {
+    withDependencies {
+        $0.placeClient = .testValue
+    } operation: {
+        Store(initialState: state) { PlaceGroupingFeature() }
+    }
 }

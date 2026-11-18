@@ -64,14 +64,9 @@ struct PlaceGroupingDetailView: View {
             }
 
             if store.isJoinConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(3)
-
-                DDConfirmationAlert(
-                    title: "합류하시겠어요?",
-                    message: "지금까지 담은 일정이 초기화돼요.\n그래도 합류하시겠어요?",
+                DDAlertOverlay(
+                    title: "합류할까요?",
+                    message: "합류하면 지금까지 담은 일정이 초기화돼요.\n그래도 합류하시겠어요?",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
                     onCancel: {
@@ -81,22 +76,17 @@ struct PlaceGroupingDetailView: View {
                         store.send(.joinConfirmationConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
+                .transition(.opacity)
                 .zIndex(4)
             }
 
             if store.isDeleteConfirmationPresented {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(5)
-
-                DDConfirmationAlert(
-                    title: "장소 삭제하기",
-                    message: "이 장소를 진짜 삭제할까요?",
+                DDAlertOverlay(
+                    title: "장소를 삭제할까요?",
+                    message: "삭제한 장소는 목록에서 사라져요.",
                     cancelTitle: "아니요",
                     confirmTitle: "네",
-                    cancelColor: DDColor.actionPrimary,
+                    confirmColor: DDColor.alertDestructive,
                     onCancel: {
                         store.send(.deleteConfirmationCancelTapped)
                     },
@@ -104,7 +94,7 @@ struct PlaceGroupingDetailView: View {
                         store.send(.deleteConfirmationConfirmTapped)
                     }
                 )
-                .frame(maxHeight: .infinity)
+                .transition(.opacity)
                 .zIndex(6)
             }
 
@@ -124,16 +114,14 @@ struct PlaceGroupingDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            DDCTAButton(
-                title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
-                isEnabled: !store.isGroupConfirmed
-            ) {
-                store.send(.confirmButtonTapped)
+            DDBottomActionArea(topSpacing: DDSpacing.xLarge) {
+                DDCTAButton(
+                    title: store.isGroupConfirmed ? "확정 취소" : "확정하기",
+                    isEnabled: !store.isGroupConfirmed
+                ) {
+                    store.send(.confirmButtonTapped)
+                }
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.xLarge)
-            .padding(.bottom, 11)
-            .background(DDColor.surfaceDefault)
         }
         .overlay(alignment: .top) {
             if let notice = store.cancellationNotice {
@@ -189,8 +177,8 @@ struct PlaceGroupingDetailView: View {
     }
 
     private var tripNavigation: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
+        DDNavigationHeader(height: 51, onBack: onBack) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(store.tripTitle)
                     .ddTypography(.label14)
                     .foregroundStyle(DDColor.textPrimary)
@@ -200,26 +188,9 @@ struct PlaceGroupingDetailView: View {
                     .foregroundStyle(DDColor.textSecondary)
             }
 
-            HStack {
-                Button {
-                    onBack()
-                } label: {
-                    ZStack(alignment: .topLeading) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 25, weight: .regular))
-                            .padding(.top, 4)
-                    }
-                    .frame(width: 44, height: 44, alignment: .topLeading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-            }
-            .foregroundStyle(DDColor.textPrimary)
-            .padding(.horizontal, DDSpacing.large)
+            Spacer(minLength: 0)
         }
-        .frame(height: 51, alignment: .top)
+        .padding(.trailing, DDSpacing.small)
     }
 
     private var groupHeading: some View {
@@ -757,7 +728,9 @@ private struct PlaceDraggableRow: View {
 
             Spacer(minLength: 0)
 
-            dragHandle
+            if isEditable {
+                dragHandle
+            }
         }
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58)
@@ -851,4 +824,24 @@ private struct PlaceDragPreview: View {
             PlaceGroupingDetailFeature()
         }
     )
+}
+
+#Preview("영문 닉네임 조사") {
+    VStack(alignment: .leading, spacing: DDSpacing.xLarge) {
+        ConfirmationCancellationBanner(
+            notice: .init(memberName: "Alex", character: .grae)
+        )
+
+        Text("\("Alex".withKoreanParticle(.topic)) 이 지역에 그룹핑된 장소가 없어요")
+            .ddTypography(.body16)
+            .foregroundStyle(DDColor.textSecondary)
+
+        ConfirmationCancellationBanner(
+            notice: .init(memberName: "민주", character: .tae)
+        )
+    }
+    .padding(DDSpacing.large)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .background(DDColor.surfaceDefault)
+    .preferredColorScheme(.dark)
 }

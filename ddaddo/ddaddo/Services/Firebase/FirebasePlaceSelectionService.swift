@@ -98,6 +98,39 @@ enum FirebasePlaceSelectionService {
         }
     }
 
+    static func startPlaceAnalysis(tripID: String) async throws {
+        try await Firestore.firestore()
+            .collection("trips")
+            .document(tripID)
+            .setData(
+                [
+                    "placeAnalysisStarted": true,
+                    "placeAnalysisStartedAt": FieldValue.serverTimestamp(),
+                    "updatedAt": FieldValue.serverTimestamp()
+                ],
+                merge: true
+            )
+    }
+
+    nonisolated static func observePlaceAnalysis(
+        tripID: String
+    ) -> AsyncThrowingStream<Bool, Error> {
+        AsyncThrowingStream { continuation in
+            let registration = Firestore.firestore()
+                .collection("trips")
+                .document(tripID)
+                .addSnapshotListener { snapshot, error in
+                    if let error {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                    guard let snapshot else { return }
+                    continuation.yield(snapshot.get("placeAnalysisStarted") as? Bool ?? false)
+                }
+            continuation.onTermination = { _ in registration.remove() }
+        }
+    }
+
     static func savePlace(_ place: PinnedPlace, tripID: String) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
         let document = try await participant.getDocument()
@@ -132,12 +165,14 @@ enum FirebasePlaceSelectionService {
         ], merge: true)
     }
 
-    static func confirmPlaces(tripID: String) async throws {
+    static func setPlaceSelectionConfirmation(tripID: String, isConfirmed: Bool) async throws {
         let participant = try await currentParticipantReference(tripID: tripID)
         try await participant.setData(
             [
-                "placeSelectionConfirmed": true,
-                "placeSelectionConfirmedAt": FieldValue.serverTimestamp(),
+                "placeSelectionConfirmed": isConfirmed,
+                "placeSelectionConfirmedAt": isConfirmed
+                    ? FieldValue.serverTimestamp()
+                    : FieldValue.delete(),
                 "updatedAt": FieldValue.serverTimestamp()
             ],
             merge: true

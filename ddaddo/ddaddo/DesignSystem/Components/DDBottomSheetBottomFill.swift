@@ -17,6 +17,21 @@ private struct DDBottomSheetBottomFillModifier: ViewModifier {
 }
 
 extension View {
+    /// Draws the same inset border on every sheet, without a horizontal line at its bottom.
+    func ddBottomSheetBorder(cornerRadius: CGFloat = 40) -> some View {
+        overlay {
+            GeometryReader { geometry in
+                UnevenRoundedRectangle(
+                    topLeadingRadius: cornerRadius,
+                    topTrailingRadius: cornerRadius
+                )
+                .strokeBorder(DDColor.borderSubtle, lineWidth: 1)
+                .frame(height: geometry.size.height + 120)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
     /// Keeps a custom bottom sheet visually attached to the physical bottom edge.
     /// The sheet's content height stays unchanged while only its background extends downward.
     func ddFillBottomSheetToScreenEdge(

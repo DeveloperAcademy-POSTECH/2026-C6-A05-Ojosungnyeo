@@ -20,7 +20,8 @@ private func activeWindowBottomSafeAreaInset() -> CGFloat {
 
 struct PlaceSelectionView: View {
     let store: StoreOf<PlaceSelectionFeature>
-    @GestureState private var sheetDragTranslation: CGFloat = 0
+    @GestureState private var isSheetDragging = false
+    @State private var sheetDragTranslation: CGFloat = 0
     @State private var bottomSafeAreaInset = activeWindowBottomSafeAreaInset()
 
     var body: some View {
@@ -59,23 +60,19 @@ struct PlaceSelectionView: View {
 
             }
 
-            // Keep the custom sheet attached to the physical screen bottom even
-            // when this view is hosted inside a container with a different safe area.
-            DDColor.surfaceDefault
-                .frame(maxWidth: .infinity)
-                .frame(height: bottomSheetBackgroundHeight)
-                .ignoresSafeArea(edges: .bottom)
-                .allowsHitTesting(false)
-
             if store.isShowingConfirmedPlaces
                 && !store.isMemberPlacesSheetPresented
                 && store.selectedPlace == nil {
                 ConfirmedPlacesBottomSheet(
                     participants: store.participants,
                     places: store.confirmedPlaces,
+                    canCancelConfirmation: store.canCancelPlaceConfirmation,
                     bottomSafeAreaInset: bottomSafeAreaInset,
                     memberTapped: { member in
                         store.send(.memberProfileTapped(member))
+                    },
+                    confirmationButtonTapped: {
+                        store.send(.confirmButtonTapped)
                     }
                 )
                 .frame(height: 379 + bottomSafeAreaInset, alignment: .top)
@@ -99,12 +96,12 @@ struct PlaceSelectionView: View {
                 .ignoresSafeArea(edges: .bottom)
             } else if store.isMemberPlacesSheetPresented {
                 MemberPlacesBottomSheet(
-                    isExpanded: store.isBottomSheetExpanded,
                     selectedMember: store.selectedMember,
                     participants: store.participants,
                     places: store.displayedPlaces,
                     canDeletePlaces: store.canEditDisplayedPlaces,
                     canConfirm: store.canConfirmPlaceSelection,
+                    canCancelConfirmation: store.canCancelPlaceConfirmation,
                     showsConfirmationButton: store.isViewingCurrentUser,
                     isConfirmationComplete: store.isCurrentUserConfirmed,
                     bottomContentInset: store.hasSelectionEnded ? 124 : DDSpacing.xLarge
@@ -151,6 +148,7 @@ struct PlaceSelectionView: View {
 
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background {
             GeometryReader { geometry in
                 Color.clear.preference(
@@ -164,6 +162,13 @@ struct PlaceSelectionView: View {
         }
         .animation(.easeOut(duration: 0.22), value: store.isBottomSheetExpanded)
         .animation(.easeOut(duration: 0.22), value: store.isShowingConfirmedPlaces)
+        .onChange(of: isSheetDragging) { _, isDragging in
+            if !isDragging && sheetDragTranslation != 0 {
+                withAnimation(.easeOut(duration: 0.22)) {
+                    sheetDragTranslation = 0
+                }
+            }
+        }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
@@ -195,58 +200,67 @@ struct PlaceSelectionView: View {
             )
         }
         .allowsHitTesting(
-            store.completionAlert == nil && store.pendingDeletionPlaceID == nil
+            store.completionAlert == nil
+                && store.pendingDeletionPlaceID == nil
+                && store.placeSyncErrorMessage == nil
+                && store.destinationValidationMessage == nil
         )
         .overlay {
             if store.pendingDeletionPlaceID != nil {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "장소 삭제하기",
-                        message: "이 장소를 진짜 삭제할까요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        cancelColor: DDColor.actionPrimary,
+                DDAlertOverlay(
+                    title: "장소를 삭제할까요?",
+                    message: "삭제한 장소는 목록에서 사라져요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: {
+                        store.send(.deleteConfirmationCancelTapped)
+                    },
+                    onConfirm: {
+                        store.send(.deleteConfirmationConfirmTapped)
+                    }
+                )
+            } else if let alert = store.completionAlert {
+                DDAlertOverlay(
+                    title: alert.title,
+                    message: store.completionAlertMessage,
+                    confirmTitle: "확인",
+                    onConfirm: {
+                        store.send(.completionAlertConfirmButtonTapped)
+                    }
+                )
+            } else if let message = store.placeSyncErrorMessage {
+                DDAlertOverlay(
+                    title: "장소를 서버에 저장하지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.placeSyncErrorDismissed) }
+                )
+            } else if let message = store.destinationValidationMessage {
+                if store.canOverrideDestinationValidation {
+                    DDAlertOverlay(
+                        title: "여행지와 다른 장소예요",
+                        message: message,
+                        cancelTitle: "취소",
+                        confirmTitle: "그래도 추가",
                         onCancel: {
-                            store.send(.deleteConfirmationCancelTapped)
+                            store.send(.destinationValidationCancelButtonTapped)
                         },
                         onConfirm: {
-                            store.send(.deleteConfirmationConfirmTapped)
+                            store.send(.destinationValidationConfirmButtonTapped)
                         }
                     )
-                }
-            } else if let alert = store.completionAlert {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: alert.title,
-                        message: store.completionAlertMessage,
+                } else {
+                    DDAlertOverlay(
+                        title: "장소를 확인할 수 없어요",
+                        message: message,
                         confirmTitle: "확인",
                         onConfirm: {
-                            store.send(.completionAlertConfirmButtonTapped)
+                            store.send(.destinationValidationConfirmButtonTapped)
                         }
                     )
                 }
             }
-        }
-        .alert(
-            "장소를 서버에 저장하지 못했어요",
-            isPresented: Binding(
-                get: { store.placeSyncErrorMessage != nil },
-                set: { if !$0 { store.send(.placeSyncErrorDismissed) } }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.placeSyncErrorDismissed)
-            }
-        } message: {
-            Text(store.placeSyncErrorMessage ?? "")
         }
     }
 
@@ -255,18 +269,12 @@ struct PlaceSelectionView: View {
     }
 
     private var placeSelectionNavigationBar: some View {
-        HStack(spacing: 13) {
-            Button {
-                store.send(.backButtonTapped)
-            } label: {
-                PlaceSelectionBackIcon()
-                    .frame(width: 24, height: 24)
-                    .frame(width: 24, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("친구 초대 화면으로 돌아가기")
-
+        DDNavigationHeader(
+            accessibilityLabel: "친구 초대 화면으로 돌아가기",
+            alignment: .top,
+            height: 62,
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.navigationTitle)
                     .ddTypography(.heading18)
@@ -297,9 +305,8 @@ struct PlaceSelectionView: View {
                 maximumCount: store.maximumPlaceCount
             )
         }
-        .padding(.horizontal, DDSpacing.large)
+        .padding(.trailing, DDSpacing.small)
         .frame(maxWidth: .infinity)
-        .frame(height: 62)
     }
 
     private var searchField: some View {
@@ -341,18 +348,30 @@ struct PlaceSelectionView: View {
                     Capsule().stroke(DDColor.borderDefault, lineWidth: 1)
                 }
             } else {
-                DDSearchField(
-                    placeholder: "꼭 가고 싶은 장소 \(store.maximumPlaceCount)개를 추가하세요.",
-                    text: Binding(
-                        get: { store.searchText },
-                        set: { store.send(.searchTextChanged($0)) }
-                    )
-                )
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        store.send(.searchFieldTapped)
+                Button {
+                    store.send(.searchFieldTapped)
+                } label: {
+                    HStack(spacing: DDSpacing.small) {
+                        Image(systemName: "magnifyingglass")
+
+                        Text("꼭 가고 싶은 장소 \(store.maximumPlaceCount)개를 추가하세요.")
+                            .ddTypography(.body16)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 0)
                     }
-                )
+                    .foregroundStyle(DDColor.textSecondary)
+                    .padding(.horizontal, DDSpacing.large)
+                    .frame(height: 41)
+                    .background(DDColor.surfaceElevated)
+                    .clipShape(.capsule)
+                    .overlay {
+                        Capsule().stroke(DDColor.borderSubtle, lineWidth: 1)
+                    }
+                    .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("장소 검색")
             }
         }
         .padding(.horizontal, DDSpacing.large)
@@ -379,28 +398,24 @@ struct PlaceSelectionView: View {
         )
     }
 
-    private var bottomSheetBackgroundHeight: CGFloat {
-        if store.isShowingConfirmedPlaces
-            && !store.isMemberPlacesSheetPresented
-            && store.selectedPlace == nil {
-            return 379 + bottomSafeAreaInset
-        }
-        if store.selectedPlace != nil {
-            return 355 + bottomSafeAreaInset
-        }
-        if store.isMemberPlacesSheetPresented {
-            return currentMemberSheetHeight
-        }
-        return currentSheetHeight
-    }
-
     private var sheetDragGesture: some Gesture {
-        DragGesture(minimumDistance: 5)
-            .updating($sheetDragTranslation) { value, state, _ in
-                state = value.translation.height
+        DragGesture(minimumDistance: 5, coordinateSpace: .global)
+            .updating($isSheetDragging) { _, isDragging, transaction in
+                transaction.disablesAnimations = true
+                isDragging = true
+            }
+            .onChanged { value in
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    sheetDragTranslation = value.translation.height
+                }
             }
             .onEnded { value in
-                store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
+                withAnimation(.easeOut(duration: 0.22)) {
+                    store.send(.bottomSheetDragEnded(value.predictedEndTranslation.height))
+                    sheetDragTranslation = 0
+                }
             }
     }
 }
@@ -445,26 +460,38 @@ private struct PlaceCountProgressView: View {
     }
 }
 
-private struct PlaceSelectionBackIcon: View {
-    var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 17, y: 3))
-            path.addLine(to: CGPoint(x: 7, y: 12))
-            path.addLine(to: CGPoint(x: 17, y: 21))
-        }
-        .stroke(
-            DDColor.textPrimary,
-            style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round)
-        )
-        .frame(width: 24, height: 24)
-        .allowsHitTesting(false)
-    }
+#Preview("장소 없음") {
+    PlaceSelectionView(store: placeSelectionPreviewStore(state: PlaceSelectionFeature.State()))
 }
 
-#Preview {
-    PlaceSelectionView(
-        store: Store(initialState: PlaceSelectionFeature.State()) {
-            PlaceSelectionFeature()
-        }
+#Preview("장소 확정·취소") {
+    var state = PlaceSelectionFeature.State(
+        memberPlaces: PlaceSelectionFeature.State.mockMemberPlaces
     )
+    state.isMemberPlacesSheetPresented = true
+    state.hasRestoredSavedPlacesPresentation = true
+    return PlaceSelectionView(store: placeSelectionPreviewStore(state: state))
+}
+
+#Preview("확정 완료 · 드래그 숨김") {
+    var state = PlaceSelectionFeature.State(
+        memberPlaces: PlaceSelectionFeature.State.mockMemberPlaces
+    )
+    state.participants[0].isConfirmed = true
+    state.isMemberPlacesSheetPresented = true
+    state.hasRestoredSavedPlacesPresentation = true
+    return PlaceSelectionView(store: placeSelectionPreviewStore(state: state))
+}
+
+private func placeSelectionPreviewStore(
+    state: PlaceSelectionFeature.State
+) -> StoreOf<PlaceSelectionFeature> {
+    var client = PlaceClient.testValue
+    // Keep local preview edits without accessing a real trip or Google Places.
+    client.fetchMemberPlaces = { _ in throw CancellationError() }
+    return withDependencies {
+        $0.placeClient = client
+    } operation: {
+        Store(initialState: state) { PlaceSelectionFeature() }
+    }
 }

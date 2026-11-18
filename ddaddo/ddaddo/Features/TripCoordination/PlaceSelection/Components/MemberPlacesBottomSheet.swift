@@ -17,12 +17,12 @@ private struct MemberPlaceDropFramesKey: PreferenceKey {
 }
 
 struct MemberPlacesBottomSheet: View {
-    let isExpanded: Bool
     let selectedMember: TripMember
     let participants: [PlaceSelectionFeature.Participant]
     let places: [PinnedPlace]
     let canDeletePlaces: Bool
     let canConfirm: Bool
+    var canCancelConfirmation = false
     let showsConfirmationButton: Bool
     let isConfirmationComplete: Bool
     var bottomContentInset: CGFloat = DDSpacing.xLarge
@@ -54,6 +54,10 @@ struct MemberPlacesBottomSheet: View {
         in: .common
     ).autoconnect()
 
+    private var canDragPlaces: Bool {
+        canDeletePlaces && !isConfirmationComplete
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
@@ -66,16 +70,12 @@ struct MemberPlacesBottomSheet: View {
                 memberSelector
                     .padding(.top, DDSpacing.xLarge)
 
-                if isExpanded {
-                    if places.isEmpty {
-                        emptyState
+                if places.isEmpty {
+                    emptyState
 
-                        Spacer(minLength: bottomContentInset)
-                    } else {
-                        placeList
-                    }
+                    Spacer(minLength: bottomContentInset)
                 } else {
-                    Spacer(minLength: 0)
+                    placeList
                 }
             }
             .padding(.horizontal, DDSpacing.large)
@@ -121,17 +121,16 @@ struct MemberPlacesBottomSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DDColor.surfaceDefault)
         .clipShape(.rect(topLeadingRadius: 40, topTrailingRadius: 40))
-        .overlay {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 40,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 40
-            )
-            .stroke(DDColor.borderDefault, lineWidth: 1)
-            .allowsHitTesting(false)
-        }
+        .ddBottomSheetBorder()
         .ddFillBottomSheetToScreenEdge()
+        .onChange(of: canDragPlaces) { _, canDrag in
+            if !canDrag {
+                finishDrag()
+            }
+        }
+        .onDisappear {
+            finishDrag()
+        }
     }
 
     private var memberSelector: some View {
@@ -168,7 +167,8 @@ struct MemberPlacesBottomSheet: View {
                 .frame(height: 28)
                 .background(canConfirm ? DDColor.actionPrimary : DDColor.surfaceControl)
                 .clipShape(.capsule)
-                .disabled(isConfirmationComplete || !canConfirm)
+                .disabled(!canConfirm && !canCancelConfirmation)
+                .accessibilityHint(isConfirmationComplete ? "장소 확정을 취소하고 다시 수정해요" : "선택한 장소를 확정해요")
             }
         }
     }
@@ -194,16 +194,19 @@ struct MemberPlacesBottomSheet: View {
                     ForEach(places) { place in
                         PlacePinCard(
                             place: place,
-                            showsDragHandle: canDeletePlaces,
+                            showsDragHandle: canDragPlaces,
                             onDragChanged: { location in
-                                guard canDeletePlaces else { return }
+                                guard canDragPlaces else { return }
                                 draggingPlaceID = place.id
                                 dragLocation = verticalDragLocation(from: location)
                                 updateAutoScrollDirection(at: location)
                                 updateDropTarget(at: location)
                             },
                             onDragEnded: { location in
-                                guard canDeletePlaces else { return }
+                                guard canDragPlaces else {
+                                    finishDrag()
+                                    return
+                                }
                                 dragLocation = verticalDragLocation(from: location)
                                 updateAutoScrollDirection(at: location)
                                 updateDropTarget(at: location)
@@ -327,7 +330,8 @@ struct MemberPlacesBottomSheet: View {
 
     private func commitDrop() {
         defer { finishDrag() }
-        guard let draggingPlaceID,
+        guard canDragPlaces,
+              let draggingPlaceID,
               let draggedPlace = places.first(where: { $0.id == draggingPlaceID })
         else { return }
 

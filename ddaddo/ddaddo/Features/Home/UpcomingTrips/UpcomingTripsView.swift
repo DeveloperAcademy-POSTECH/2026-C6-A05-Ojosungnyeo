@@ -24,8 +24,14 @@ struct UpcomingTripsView: View {
                     .padding(.bottom, 8)
 
                 if store.trips.isEmpty && !store.isLoadingTrips {
-                    emptyState
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    GeometryReader { proxy in
+                        emptyState
+                            .frame(
+                                width: proxy.size.width,
+                                height: proxy.size.height,
+                                alignment: .center
+                            )
+                    }
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 15) {
@@ -50,7 +56,7 @@ struct UpcomingTripsView: View {
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 header
-                    .padding(.horizontal, DDSpacing.small)
+                    .padding(.trailing, DDSpacing.small)
                     .padding(.bottom, DDSpacing.small)
                     .background(DDColor.surfaceDefault)
             }
@@ -99,6 +105,7 @@ struct UpcomingTripsView: View {
                         }
                     )
                 }
+                .ignoresSafeArea()
                 .transition(.opacity)
             }
 
@@ -115,56 +122,61 @@ struct UpcomingTripsView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: store.isInviteCodeModalPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isWaitingForParticipantsPresented)
-        .allowsHitTesting(store.pendingDeletionTripID == nil)
+        .allowsHitTesting(
+            store.pendingDeletionTripID == nil
+                && store.joinErrorMessage == nil
+                && store.deletionErrorMessage == nil
+        )
         .overlay {
             if store.pendingDeletionTripID != nil {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "내 여행 목록에서 삭제하기",
-                        message: "예정된 여행을 진짜 삭제할까요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        onCancel: { store.send(.deleteCancelButtonTapped) },
-                        onConfirm: { store.send(.deleteConfirmButtonTapped) }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "여행을 삭제할까요?",
+                    message: "삭제한 여행은 예정된 여행 목록에서 사라져요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: { store.send(.deleteCancelButtonTapped) },
+                    onConfirm: { store.send(.deleteConfirmButtonTapped) }
+                )
+            } else if let message = store.joinErrorMessage {
+                DDAlertOverlay(
+                    title: joinAlertTitle(for: message),
+                    message: joinAlertMessage(for: message),
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.joinErrorDismissed) }
+                )
+            } else if let message = store.deletionErrorMessage {
+                DDAlertOverlay(
+                    title: "여행을 삭제하지 못했어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.deletionErrorDismissed) }
+                )
+            } else if let message = store.resetDevelopmentDataMessage {
+                DDAlertOverlay(
+                    title: "Dev 목데이터",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.resetDevelopmentDataMessageDismissed) }
+                )
             }
         }
         .preferredColorScheme(.dark)
-        .alert(
-            "여행에 참여할 수 없어요",
-            isPresented: Binding(
-                get: { store.joinErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.joinErrorDismissed)
-                    }
-                }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.joinErrorDismissed)
-            }
-        } message: {
-            Text(store.joinErrorMessage ?? "")
+    }
+
+    private func joinAlertTitle(for message: String) -> String {
+        isCapacityError(message) ? "초대 인원이 모두 찼어요" : "여행에 참여할 수 없어요"
+    }
+
+    private func joinAlertMessage(for message: String) -> String {
+        if isCapacityError(message) {
+            return "이 여행은 정원이 가득 차 참여할 수 없어요.\n초대한 친구에게 확인해 주세요."
         }
-        .alert(
-            "여행을 삭제하지 못했어요",
-            isPresented: Binding(
-                get: { store.deletionErrorMessage != nil },
-                set: { if !$0 { store.send(.deletionErrorDismissed) } }
-            )
-        ) {
-            Button("확인", role: .cancel) {
-                store.send(.deletionErrorDismissed)
-            }
-        } message: {
-            Text(store.deletionErrorMessage ?? "")
-        }
+        return message
+    }
+
+    private func isCapacityError(_ message: String) -> Bool {
+        message == TripServiceError.tripIsFull.errorDescription
     }
 
     private var emptyState: some View {
@@ -182,18 +194,35 @@ struct UpcomingTripsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 0) {
-            headerButton(
-                systemName: "chevron.left",
-                accessibilityLabel: "홈으로 돌아가기",
-                action: { store.send(.backButtonTapped) }
-            )
-
+        DDNavigationHeader(
+            accessibilityLabel: "홈으로 돌아가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text("예정된 여행")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
 
-            Spacer(minLength: DDSpacing.small)
+            Spacer(minLength: 0)
+
+            #if DEBUG
+            Button {
+                store.send(.resetDevelopmentDataButtonTapped)
+            } label: {
+                if store.isResettingDevelopmentData {
+                    ProgressView()
+                        .tint(DDColor.actionPrimary)
+                        .frame(width: 44, height: 44)
+                } else {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(DDColor.actionPrimary)
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(store.isResettingDevelopmentData)
+            .accessibilityLabel("Dev 목데이터 초기화")
+            #endif
 
             headerButton(
                 systemName: "plus",
@@ -201,7 +230,6 @@ struct UpcomingTripsView: View {
                 action: { store.send(.addTripButtonTapped) }
             )
         }
-        .frame(height: 52)
     }
 
     private func headerButton(
@@ -291,9 +319,11 @@ private struct SwipeableUpcomingTripCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(trip.destination) 여행 삭제")
 
-                UpcomingTripTicketCard(trip: trip, action: action)
-                    .frame(width: proxy.size.width)
+                UpcomingTripTicketCard(trip: trip)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .contentShape(.rect(cornerRadius: 20))
                     .offset(x: cardOffset)
+                    .onTapGesture(perform: action)
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 20)
                             .onChanged { value in
@@ -308,10 +338,12 @@ private struct SwipeableUpcomingTripCard: View {
                                 }
                             }
                     )
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("\(trip.destination) 여행, \(trip.progressTitle)")
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .aspectRatio(377.6288757324219 / 146, contentMode: .fit)
+        .frame(height: 146)
     }
 }
 
@@ -328,9 +360,8 @@ private struct UpcomingTripsBroadcastBanner: View {
                     let bannerScale = proxy.size.width / 370
 
                     Text(message)
-                        .ddTypography(.captionEmphasis12)
-                        .tracking(0.6)
-                        .lineSpacing(2)
+                        .ddTypography(.labelEmphasis14)
+                        .lineSpacing(3)
                         .foregroundStyle(DDColor.textOnPrimary)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
@@ -339,10 +370,9 @@ private struct UpcomingTripsBroadcastBanner: View {
                             height: 40 * bannerScale,
                             alignment: .leading
                         )
-                        .background(Color.white)
                         .position(
-                            x: proxy.size.width * 0.744,
-                            y: proxy.size.height * 0.32
+                            x: proxy.size.width * 0.743,
+                            y: proxy.size.height * 0.315
                         )
                 }
             }
@@ -353,109 +383,100 @@ private struct UpcomingTripsBroadcastBanner: View {
 
 private struct UpcomingTripTicketCard: View {
     let trip: UpcomingTripsFeature.Trip
-    let action: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
-            let trailingWidth = proxy.size.width * 0.378
+            let trailingWidth = proxy.size.width * (140 / 370)
             let leadingWidth = proxy.size.width - trailingWidth
 
-            ZStack {
-                ticketBackground(
-                    width: proxy.size.width,
-                    trailingWidth: trailingWidth
-                )
+            ZStack(alignment: .leading) {
+                HStack(spacing: 0) {
+                    Color(red: 94 / 255, green: 94 / 255, blue: 94 / 255)
+                        .frame(width: leadingWidth)
 
-                Image("DDHomeTripCardMascot")
+                    DDColor.surfaceSelected
+                        .frame(width: trailingWidth)
+                }
+
+                Image("DDUpcomingTripCardMascot")
                     .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .mask {
-                        ZStack {
-                            Color.white
-
-                            Rectangle()
-                                .frame(width: 54, height: 48)
-                                .position(x: leadingWidth - 25, y: 48)
-                                .blendMode(.destinationOut)
-                        }
-                        .compositingGroup()
-                    }
+                    .frame(width: 134, height: 188)
+                    .opacity(0.5)
+                    .offset(x: 44, y: 21)
                     .allowsHitTesting(false)
 
-                Image(systemName: "airplane")
+                Image(systemName: "airplane.up.forward")
                     .font(.system(size: 29, weight: .semibold))
                     .foregroundStyle(DDColor.surfaceControl)
-                    .rotationEffect(.degrees(-20))
-                    .position(x: leadingWidth - 25, y: 48)
+                    .rotationEffect(.degrees(22.6))
+                    .position(x: leadingWidth - 44, y: 48)
                     .accessibilityHidden(true)
 
-                VStack(spacing: 0) {
-                    HStack(alignment: .top, spacing: DDSpacing.small) {
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(trip.dateText)
                             .ddTypography(.label14)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         Spacer(minLength: 0)
 
-                        Text(trip.progressTitle)
-                            .ddTypography(.labelEmphasis14)
-                            .foregroundStyle(DDColor.surfaceControl)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    HStack(alignment: .bottom, spacing: DDSpacing.small) {
                         VStack(alignment: .leading, spacing: 0) {
                             Text(trip.destination)
-                                .ddTypography(.title28)
+                                .font(.custom("Pretendard-Bold", size: 28, relativeTo: .title))
                                 .foregroundStyle(DDColor.surfaceSelected)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.75)
+                                .minimumScaleFactor(0.65)
 
                             Text(trip.country)
                                 .ddTypography(.body16)
                                 .foregroundStyle(DDColor.textSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
+                    }
+                    .frame(width: leadingWidth - 16, height: 117, alignment: .leading)
+                    .padding(.leading, DDSpacing.large)
+
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(trip.progressTitle)
+                            .ddTypography(.labelEmphasis14)
+                            .foregroundStyle(DDColor.surfaceControl)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         Spacer(minLength: 0)
 
-                        Button("바로가기", action: action)
-                            .ddTypography(.bodyEmphasis16)
-                            .foregroundStyle(DDColor.textPrimary)
-                            .padding(.horizontal, DDSpacing.large)
-                            .frame(height: 40)
-                            .background(DDColor.surfaceControl)
-                            .clipShape(Capsule())
+                        Image(systemName: "chevron.down.dotted.2")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(DDColor.textOnPrimary)
+                            .rotationEffect(.degrees(-90))
+                            .accessibilityHidden(true)
                     }
+                    .frame(width: trailingWidth - 16, height: 117, alignment: .trailing)
+                    .padding(.trailing, DDSpacing.large)
                 }
-                .padding(.horizontal, DDSpacing.large)
-                .padding(.vertical, DDSpacing.medium)
+                .padding(.top, 13)
+                .padding(.bottom, DDSpacing.large)
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipShape(.rect(cornerRadius: 20))
         }
-        .aspectRatio(377.6288757324219 / 146, contentMode: .fit)
-    }
-
-    private func ticketBackground(
-        width: CGFloat,
-        trailingWidth: CGFloat
-    ) -> some View {
-        HStack(spacing: 0) {
-            Color(red: 96 / 255, green: 96 / 255, blue: 96 / 255)
-                .frame(width: width - trailingWidth)
-
-            DDColor.surfaceSelected
-                .frame(width: trailingWidth)
-        }
-        .clipShape(.rect(cornerRadius: 20))
     }
 }
 
-#Preview {
+#Preview("여행 목록") {
     UpcomingTripsView(
         store: Store(initialState: UpcomingTripsPreviewData.state) {
+            UpcomingTripsFeature()
+        }
+    )
+}
+
+#Preview("예정된 여행 없음") {
+    UpcomingTripsView(
+        store: Store(initialState: UpcomingTripsFeature.State()) {
             UpcomingTripsFeature()
         }
     )

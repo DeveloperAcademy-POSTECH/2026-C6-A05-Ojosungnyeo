@@ -28,7 +28,6 @@ struct HomeView: View {
                     bottomGradient
                     speechBubble
                     menuButton
-                    exploreTripsButton
 
                     if store.isMenuPresented {
                         menuDismissArea
@@ -47,6 +46,14 @@ struct HomeView: View {
             .ignoresSafeArea()
             .allowsHitTesting(!store.isUpcomingTripsPresented)
             .gesture(homeSwipeGesture)
+
+            VStack {
+                Spacer(minLength: 0)
+                DDBottomActionArea(backgroundColor: .clear) {
+                    exploreTripsButton
+                }
+            }
+            .allowsHitTesting(!store.isUpcomingTripsPresented)
 
             if store.isUpcomingTripsPresented {
                 UpcomingTripsView(
@@ -78,11 +85,12 @@ struct HomeView: View {
                 .transition(.move(edge: .trailing))
             }
 
-            if store.isPlaceAnalysisLoading {
+            if store.isPlaceAnalysisLoading || store.placeGrouping.isRouteGroupingLoading {
                 LoadingView(message: "여행 취향과 장소를 분석 중...")
                     .transition(.opacity)
                     .zIndex(5)
-                    .task {
+                    .task(id: store.isPlaceAnalysisLoading) {
+                        guard store.isPlaceAnalysisLoading else { return }
                         try? await Task.sleep(for: .seconds(1.5))
                         guard !Task.isCancelled else { return }
                         store.send(.placeAnalysisFinished)
@@ -114,11 +122,20 @@ struct HomeView: View {
                 SettingsView(store: store.scope(state: \.settings, action: \.settings))
                     .transition(.move(edge: .trailing))
             }
+
+            if store.isSavingRecommendations {
+                LoadingView(message: "추천 그룹을 저장 중...")
+                    .zIndex(6)
+            }
         }
         .animation(.easeInOut(duration: 0.3), value: store.isUpcomingTripsPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripItineraryPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isPlaceSelectionPresented)
         .animation(.easeInOut(duration: 0.25), value: store.isPlaceAnalysisLoading)
+        .animation(
+            .easeInOut(duration: 0.25),
+            value: store.placeGrouping.isRouteGroupingLoading
+        )
         .animation(.easeInOut(duration: 0.3), value: store.isPlaceGroupingPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isTripSearchPresented)
         .animation(.easeInOut(duration: 0.3), value: store.isSettingsPresented)
@@ -126,43 +143,34 @@ struct HomeView: View {
             store.send(.onAppear)
         }
         .preferredColorScheme(.dark)
-        .confirmationDialog(
-            "정말 탈퇴할까요?",
-            isPresented: Binding(
-                get: { store.isWithdrawalConfirmationPresented },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.withdrawalConfirmationDismissed)
-                    }
-                }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("탈퇴하기", role: .destructive) {
-                store.send(.withdrawalConfirmed)
+        .overlay {
+            if store.isWithdrawalConfirmationPresented {
+                DDAlertOverlay(
+                    title: "회원 탈퇴할까요?",
+                    message: "탈퇴하면 계정을 다시 복구하거나\n로그인할 수 없어요.",
+                    cancelTitle: "취소",
+                    confirmTitle: "탈퇴하기",
+                    confirmColor: DDColor.alertDestructive,
+                    onCancel: { store.send(.withdrawalConfirmationDismissed) },
+                    onConfirm: { store.send(.withdrawalConfirmed) }
+                )
+            } else if let message = store.withdrawalErrorMessage {
+                DDAlertOverlay(
+                    title: "탈퇴할 수 없어요",
+                    message: message,
+                    confirmTitle: "확인",
+                    onConfirm: { store.send(.withdrawalErrorDismissed) }
+                )
+            } else if let message = store.recommendationSaveErrorMessage {
+                DDAlertOverlay(
+                    title: "추천 그룹을 저장할 수 없어요",
+                    message: message,
+                    cancelTitle: "나중에",
+                    confirmTitle: "다시 시도",
+                    onCancel: { store.send(.recommendationsSaveErrorDismissed) },
+                    onConfirm: { store.send(.retryRecommendationsSaveTapped) }
+                )
             }
-            Button("취소", role: .cancel) {
-                store.send(.withdrawalConfirmationDismissed)
-            }
-        } message: {
-            Text("계정을 삭제하면 다시 되돌릴 수 없어요.")
-        }
-        .alert(
-            "탈퇴할 수 없어요",
-            isPresented: Binding(
-                get: { store.withdrawalErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        store.send(.withdrawalErrorDismissed)
-                    }
-                }
-            )
-        ) {
-            Button("확인") {
-                store.send(.withdrawalErrorDismissed)
-            }
-        } message: {
-            Text(store.withdrawalErrorMessage ?? "")
         }
     }
 
@@ -208,52 +216,50 @@ struct HomeView: View {
 
     private var speechBubble: some View {
         mascotMessageText
-            //.ddTypography(.bodyEmphasis16)
-            .ddTypography(.labelEmphasis14)
-            .lineSpacing(4)
-            .frame(width: 250, height: 48, alignment: .leading)
-            .frame(width: 324, height: 92)
+            .ddTypography(.bodyEmphasis16)
+            .frame(height: 72)
+            .frame(width: 324, height: 104.321)
             .background(.white)
-            .clipShape(.rect(cornerRadius: 46))
+            .clipShape(.rect(cornerRadius: 60))
             .overlay(alignment: .bottomTrailing) {
                 Image("DDSpeechBubbleTail")
                     .resizable()
-                    .frame(width: 27.0645, height: 24.5)
+                    .frame(width: 38, height: 43.09)
                     .rotationEffect(.degrees(180))
-                    .offset(x: -54, y: 17)
+                    .offset(x: -49, y: 22.6)
             }
-            .position(x: 203, y: 242)
+            .position(x: 203, y: 233.16)
     }
 
-    private var mascotMessageText: Text {
-        let originalNickname = store.nickname.isEmpty ? "지구인" : store.nickname
-        let nickname = originalNickname.count > 3
-            ? "\(originalNickname.prefix(3))…"
-            : originalNickname
+    private var mascotMessageText: some View {
+        let nickname = store.nickname.isEmpty ? "지구인" : store.nickname
         let bodyColor = Color(red: 0.38, green: 0.38, blue: 0.38)
         let nicknameColor = DDColor.textOnPrimary
 
-        switch store.mascotMessage {
-        case .welcome:
-            return Text("어서오세따. 저는 따또입니따.\n")
-                .foregroundColor(bodyColor)
-                + Text(nickname)
-                .foregroundColor(nicknameColor)
-                + Text("의 즐거운 지구 여행을 책임집니따.")
-                .foregroundColor(bodyColor)
-        case .destination:
-            return Text(nickname)
-                .foregroundColor(nicknameColor)
-                + Text(", 어디로 여행을 가볼까따?\n말만 해주세따. 제가 다 도와드리게따.")
-                .foregroundColor(bodyColor)
-        case .friends:
-            return Text("친구와 함께 가는 여행이라니 즐겁게따.\n")
-                .foregroundColor(bodyColor)
-                + Text(nickname)
-                .foregroundColor(nicknameColor)
-                + Text(", 내가 성심성의껏 도와주게따.")
-                .foregroundColor(bodyColor)
+        return VStack(alignment: .center, spacing: 0) {
+            switch store.mascotMessage {
+            case .welcome:
+                messageLine("\(nickname),", color: nicknameColor)
+                messageLine("어서오세따. 저는 따또입니따.", color: bodyColor)
+                messageLine("즐거운 지구 여행을 책임집니따.", color: bodyColor)
+            case .destination:
+                messageLine("\(nickname),", color: nicknameColor)
+                messageLine("어디로 여행을 가볼까따?", color: bodyColor)
+                messageLine("말만 해주세따. 제가 다 도와드리게따.", color: bodyColor)
+            case .friends:
+                messageLine("\(nickname),", color: nicknameColor)
+                messageLine("친구와 함께 가는 여행이라니 즐겁게따.", color: bodyColor)
+                messageLine("내가 성심성의껏 도와주게따.", color: bodyColor)
+            }
         }
+        .fixedSize(horizontal: true, vertical: true)
+    }
+
+    private func messageLine(_ text: String, color: Color) -> some View {
+        Text(text)
+            .foregroundColor(color)
+            .lineLimit(1)
+            .frame(height: 24)
     }
 
     private var sparkles: some View {
@@ -372,11 +378,11 @@ struct HomeView: View {
                     .ddTypography(.heading20)
             }
             .foregroundStyle(.white)
-            .frame(width: 346, height: 72)
+            .frame(maxWidth: .infinity)
+            .frame(height: 72)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .position(x: 201, y: 766)
     }
 
     private enum Layout {

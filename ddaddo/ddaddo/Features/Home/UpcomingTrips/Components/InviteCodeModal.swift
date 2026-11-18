@@ -49,9 +49,8 @@ struct InviteCodeModal: View {
                     action: cancelAction
                 )
 
-                Rectangle()
-                    .fill(Color(red: 72 / 255, green: 72 / 255, blue: 72 / 255))
-                    .frame(width: 0.5, height: 48)
+                DDAlertSeparator(orientation: .vertical)
+                    .frame(height: 48)
 
                 actionButton(
                     title: "참여하기",
@@ -117,9 +116,7 @@ struct InviteCodeModal: View {
     }
 
     private var separator: some View {
-        Rectangle()
-            .fill(Color(red: 72 / 255, green: 72 / 255, blue: 72 / 255))
-            .frame(height: 0.5)
+        DDAlertSeparator(orientation: .horizontal)
     }
 
     private func digit(at index: Int) -> Character? {

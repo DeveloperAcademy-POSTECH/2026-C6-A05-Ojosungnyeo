@@ -71,10 +71,19 @@ struct PlaceGroupingFeature: Reducer {
         var isCriteriaChangeConfirmationPresented = false
         var waitingForConfirmation = WaitingForConfirmationFeature.State()
         var isWaitingForConfirmationPresented = false
+        var isRouteGroupingLoading = false
 
         var haveAllRecommendedGroupsConfirmed: Bool {
             !recommendedGroups.isEmpty
                 && recommendedGroups.allSatisfy { confirmedGroupIDs.contains($0.id) }
+        }
+
+        var hasConfirmedRecommendedGroup: Bool {
+            recommendedGroups.contains { confirmedGroupIDs.contains($0.id) }
+        }
+
+        var confirmedRecommendedGroupCount: Int {
+            recommendedGroups.count { confirmedGroupIDs.contains($0.id) }
         }
 
         init() {}
@@ -123,6 +132,8 @@ struct PlaceGroupingFeature: Reducer {
         case refreshMemberPlaces
         case memberPlacesResponse([MemberPlacePins])
         case memberPlacesFailed
+        case routeTravelTimesResponse(RouteTravelTimeMatrix)
+        case routeTravelTimesFailed
         case groupMembershipsResponse([MemberGroupMembership])
         case groupMembershipsFailed
         case groupConfirmationsResponse([MemberGroupConfirmation])
@@ -136,6 +147,7 @@ struct PlaceGroupingFeature: Reducer {
         case transportationSheetDismissed
         case transportationSheet(TripSetUpTransportationFeature.Action)
         case tabSelected(Tab)
+        case selectAllRecommendedGroupsTapped
         case memberTapped(String)
         case recommendedGroupTapped(String)
         case detail(PlaceGroupingDetailFeature.Action)
@@ -145,6 +157,7 @@ struct PlaceGroupingFeature: Reducer {
     }
 
     @Dependency(\.placeClient) var placeClient
+    @Dependency(\.mapClient) var mapClient
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -163,12 +176,14 @@ struct PlaceGroupingFeature: Reducer {
                             .cancellable(id: "place-grouping-memberships", cancelInFlight: true)
                     )
                 }
+                effects.append(routeGroupingEffect(for: &state))
                 return .merge(effects)
 
             case .onDisappear:
                 return .merge(
                     .cancel(id: "place-grouping-member-places"),
-                    .cancel(id: "place-grouping-memberships")
+                    .cancel(id: "place-grouping-memberships"),
+                    .cancel(id: "route-grouping")
                 )
 
             case .refreshMemberPlaces:
@@ -177,15 +192,24 @@ struct PlaceGroupingFeature: Reducer {
 
             case let .memberPlacesResponse(memberPins):
                 guard var source = state.sourcePlaceSelection else { return .none }
+                var havePlacesChanged = false
+                var hasParticipantStatusChanged = false
                 for pins in memberPins {
-                    source.memberPlaces[pins.member] = pins.places
+                    if placeIdentitySet(source.memberPlaces[pins.member, default: []])
+                        != placeIdentitySet(pins.places) {
+                        source.memberPlaces[pins.member] = pins.places
+                        havePlacesChanged = true
+                    }
                     if let index = source.participants.firstIndex(where: {
                         $0.member == pins.member
-                    }) {
+                    }), source.participants[index].isConfirmed != pins.isConfirmed {
                         source.participants[index].isConfirmed = pins.isConfirmed
+                        hasParticipantStatusChanged = true
                     }
                 }
+                guard havePlacesChanged || hasParticipantStatusChanged else { return .none }
                 state.sourcePlaceSelection = source
+                guard havePlacesChanged else { return .none }
                 let refreshed = PlaceGroupingEngine.makeGroups(
                     from: source,
                     selection: state.transportationSelection
@@ -231,9 +255,27 @@ struct PlaceGroupingFeature: Reducer {
                 state.applyDeletedGroupPlaces()
                 state.applyGroupPlaceOrders()
                 state.confirmedGroupIDs.formIntersection(state.recommendedGroups.map(\.id))
-                return .merge(placePhotoEffects(state: &state))
+                var effects = placePhotoEffects(state: &state)
+                effects.append(routeGroupingEffect(for: &state))
+                return .merge(effects)
 
             case .memberPlacesFailed:
+                return .none
+
+            case let .routeTravelTimesResponse(travelTimes):
+                state.isRouteGroupingLoading = false
+                guard let source = state.sourcePlaceSelection else { return .none }
+                state.applyGroupingResult(
+                    PlaceGroupingEngine.makeGroups(
+                        from: source,
+                        selection: state.transportationSelection,
+                        travelTimes: travelTimes
+                    )
+                )
+                return .merge(placePhotoEffects(state: &state))
+
+            case .routeTravelTimesFailed:
+                state.isRouteGroupingLoading = false
                 return .none
 
             case let .groupMembershipsResponse(memberships):
@@ -428,11 +470,15 @@ struct PlaceGroupingFeature: Reducer {
                 state.confirmedGroupIDs = []
                 state.selectedGroupID = nil
                 guard let tripID = state.sourcePlaceSelection?.tripID else {
-                    return .send(.delegate(.reanalyzeGrouping))
+                    return .merge(
+                        routeGroupingEffect(for: &state),
+                        .send(.delegate(.reanalyzeGrouping))
+                    )
                 }
                 let eventID = UUID().uuidString
                 state.processedGroupingConfigurationEventIDs.insert(eventID)
                 return .merge(
+                    routeGroupingEffect(for: &state),
                     .run { _ in
                         try? await placeClient.updateGroupingConfiguration(
                             tripID,
@@ -507,7 +553,9 @@ struct PlaceGroupingFeature: Reducer {
                     )
                 }
                 state.placeGroups = state.placeGroups.map { group in
-                    guard group.id == selectedGroupID else { return group }
+                    guard group.places.contains(where: { $0.id == placeID }) else {
+                        return group
+                    }
                     return MapPlaceGroup(
                         id: group.id,
                         name: group.name,
@@ -546,7 +594,7 @@ struct PlaceGroupingFeature: Reducer {
             case .detail:
                 return .none
             case .confirmButtonTapped:
-                guard state.haveAllRecommendedGroupsConfirmed else { return .none }
+                guard state.hasConfirmedRecommendedGroup else { return .none }
                 guard let source = state.sourcePlaceSelection else { return .none }
                 state.waitingForConfirmation = WaitingForConfirmationFeature.State(
                     tripID: source.tripID,
@@ -574,6 +622,24 @@ struct PlaceGroupingFeature: Reducer {
             case let .tabSelected(tab):
                 state.selectedTab = tab
                 return .none
+            case .selectAllRecommendedGroupsTapped:
+                let groupIDs = Set(state.recommendedGroups.map(\.id))
+                let shouldSelectAll = !state.haveAllRecommendedGroupsConfirmed
+                if shouldSelectAll {
+                    state.confirmedGroupIDs.formUnion(groupIDs)
+                } else {
+                    state.confirmedGroupIDs.subtract(groupIDs)
+                }
+                state.confirmedGroupIDsByMemberID[state.currentMemberID] = state.confirmedGroupIDs
+
+                guard let tripID = state.sourcePlaceSelection?.tripID else { return .none }
+                return .run { _ in
+                    for groupID in groupIDs {
+                        try? await placeClient.setGroupConfirmation(
+                            tripID, groupID, shouldSelectAll, false
+                        )
+                    }
+                }
             }
         }
 
@@ -666,9 +732,80 @@ struct PlaceGroupingFeature: Reducer {
             }
         }
     }
+
+    private func placeIdentitySet(_ places: [PinnedPlace]) -> Set<String> {
+        Set(places.map(\.id))
+    }
+
+    private func routeGroupingEffect(for state: inout State) -> Effect<Action> {
+        guard let source = state.sourcePlaceSelection else { return .none }
+        let places = source.participants
+            .filter(\.hasJoined)
+            .flatMap { source.memberPlaces[$0.member, default: []] }
+        guard places.count > 1 else { return .none }
+        state.isRouteGroupingLoading = true
+        let transportation = state.transportationSelection.transportation
+        return .run { send in
+            do {
+                let travelTimes = try await mapClient.fetchTravelTimes(
+                    places,
+                    transportation
+                )
+                await send(.routeTravelTimesResponse(travelTimes))
+            } catch {
+                await send(.routeTravelTimesFailed)
+            }
+        }
+        .cancellable(id: "route-grouping", cancelInFlight: true)
+    }
 }
 
 private extension PlaceGroupingFeature.State {
+    mutating func applyGroupingResult(_ result: PlaceGroupingEngine.Result) {
+        let photoDataByID = recommendedGroups
+            .flatMap(\.places)
+            .reduce(into: [String: [Data]]()) { values, place in
+                if !place.photoData.isEmpty { values[place.id] = place.photoData }
+            }
+        let enrich: (PinnedPlace) -> PinnedPlace = { place in
+            guard let photoData = photoDataByID[place.id] else { return place }
+            return PinnedPlace(
+                id: place.id,
+                name: place.name,
+                description: place.description,
+                thumbnailName: place.thumbnailName,
+                category: place.category,
+                photoData: photoData,
+                latitude: place.latitude,
+                longitude: place.longitude
+            )
+        }
+
+        members = result.members
+        placeGroups = result.mapGroups.map { group in
+            MapPlaceGroup(
+                id: group.id,
+                name: group.name,
+                places: group.places.map(enrich),
+                radius: group.radius
+            )
+        }
+        recommendedGroups = result.recommendedGroups.map { group in
+            PlaceGroupingFeature.RecommendedGroup(
+                id: group.id,
+                title: group.title,
+                participantSummary: group.participantSummary,
+                memberIDs: group.memberIDs,
+                categories: group.categories,
+                places: group.places.map(enrich)
+            )
+        }
+        applyJoinedGroupMemberships()
+        applyDeletedGroupPlaces()
+        applyGroupPlaceOrders()
+        confirmedGroupIDs.formIntersection(recommendedGroups.map(\.id))
+    }
+
     mutating func applyGroupingConfiguration(_ event: GroupingConfigurationEvent) {
         guard let transportation = Transportation(rawValue: event.transportation),
               let duration = TravelDuration(rawValue: event.durationMinutes),
@@ -730,13 +867,15 @@ private extension PlaceGroupingFeature.State {
                 places: group.places.filter { !deletedPlaceIDs.contains($0.id) }
             )
         }
+        let allDeletedPlaceIDs = deletedPlaceIDsByGroupID.values.reduce(into: Set<String>()) {
+            $0.formUnion($1)
+        }
         placeGroups = placeGroups.map { group in
-            let deletedPlaceIDs = deletedPlaceIDsByGroupID[group.id, default: []]
-            guard !deletedPlaceIDs.isEmpty else { return group }
+            guard !allDeletedPlaceIDs.isEmpty else { return group }
             return MapPlaceGroup(
                 id: group.id,
                 name: group.name,
-                places: group.places.filter { !deletedPlaceIDs.contains($0.id) },
+                places: group.places.filter { !allDeletedPlaceIDs.contains($0.id) },
                 radius: group.radius
             )
         }
@@ -790,6 +929,8 @@ private extension PlaceGroupingFeature.State {
 }
 
 private enum PlaceGroupingEngine {
+    private static let maximumPlacesPerCourse = 5
+
     struct Result {
         let members: [PlaceGroupingFeature.Member]
         let mapGroups: [MapPlaceGroup]
@@ -797,13 +938,14 @@ private enum PlaceGroupingEngine {
     }
 
     private struct OwnedPlace {
-        let member: TripMember
+        var members: Set<TripMember>
         let place: PinnedPlace
     }
 
     static func makeGroups(
         from state: PlaceSelectionFeature.State,
-        selection: TripSetUpTransportationFeature.Selection
+        selection: TripSetUpTransportationFeature.Selection,
+        travelTimes: RouteTravelTimeMatrix? = nil
     ) -> Result {
         let joined = state.participants.filter(\.hasJoined)
         let members = joined.map { participant in
@@ -821,51 +963,63 @@ private enum PlaceGroupingEngine {
             )
         }
 
-        let ownedPlaces = joined.flatMap { participant in
+        let selectedPlaces = joined.flatMap { participant in
             state.memberPlaces[participant.member, default: []].map {
-                OwnedPlace(member: participant.member, place: $0)
+                OwnedPlace(members: [participant.member], place: $0)
             }
         }
-        let regions = connectedRegions(
+        let ownedPlaces = mergingSamePlaces(selectedPlaces)
+        let regions = completeLinkRegions(
             ownedPlaces,
-            maximumDistance: maximumDistance(for: selection)
+            maximumDistance: maximumDistance(for: selection),
+            maximumTravelTime: TimeInterval(selection.duration.rawValue * 60),
+            travelTimes: travelTimes
         )
         let mapGroups = regions.enumerated().map { index, region in
-            let uniquePlaces = unique(region.map(\.place))
+            let places = unique(region.map(\.place))
             return MapPlaceGroup(
                 id: "region-\(index)",
                 name: courseName(
-                    places: uniquePlaces,
+                    places: places,
                     destination: state.destinationName,
                     index: index
                 ),
-                places: uniquePlaces,
-                radius: max(800, regionRadius(uniquePlaces) + 500)
+                places: places,
+                radius: enclosingRadius(of: region)
             )
         }
-
         var recommendations: [PlaceGroupingFeature.RecommendedGroup] = []
         for (regionIndex, region) in regions.enumerated() {
-            let regionPlaces = unique(region.map(\.place))
-            let title = courseName(
-                places: regionPlaces,
-                destination: state.destinationName,
-                index: regionIndex
+            let preferences = memberPreferences(in: region)
+            let courses = recommendedCourses(
+                in: region,
+                preferences: preferences,
+                maximumDistance: maximumDistance(for: selection),
+                maximumTravelTime: TimeInterval(selection.duration.rawValue * 60),
+                travelTimes: travelTimes
             )
-            let memberIDs = Array(Set(region.map { $0.member.rawValue })).sorted()
-            let categories = Array(Set(regionPlaces.map {
-                normalizedCategory($0.category)
-            })).sorted()
-            recommendations.append(
-                .init(
-                    id: "region-\(regionIndex)",
-                    title: title,
-                    participantSummary: "\(memberIDs.count)명",
-                    memberIDs: memberIDs,
-                    categories: categories,
-                    places: regionPlaces
+            for (courseIndex, course) in courses.enumerated() {
+                let places = course.map(\.place)
+                let memberIDs = Array(Set(
+                    course.flatMap(\.members).map(\.rawValue)
+                )).sorted()
+                let categories = Array(Set(
+                    places.map { normalizedCategory($0.category) }
+                )).sorted()
+                let regionName = mapGroups[regionIndex].name
+                recommendations.append(
+                    PlaceGroupingFeature.RecommendedGroup(
+                        id: "region-\(regionIndex)-course-\(courseIndex)",
+                        title: courses.count == 1
+                            ? regionName
+                            : "\(regionName) \(courseIndex + 1)",
+                        participantSummary: "\(memberIDs.count)명",
+                        memberIDs: memberIDs,
+                        categories: categories,
+                        places: places
+                    )
                 )
-            )
+            }
         }
 
         return Result(
@@ -875,28 +1029,367 @@ private enum PlaceGroupingEngine {
         )
     }
 
-    private static func connectedRegions(
+    /// 어느 한 장소만 이어지는 단순 연결 그룹이 아니라,
+    /// 합친 지역 안의 모든 장소 쌍이 이동시간 조건을 만족할 때만 합친다.
+    private static func completeLinkRegions(
         _ places: [OwnedPlace],
-        maximumDistance: Double
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
     ) -> [[OwnedPlace]] {
-        var visited = Set<Int>()
-        var result: [[OwnedPlace]] = []
-        for start in places.indices where !visited.contains(start) {
-            var queue = [start]
-            visited.insert(start)
-            var region: [OwnedPlace] = []
-            while let index = queue.popLast() {
-                region.append(places[index])
-                for candidate in places.indices where !visited.contains(candidate) {
-                    if distance(places[index].place, places[candidate].place) <= maximumDistance {
-                        visited.insert(candidate)
-                        queue.append(candidate)
+        var regions = places.map { [$0] }
+        while true {
+            var bestPair: (lhs: Int, rhs: Int, distance: Double)?
+            guard regions.count > 1 else { break }
+            for lhs in regions.indices {
+                for rhs in regions.indices where rhs > lhs {
+                    guard canMergeRegions(
+                        regions[lhs],
+                        regions[rhs],
+                        maximumDistance: maximumDistance,
+                        maximumTravelTime: maximumTravelTime,
+                        travelTimes: travelTimes
+                    ) else { continue }
+                    let candidateDistance = distanceBetweenRegions(regions[lhs], regions[rhs])
+                    if bestPair == nil || candidateDistance < bestPair!.distance {
+                        bestPair = (lhs, rhs, candidateDistance)
                     }
                 }
             }
-            result.append(region)
+            guard let pair = bestPair else { break }
+            regions[pair.lhs].append(contentsOf: regions[pair.rhs])
+            regions.remove(at: pair.rhs)
         }
-        return result
+        return regions
+    }
+
+    private static func canMergeRegions(
+        _ lhs: [OwnedPlace],
+        _ rhs: [OwnedPlace],
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> Bool {
+        lhs.allSatisfy { left in
+            rhs.allSatisfy { right in
+                areWithinTravelLimit(
+                    left.place,
+                    right.place,
+                    maximumDistance: maximumDistance,
+                    maximumTravelTime: maximumTravelTime,
+                    travelTimes: travelTimes
+                )
+            }
+        }
+    }
+
+    /// 해당 지역에서 멤버가 선택한 장소의 카테고리 비율을 계산한다.
+    private static func memberPreferences(
+        in region: [OwnedPlace]
+    ) -> [TripMember: [String: Double]] {
+        var counts: [TripMember: [String: Int]] = [:]
+        for ownedPlace in region {
+            let category = normalizedCategory(ownedPlace.place.category)
+            for member in ownedPlace.members {
+                counts[member, default: [:]][category, default: 0] += 1
+            }
+        }
+        return counts.mapValues { categoryCounts in
+            let total = Double(categoryCounts.values.reduce(0, +))
+            guard total > 0 else { return [:] }
+            return categoryCounts.mapValues { Double($0) / total }
+        }
+    }
+
+    /// 최소 코스 수로 시작하고, 코스를 하나 늘린 안의
+    /// 취향·선택 장소 비율·이동시간 점수가 더 높을 때만 분리한다.
+    private static func recommendedCourses(
+        in region: [OwnedPlace],
+        preferences: [TripMember: [String: Double]],
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> [[OwnedPlace]] {
+        guard !region.isEmpty else { return [] }
+        let minimumCount = Int(ceil(
+            Double(region.count) / Double(maximumPlacesPerCourse)
+        ))
+        var best = makeCourses(
+            from: region,
+            count: minimumCount,
+            preferences: preferences,
+            maximumDistance: maximumDistance,
+            maximumTravelTime: maximumTravelTime,
+            travelTimes: travelTimes
+        )
+        var bestScore = coursePlanScore(
+            best,
+            preferences: preferences,
+            minimumCourseCount: minimumCount,
+            maximumDistance: maximumDistance,
+            maximumTravelTime: maximumTravelTime,
+            travelTimes: travelTimes
+        )
+
+        guard minimumCount < region.count else { return best }
+        for count in (minimumCount + 1)...region.count {
+            let candidate = makeCourses(
+                from: region,
+                count: count,
+                preferences: preferences,
+                maximumDistance: maximumDistance,
+                maximumTravelTime: maximumTravelTime,
+                travelTimes: travelTimes
+            )
+            let candidateScore = coursePlanScore(
+                candidate,
+                preferences: preferences,
+                minimumCourseCount: minimumCount,
+                maximumDistance: maximumDistance,
+                maximumTravelTime: maximumTravelTime,
+                travelTimes: travelTimes
+            )
+            guard candidateScore > bestScore else { break }
+            best = candidate
+            bestScore = candidateScore
+        }
+        guard isValidCoursePlan(best, source: region) else {
+            return stride(from: 0, to: region.count, by: maximumPlacesPerCourse).map {
+                Array(region[$0..<min($0 + maximumPlacesPerCourse, region.count)])
+            }
+        }
+        return best
+    }
+
+    private static func isValidCoursePlan(
+        _ courses: [[OwnedPlace]],
+        source: [OwnedPlace]
+    ) -> Bool {
+        let assignedIDs = courses.flatMap { $0.map(\.place.id) }
+        return courses.allSatisfy { !$0.isEmpty && $0.count <= maximumPlacesPerCourse }
+            && assignedIDs.count == source.count
+            && Set(assignedIDs) == Set(source.map(\.place.id))
+    }
+
+    private static func makeCourses(
+        from places: [OwnedPlace],
+        count: Int,
+        preferences: [TripMember: [String: Double]],
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> [[OwnedPlace]] {
+        let sorted = places.sorted {
+            if $0.members.count != $1.members.count {
+                return $0.members.count > $1.members.count
+            }
+            return $0.place.id < $1.place.id
+        }
+        var seeds: [OwnedPlace] = [sorted[0]]
+        var remaining = Array(sorted.dropFirst())
+        while seeds.count < count, !remaining.isEmpty {
+            let index = remaining.indices.max { lhs, rhs in
+                seedSeparation(
+                    remaining[lhs],
+                    from: seeds,
+                    maximumDistance: maximumDistance,
+                    maximumTravelTime: maximumTravelTime,
+                    travelTimes: travelTimes
+                ) < seedSeparation(
+                    remaining[rhs],
+                    from: seeds,
+                    maximumDistance: maximumDistance,
+                    maximumTravelTime: maximumTravelTime,
+                    travelTimes: travelTimes
+                )
+            }!
+            seeds.append(remaining.remove(at: index))
+        }
+
+        var courses = seeds.map { [$0] }
+        remaining.sort {
+            if $0.members.count != $1.members.count {
+                return $0.members.count > $1.members.count
+            }
+            return $0.place.id < $1.place.id
+        }
+        for place in remaining {
+            let candidates = courses.indices.filter {
+                courses[$0].count < maximumPlacesPerCourse
+            }
+            guard let bestIndex = candidates.max(by: { lhs, rhs in
+                placementScore(
+                    place,
+                    in: courses[lhs],
+                    preferences: preferences,
+                    maximumDistance: maximumDistance,
+                    maximumTravelTime: maximumTravelTime,
+                    travelTimes: travelTimes
+                ) < placementScore(
+                    place,
+                    in: courses[rhs],
+                    preferences: preferences,
+                    maximumDistance: maximumDistance,
+                    maximumTravelTime: maximumTravelTime,
+                    travelTimes: travelTimes
+                )
+            }) else { continue }
+            courses[bestIndex].append(place)
+        }
+        return courses
+    }
+
+    private static func placementScore(
+        _ candidate: OwnedPlace,
+        in course: [OwnedPlace],
+        preferences: [TripMember: [String: Double]],
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> Double {
+        let courseMembers = Set(course.flatMap(\.members))
+        let sharedMemberScore = Double(candidate.members.intersection(courseMembers).count)
+            / Double(max(candidate.members.union(courseMembers).count, 1))
+        let category = normalizedCategory(candidate.place.category)
+        let candidatePreference = candidate.members.map {
+            preferences[$0]?[category] ?? 0
+        }.average
+        let coursePreference = courseMembers.map {
+            preferences[$0]?[category] ?? 0
+        }.average
+        let preferenceScore = (candidatePreference + coursePreference) / 2
+        let travelScore = course.map {
+            proximityScore(
+                candidate.place,
+                $0.place,
+                maximumDistance: maximumDistance,
+                maximumTravelTime: maximumTravelTime,
+                travelTimes: travelTimes
+            )
+        }.average
+        // 멤버 겹침 > 취향 유사도 > 이동시간 순서가 뒤집히지 않도록
+        // 각 단계의 가중치 범위를 분리한다.
+        return sharedMemberScore * 100 + preferenceScore * 10 + travelScore
+    }
+
+    private static func seedSeparation(
+        _ candidate: OwnedPlace,
+        from seeds: [OwnedPlace],
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> Double {
+        seeds.map { seed in
+            let memberSimilarity = Double(candidate.members.intersection(seed.members).count)
+                / Double(max(candidate.members.union(seed.members).count, 1))
+            let proximity = proximityScore(
+                candidate.place,
+                seed.place,
+                maximumDistance: maximumDistance,
+                maximumTravelTime: maximumTravelTime,
+                travelTimes: travelTimes
+            )
+            return (1 - memberSimilarity) * 0.6 + (1 - proximity) * 0.4
+        }.min() ?? 0
+    }
+
+    private static func coursePlanScore(
+        _ courses: [[OwnedPlace]],
+        preferences: [TripMember: [String: Double]],
+        minimumCourseCount: Int,
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> Double {
+        let members = Set(courses.flatMap { $0.flatMap(\.members) })
+        let memberFit = members.map { member in
+            let participating = courses.filter { course in
+                course.contains { $0.members.contains(member) }
+            }
+            return participating.map { course in
+                let ownPlaceRatio = Double(course.count { $0.members.contains(member) })
+                    / Double(max(course.count, 1))
+                let interestRatio = course.map {
+                    preferences[member]?[normalizedCategory($0.place.category)] ?? 0
+                }.average
+                return ownPlaceRatio * 0.7 + interestRatio * 0.3
+            }.average
+        }.average
+
+        let travelFit = courses.map { course in
+            guard course.count > 1 else { return 1.0 }
+            var scores: [Double] = []
+            for lhs in course.indices {
+                for rhs in course.indices where rhs > lhs {
+                    scores.append(
+                        proximityScore(
+                            course[lhs].place,
+                            course[rhs].place,
+                            maximumDistance: maximumDistance,
+                            maximumTravelTime: maximumTravelTime,
+                            travelTimes: travelTimes
+                        )
+                    )
+                }
+            }
+            return scores.average
+        }.average
+        let additionalCoursePenalty = Double(max(courses.count - minimumCourseCount, 0)) * 0.1
+        return memberFit * 0.7 + travelFit * 0.3 - additionalCoursePenalty
+    }
+
+    private static func proximityScore(
+        _ lhs: PinnedPlace,
+        _ rhs: PinnedPlace,
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> Double {
+        if let duration = travelDuration(lhs, rhs, travelTimes: travelTimes) {
+            return max(0, 1 - duration / max(maximumTravelTime, 1))
+        }
+        return max(0, 1 - distance(lhs, rhs) / max(maximumDistance, 1))
+    }
+
+    private static func areWithinTravelLimit(
+        _ lhs: PinnedPlace,
+        _ rhs: PinnedPlace,
+        maximumDistance: Double,
+        maximumTravelTime: TimeInterval,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> Bool {
+        if let duration = travelDuration(lhs, rhs, travelTimes: travelTimes) {
+            return duration <= maximumTravelTime
+        }
+        return distance(lhs, rhs) <= maximumDistance
+    }
+
+    private static func travelDuration(
+        _ lhs: PinnedPlace,
+        _ rhs: PinnedPlace,
+        travelTimes: RouteTravelTimeMatrix?
+    ) -> TimeInterval? {
+        guard let travelTimes else { return nil }
+        return [
+            travelTimes.duration(from: lhs.id, to: rhs.id),
+            travelTimes.duration(from: rhs.id, to: lhs.id)
+        ]
+        .compactMap { $0 }
+        .min()
+    }
+
+    /// 같은 Google Place를 여러 명이 선택해도 장소 하나와 하나의 추천 그룹으로 취급한다.
+    /// 선택한 사람들은 대표 장소의 `members`에 합쳐 추천 그룹 참여자로 표시한다.
+    private static func mergingSamePlaces(_ places: [OwnedPlace]) -> [OwnedPlace] {
+        places.reduce(into: [OwnedPlace]()) { result, ownedPlace in
+            guard let index = result.firstIndex(where: {
+                isSamePlace($0.place, ownedPlace.place)
+            }) else {
+                result.append(ownedPlace)
+                return
+            }
+            result[index].members.formUnion(ownedPlace.members)
+        }
     }
 
     private static func maximumDistance(
@@ -921,6 +1414,10 @@ private enum PlaceGroupingEngine {
             .distance(from: CLLocation(latitude: rhs.latitude, longitude: rhs.longitude))
     }
 
+    private static func isSamePlace(_ lhs: PinnedPlace, _ rhs: PinnedPlace) -> Bool {
+        lhs.id == rhs.id
+    }
+
     private static func regionRadius(_ places: [PinnedPlace]) -> Double {
         guard !places.isEmpty else { return 800 }
         let latitude = places.map(\.latitude).reduce(0, +) / Double(places.count)
@@ -931,9 +1428,33 @@ private enum PlaceGroupingEngine {
         }.max() ?? 800
     }
 
+    private static func enclosingRadius(of region: [OwnedPlace]) -> Double {
+        max(350, regionRadius(unique(region.map(\.place))) + 200)
+    }
+
+    private static func distanceBetweenRegions(
+        _ lhs: [OwnedPlace],
+        _ rhs: [OwnedPlace]
+    ) -> Double {
+        regionCenter(lhs).distance(from: regionCenter(rhs))
+    }
+
+    private static func regionCenter(_ region: [OwnedPlace]) -> CLLocation {
+        // 여러 명이 같은 장소를 선택해도 중심점이 특정 장소 쪽으로
+        // 치우치 않도록 지도에 표시하는 고유 장소를 기준으로 계산한다.
+        let places = unique(region.map(\.place))
+        let count = Double(max(places.count, 1))
+        return CLLocation(
+            latitude: places.map(\.latitude).reduce(0, +) / count,
+            longitude: places.map(\.longitude).reduce(0, +) / count
+        )
+    }
+
     private static func unique(_ places: [PinnedPlace]) -> [PinnedPlace] {
-        var ids = Set<String>()
-        return places.filter { ids.insert($0.id).inserted }
+        places.reduce(into: [PinnedPlace]()) { result, place in
+            guard !result.contains(where: { isSamePlace($0, place) }) else { return }
+            result.append(place)
+        }
     }
 
     private static func courseName(
@@ -948,5 +1469,12 @@ private enum PlaceGroupingEngine {
             return "\(representativePlace.name) 코스"
         }
         return "\(representativePlace.name) 중심 코스"
+    }
+}
+
+private extension Collection where Element == Double {
+    var average: Double {
+        guard !isEmpty else { return 0 }
+        return reduce(0, +) / Double(count)
     }
 }

@@ -51,11 +51,30 @@ private struct TimeTableReadOnlyContent: View {
                 store.coursesByID[schedule.courseID].map { (index, schedule, $0) }
             }
             .sorted {
+                if let left = $0.1.orderIndex, let right = $1.1.orderIndex, left != right {
+                    return left < right
+                }
+                if $0.1.orderIndex != nil && $1.1.orderIndex == nil { return true }
+                if $0.1.orderIndex == nil && $1.1.orderIndex != nil { return false }
                 let left = $0.1.timing.startMinuteOfDay
                 let right = $1.1.timing.startMinuteOfDay
                 return left == right ? $0.0 < $1.0 : left < right
             }
             .map { ($0.1, $0.2) }
+    }
+
+    private var scheduledRows: [[(schedule: TimeTableSchedule, course: TimeTableCourse)]] {
+        var rows: [[(schedule: TimeTableSchedule, course: TimeTableCourse)]] = []
+        var seenBranchGroupIDs: Set<Int> = []
+        for item in scheduledCourses {
+            if let branchGroupID = item.schedule.branchGroupID {
+                guard seenBranchGroupIDs.insert(branchGroupID).inserted else { continue }
+                rows.append(scheduledCourses.filter { $0.schedule.branchGroupID == branchGroupID })
+            } else {
+                rows.append([item])
+            }
+        }
+        return rows
     }
 
     var body: some View {
@@ -81,16 +100,7 @@ private struct TimeTableReadOnlyContent: View {
     }
 
     private var navigationBar: some View {
-        HStack {
-            Button(action: onBack) {
-                Image("DDTimeTableBack")
-                    .resizable()
-                    .frame(width: 20, height: 40)
-                    .frame(width: 44, height: 40, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
+        DDNavigationHeader(onBack: onBack) {
             Spacer()
 
             Button("편집", action: onEdit)
@@ -101,9 +111,8 @@ private struct TimeTableReadOnlyContent: View {
                 .clipShape(.capsule)
                 .buttonStyle(.plain)
         }
-        .frame(height: 40)
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, 7)
+        .frame(height: 44)
+        .padding(.trailing, DDSpacing.large)
     }
 
     private var tripHeader: some View {
@@ -213,14 +222,25 @@ private struct TimeTableReadOnlyContent: View {
     }
 
     private var originalScheduleRows: some View {
-        ForEach(Array(scheduledCourses.enumerated()), id: \.element.schedule.id) { index, item in
+        ForEach(Array(scheduledRows.enumerated()), id: \.offset) { index, row in
             HStack(alignment: .top, spacing: 20) {
                 timelineMarker(
                     number: index + 1,
-                    isLast: index == scheduledCourses.count - 1,
-                    rowHeight: scheduleCardHeight(item.course)
+                    isLast: index == scheduledRows.count - 1,
+                    rowHeight: row.map { scheduleCardHeight($0.course) }.max() ?? 71
                 )
-                scheduleCard(item.course)
+                if row.count > 1 {
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: DDSpacing.small) {
+                            ForEach(row, id: \.schedule.id) { item in
+                                scheduleCard(item.course).frame(width: 200)
+                            }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                } else if let item = row.first {
+                    scheduleCard(item.course)
+                }
             }
             .padding(.leading, DDSpacing.medium)
             .padding(.trailing, DDSpacing.large)
@@ -261,9 +281,11 @@ private struct TimeTableReadOnlyContent: View {
                             .ddTypography(.bodyEmphasis16)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
-                        HStack(spacing: -5) {
-                            ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
-                                Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                        if TimeTableCourse.kind(of: first.memberIDs, among: store.tripMembers) == .separate {
+                            HStack(spacing: -5) {
+                                ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
+                                    Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
+                                }
                             }
                         }
                     }
@@ -379,7 +401,7 @@ private struct TimeTableReadOnlyContent: View {
                 }
                 .padding(.horizontal, DDSpacing.large)
                 .padding(.bottom, DDSpacing.large)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,17 +457,7 @@ struct TimeTableContent: View {
     }
 
     private var navigationBar: some View {
-        HStack {
-            Button {
-                onBack()
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-
+        DDNavigationHeader(onBack: onBack) {
             Spacer()
 
             if let onEdit {
@@ -472,7 +484,6 @@ struct TimeTableContent: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.leading, DDSpacing.small)
         .padding(.trailing, DDSpacing.large)
     }
 
@@ -609,6 +620,11 @@ struct TimeTableContent: View {
         }
 
         return rows.enumerated().sorted {
+            let lhsOrder = $0.element.schedules.compactMap(\.orderIndex).min()
+            let rhsOrder = $1.element.schedules.compactMap(\.orderIndex).min()
+            if let lhsOrder, let rhsOrder, lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+            if lhsOrder != nil && rhsOrder == nil { return true }
+            if lhsOrder == nil && rhsOrder != nil { return false }
             let lhsMinute = $0.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
             let rhsMinute = $1.element.schedules.map(\.timing.startMinuteOfDay).min() ?? 0
             return lhsMinute == rhsMinute ? $0.offset < $1.offset : lhsMinute < rhsMinute

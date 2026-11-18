@@ -52,8 +52,17 @@ struct WaitingForConfirmationFeature: Reducer {
                     name: $0.name,
                     avatar: $0.avatar,
                     isConfirmed: $0.id == currentMemberID
+                        || Self.isDevelopmentPreconfirmedMember(name: $0.name)
                 )
             }
+        }
+
+        private static func isDevelopmentPreconfirmedMember(name: String) -> Bool {
+#if DEBUG
+            ["테이", "하르딘"].contains(name)
+#else
+            false
+#endif
         }
     }
 
@@ -98,6 +107,7 @@ struct WaitingForConfirmationFeature: Reducer {
                         name: displayName(confirmation.name),
                         avatar: member.avatar,
                         isConfirmed: confirmation.isConfirmed
+                            || isDevelopmentPreconfirmedMember(name: confirmation.name)
                     )
                 }
                 return .none
@@ -137,5 +147,13 @@ struct WaitingForConfirmationFeature: Reducer {
 
     private func displayName(_ name: String) -> String {
         name.count > 3 ? "\(name.prefix(3))···" : name
+    }
+
+    private func isDevelopmentPreconfirmedMember(name: String) -> Bool {
+#if DEBUG
+        ["테이", "하르딘"].contains(name)
+#else
+        false
+#endif
     }
 }

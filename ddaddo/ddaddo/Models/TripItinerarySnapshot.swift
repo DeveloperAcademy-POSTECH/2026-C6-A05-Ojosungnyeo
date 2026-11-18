@@ -12,6 +12,19 @@ struct ItineraryPlace: Equatable, Sendable {
     let longitude: Double
 }
 
+struct TripRecommendationSnapshot: Equatable, Sendable {
+    let id: String
+    let groupID: String
+    let placeID: String
+    let placeName: String
+    let category: String
+    let groupCategories: [String]
+    let memberIDs: [String]
+    let placeOwnerMemberIDs: [String]
+    let latitude: Double
+    let longitude: Double
+}
+
 struct TripItinerarySaveRequest: Equatable, Sendable {
     struct Course: Equatable, Sendable {
         let id: Int
@@ -47,6 +60,8 @@ struct TripItinerarySaveRequest: Equatable, Sendable {
         let day: String
         let startMinuteOfDay: Int
         let branchGroupID: Int?
+        var recommendationGroupID: String? = nil
+        var orderIndex: Int? = nil
     }
 
     let tripID: String
@@ -57,4 +72,5 @@ struct TripItinerarySaveRequest: Equatable, Sendable {
 struct TripItinerarySnapshot: Equatable, Sendable {
     let courses: [TripItinerarySaveRequest.Course]
     let schedules: [TripItinerarySaveRequest.Schedule]
+    let recommendations: [TripRecommendationSnapshot]
 }

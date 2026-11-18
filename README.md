@@ -1,7 +1,6 @@
 <img width="20000" alt="썸네일" src="https://github.com/user-attachments/assets/fca05b05-aa73-486b-a9f0-f99c99461c1a" />
 
 
-
 # 👽 따또 개발 배경
 
 > 왜 친구와 여행 가서 싸우는 일이 생길까요?
@@ -45,9 +44,6 @@
 
 # 👽 App Flow
 
-<img width="3000" alt="image" src="https://github.com/user-attachments/assets/16858b6a-d570-436b-8e45-94e0a99e0ace" />
-
-
 ### **1. 여행 생성 및 친구 초대**
 
 - 여행 지역과 기간을 설정해 새로운 여행 생성
@@ -63,6 +59,10 @@
 
 - 확정된 여행 그룹과 방문 장소를 바탕으로 날짜별 방문 순서 구성
 - `함께하는 그룹`과 `따로 여행하는 그룹`의 이동 동선을 지도 위에서 한눈에 확인
+
+| Screenshot  |    Demo |
+|:----------: | :----------: |
+| <img src = "https://github.com/user-attachments/assets/16858b6a-d570-436b-8e45-94e0a99e0ace" width ="800">  | https://github.com/user-attachments/assets/fbfef9ce-4faa-4d7e-a5dd-4756602fff6b  |
 
 
 ## 🐹 Team Members

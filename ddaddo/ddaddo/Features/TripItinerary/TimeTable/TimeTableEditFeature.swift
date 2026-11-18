@@ -13,16 +13,25 @@ struct TimeTableEditRow: Equatable, Identifiable {
 }
 
 struct TimeTableEditFeature: Reducer {
+    enum PlaceDeletionTarget: Equatable {
+        case course(scheduleID: TimeTableSchedule.ID, courseID: TimeTableCourse.ID, placeID: UUID)
+        case recommendation(groupID: String, recommendationID: String)
+    }
+
     enum Delegate: Equatable {
         case addPlaceRequested
     }
 
     @ObservableState
     struct State: Equatable {
-        struct PendingDeletion: Equatable {
-            let day: TripDay
-            let rowID: TimeTableEditRow.ID
-            let source: TimeTableEditRow.Source
+        enum PendingDeletion: Equatable {
+            case row(day: TripDay, rowID: TimeTableEditRow.ID, source: TimeTableEditRow.Source)
+            case place(PlaceDeletionTarget)
+
+            var isPlace: Bool {
+                if case .place = self { return true }
+                return false
+            }
         }
 
         var isAddSchedulePresented = false
@@ -36,9 +45,12 @@ struct TimeTableEditFeature: Reducer {
         var selectedMinuteOfDay: Int?
         var rowsByDay: [TripDay: [TimeTableEditRow]] = [:]
         var draftPlacements: [TimeTableSchedule] = []
+        var originalCoursesByID: [TimeTableCourse.ID: TimeTableCourse]?
+        var originalRecommendations: [TimeTableRecommendation]?
+        var coursePlaceIDsByID: [TimeTableCourse.ID: [UUID]] = [:]
         var isSaving = false
         var isSaveUnavailableAlertPresented = false
-        var saveErrorMessage = "일정을 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
+        var saveErrorMessage = "일정을 저장하지 못했어요.\n잠시 후 다시 시도해 주세요."
         var pendingDeletion: PendingDeletion?
 
         var isTimeSelectionPresented: Bool {
@@ -69,8 +81,12 @@ struct TimeTableEditFeature: Reducer {
         case placeSearchResultTapped(PlaceSearchResult)
         case recommendationDropped(String, before: TimeTableEditRow.ID?)
         case scheduleRowMoved(TimeTableEditRow.ID, source: TimeTableEditRow.Source, before: TimeTableEditRow.ID?)
+        case rowMovedToDay(TimeTableEditRow.ID, source: TimeTableEditRow.Source, day: TripDay)
         case rowMerged(TimeTableEditRow.ID, source: TimeTableEditRow.Source, into: TimeTableEditRow.ID)
         case recommendationMerged(String, into: TimeTableEditRow.ID)
+        case coursePlaceMoved(TimeTableCourse.ID, sourceIndex: Int, beforeIndex: Int)
+        case recommendationPlaceMoved(String, sourceIndex: Int, beforeIndex: Int)
+        case placeDeletionRequested(PlaceDeletionTarget)
         case deletionRequested(TripDay, rowID: TimeTableEditRow.ID, source: TimeTableEditRow.Source)
         case deletionCancelled
         case deletionConfirmed
@@ -91,12 +107,18 @@ struct TimeTableEditFeature: Reducer {
 
             case .saveButtonTapped, .placeSearchResultTapped, .scheduleTapped,
                  .groupAddButtonTapped, .timeSelectionDoneTapped,
-                 .recommendationDropped, .scheduleRowMoved, .rowMerged, .recommendationMerged,
+                 .recommendationDropped, .scheduleRowMoved, .rowMovedToDay, .rowMerged, .recommendationMerged,
+                 .coursePlaceMoved,
+                 .recommendationPlaceMoved,
                  .delegate:
                 return .none
 
             case let .deletionRequested(day, rowID, source):
-                state.pendingDeletion = State.PendingDeletion(day: day, rowID: rowID, source: source)
+                state.pendingDeletion = .row(day: day, rowID: rowID, source: source)
+                return .none
+
+            case let .placeDeletionRequested(target):
+                state.pendingDeletion = .place(target)
                 return .none
 
             case .deletionCancelled:
@@ -104,17 +126,17 @@ struct TimeTableEditFeature: Reducer {
                 return .none
 
             case .deletionConfirmed:
-                guard let target = state.pendingDeletion,
-                      var rows = state.rowsByDay[target.day],
-                      let rowIndex = rows.firstIndex(where: { $0.id == target.rowID }),
-                      let sourceIndex = rows[rowIndex].sources.firstIndex(of: target.source)
+                guard case let .row(day, rowID, source)? = state.pendingDeletion,
+                      var rows = state.rowsByDay[day],
+                      let rowIndex = rows.firstIndex(where: { $0.id == rowID }),
+                      let sourceIndex = rows[rowIndex].sources.firstIndex(of: source)
                 else {
                     state.pendingDeletion = nil
                     return .none
                 }
 
                 rows[rowIndex].sources.remove(at: sourceIndex)
-                if case let .schedule(scheduleID) = target.source {
+                if case let .schedule(scheduleID) = source {
                     state.draftPlacements.removeAll { $0.id == scheduleID }
                 }
                 if rows[rowIndex].sources.isEmpty {
@@ -122,7 +144,7 @@ struct TimeTableEditFeature: Reducer {
                 } else if rows[rowIndex].sources.count == 1 {
                     rows[rowIndex].branchGroupID = nil
                 }
-                state.rowsByDay[target.day] = rows
+                state.rowsByDay[day] = rows
                 state.pendingDeletion = nil
                 return .none
 

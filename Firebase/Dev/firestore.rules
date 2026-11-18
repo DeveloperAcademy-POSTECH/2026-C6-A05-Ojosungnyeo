@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDevelopmentSeedOperator() {
+      return isSignedIn()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.nicknameKey in [
+          "999150ec9bb6ce141fed9c6666a1ba5f15641fdaca676919d2519c68bde470b3",
+          "630f3a1e31f8a3de46cb12acf791b26344b091c20fef93e8a7cae85d880a6822",
+          "31eef782e2c8ab07f90fc402d3786cbff8118a68773bdcbbe458940fa189b762",
+          "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039",
+          "94220151a77fe8912c14b07a291e9df4ea598d63838cea9b077a068974cdea71",
+          "cf2417cf73a770df6a0ae52f12cf63b4b66bc81a4ca8b9151ead075ee7f98e99"
+        ];
+    }
+
+    function isDevelopmentSeedMember() {
+      return resource.data.nicknameKey in [
+        "999150ec9bb6ce141fed9c6666a1ba5f15641fdaca676919d2519c68bde470b3",
+        "630f3a1e31f8a3de46cb12acf791b26344b091c20fef93e8a7cae85d880a6822",
+        "31eef782e2c8ab07f90fc402d3786cbff8118a68773bdcbbe458940fa189b762",
+          "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039",
+          "94220151a77fe8912c14b07a291e9df4ea598d63838cea9b077a068974cdea71",
+          "cf2417cf73a770df6a0ae52f12cf63b4b66bc81a4ca8b9151ead075ee7f98e99"
+      ];
+    }
+
+    match /users/{userId} {
+      allow read, create, update, delete:
+        if isSignedIn() && request.auth.uid == userId;
+
+      allow read:
+        if isDevelopmentSeedOperator()
+        && isDevelopmentSeedMember();
+
+      allow update:
+        if isDevelopmentSeedOperator()
+        && isDevelopmentSeedMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "avatarName",
+          "joinedTripIDs",
+          "dismissedTripIDs",
+          "updatedAt"
+        ]);
+    }
+
+    match /nicknames/{nicknameKey} {
+      allow read: if isSignedIn();
+
+      allow create:
+        if isSignedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update:
+        if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete:
+        if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    match /destinations/{destinationId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /trips/{tripId} {
+      allow read, create, update, delete: if isSignedIn();
+
+      match /participants/{participantId} {
+        allow read, create, update, delete: if isSignedIn();
+
+        match /places/{placeId} {
+          allow read, create, update, delete: if isSignedIn();
+        }
+      }
+
+      match /itinerary/{documentId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /inviteCodes/{inviteCode} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+  }
+}
+

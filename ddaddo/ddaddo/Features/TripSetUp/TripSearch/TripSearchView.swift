@@ -13,7 +13,7 @@ struct TripSearchView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 header
-                    .padding(.horizontal, DDSpacing.large)
+                    .padding(.trailing, DDSpacing.small)
 
                 searchField
                     .padding(.horizontal, DDSpacing.large)
@@ -53,26 +53,16 @@ struct TripSearchView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            Button {
-                store.send(.backButtonTapped)
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 23, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 24, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             Text("여행지 검색")
                 .ddTypography(.title24)
                 .foregroundStyle(DDColor.textPrimary)
 
             Spacer()
         }
-        .frame(height: 52)
     }
 
     private var searchField: some View {
@@ -133,21 +123,25 @@ struct TripSearchView: View {
                 .padding(.horizontal, DDSpacing.large)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: DDSpacing.medium) {
+                    LazyVStack(alignment: .leading, spacing: DDSpacing.xLarge) {
                         ForEach(groupedCities) { group in
-                            Text(group.country)
-                                .ddTypography(.caption12)
-                                .foregroundStyle(DDColor.textSecondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: DDSpacing.medium) {
+                                Text(group.country)
+                                    .ddTypography(.caption12)
+                                    .foregroundStyle(DDColor.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                            ForEach(group.cities) { city in
-                                Button {
-                                    store.send(.cityTapped(city.id))
-                                } label: {
-                                    cityRow(city)
+                                LazyVStack(spacing: 5) {
+                                    ForEach(group.cities) { city in
+                                        Button {
+                                            store.send(.cityTapped(city.id))
+                                        } label: {
+                                            cityRow(city)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
+                                    }
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityAddTraits(store.selectedCityIDs.contains(city.id) ? .isSelected : [])
                             }
                         }
                     }
@@ -160,30 +154,30 @@ struct TripSearchView: View {
     }
 
     private var selectionArea: some View {
-        VStack(alignment: .leading, spacing: DDSpacing.medium) {
-            Text("선택한 여행지 \(store.selectedCities.count)")
-                .ddTypography(.captionEmphasis12)
-                .foregroundStyle(DDColor.textSecondary)
+        DDBottomActionArea(topSpacing: 5) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("선택한 여행지 \(store.selectedCities.count)")
+                    .ddTypography(.captionEmphasis12)
+                    .foregroundStyle(DDColor.textSecondary)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: DDSpacing.small) {
-                    ForEach(store.selectedCities) { city in
-                        selectedCityChip(city)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DDSpacing.small) {
+                        ForEach(store.selectedCities) { city in
+                            selectedCityChip(city)
+                        }
                     }
                 }
-            }
-            .frame(height: 32)
+                .frame(height: 32)
+                .padding(.top, DDSpacing.medium)
 
-            DDCTAButton(
-                title: "\(store.selectedCities.count)개 도시로 여행 만들기",
-                isEnabled: !store.selectedCities.isEmpty,
-                action: { store.send(.nextButtonTapped) }
-            )
+                DDCTAButton(
+                    title: "\(store.selectedCities.count)개 도시로 여행 만들기",
+                    isEnabled: !store.selectedCities.isEmpty,
+                    action: { store.send(.nextButtonTapped) }
+                )
+                .padding(.top, 17)
+            }
         }
-        .padding(.horizontal, DDSpacing.large)
-        .padding(.top, 5)
-        .padding(.bottom, 11)
-        .background(DDColor.surfaceDefault)
     }
 
     private func selectedCityChip(_ city: TripSearchFeature.City) -> some View {

@@ -24,6 +24,7 @@ struct TripInvitationSnapshot: Equatable, Sendable {
         let avatarName: String?
         let hasJoined: Bool
         let isCurrentUser: Bool
+        let isPlaceSelectionConfirmed: Bool
     }
 
     let tripID: String
@@ -50,4 +51,5 @@ struct UpcomingTripSnapshot: Equatable, Sendable {
     let startDate: Date
     let endDate: Date
     let progress: Progress
+    let joinedAvatarNames: [String]
 }

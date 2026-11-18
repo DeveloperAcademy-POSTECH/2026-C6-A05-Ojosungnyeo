@@ -19,13 +19,27 @@ struct WaitingForParticipantsView: View {
                     .foregroundStyle(DDColor.textSecondary)
                     .lineSpacing(2)
                     .padding(.top, DDSpacing.small)
+                    .offset(y: -5)
 
                 invitationCard
                     .padding(.top, DDSpacing.xxLarge + DDSpacing.large)
 
-                timer
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 108)
+                VStack(spacing: DDSpacing.medium) {
+                    HStack(spacing: DDSpacing.zero) {
+                        Text("장소 핀을 찍을 수 있는 시간")
+                            .ddTypography(.bodyEmphasis16)
+
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundStyle(DDColor.textPrimary)
+                    .frame(height: 24)
+                    .accessibilityLabel("장소 핀을 찍을 수 있는 시간⚡")
+
+                    timer
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 72)
 
                 participantsCard
                     .padding(.top, 98)
@@ -41,13 +55,11 @@ struct WaitingForParticipantsView: View {
         }
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: DDSpacing.zero) {
-            DDCTAButton(title: "지도에 핀 찍으러 가기") {
-                store.send(.mapButtonTapped)
+            DDBottomActionArea(topSpacing: DDSpacing.medium) {
+                DDCTAButton(title: "지도에 핀 찍으러 가기") {
+                    store.send(.mapButtonTapped)
+                }
             }
-            .padding(.horizontal, DDSpacing.large)
-            .padding(.top, DDSpacing.medium)
-            .padding(.bottom, 11)
-            .background(DDColor.surfaceDefault)
         }
         .background(DDColor.surfaceDefault.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -74,38 +86,23 @@ struct WaitingForParticipantsView: View {
         .allowsHitTesting(!store.isMapConfirmationPresented)
         .overlay {
             if store.isMapConfirmationPresented {
-                ZStack {
-                    Color.black
-                        .opacity(0.55)
-                        .ignoresSafeArea()
-
-                    DDConfirmationAlert(
-                        title: "먼저 여행 준비하기",
-                        message: "지도에 핀을 찍으러 이동하시겠어요?",
-                        cancelTitle: "아니요",
-                        confirmTitle: "네",
-                        onCancel: { store.send(.mapConfirmationCancelButtonTapped) },
-                        onConfirm: { store.send(.mapConfirmationConfirmButtonTapped) }
-                    )
-                }
+                DDAlertOverlay(
+                    title: "먼저 여행을 준비할까요?",
+                    message: "지도에서 가고 싶은 장소를 선택해 주세요.",
+                    cancelTitle: "아니요",
+                    confirmTitle: "네",
+                    onCancel: { store.send(.mapConfirmationCancelButtonTapped) },
+                    onConfirm: { store.send(.mapConfirmationConfirmButtonTapped) }
+                )
             }
         }
     }
 
     private var header: some View {
-        HStack(spacing: DDSpacing.small) {
-            Button {
-                store.send(.backButtonTapped)
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 23, weight: .regular))
-                    .foregroundStyle(DDColor.textPrimary)
-                    .frame(width: 24, height: 35)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("뒤로 가기")
-
+        DDNavigationHeader(
+            accessibilityLabel: "뒤로 가기",
+            onBack: { store.send(.backButtonTapped) }
+        ) {
             HStack(spacing: DDSpacing.xSmall) {
                 Text("친구를 기다리고 이따")
                     .ddTypography(.title24)
@@ -118,7 +115,8 @@ struct WaitingForParticipantsView: View {
 
             Spacer(minLength: DDSpacing.zero)
         }
-        .frame(height: 35)
+        .padding(.leading, -DDSpacing.large)
+        .padding(.trailing, -DDSpacing.small)
     }
 
     private var invitationCard: some View {

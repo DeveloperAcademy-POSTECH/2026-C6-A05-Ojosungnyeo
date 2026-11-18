@@ -72,6 +72,8 @@ struct TimeSelectionBottomSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DDColor.surfaceDefault)
+        .clipShape(.rect(topLeadingRadius: 28, topTrailingRadius: 28))
+        .ddBottomSheetBorder(cornerRadius: 28)
         .preferredColorScheme(.dark)
     }
 

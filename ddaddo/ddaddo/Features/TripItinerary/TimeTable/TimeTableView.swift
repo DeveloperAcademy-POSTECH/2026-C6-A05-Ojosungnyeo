@@ -63,6 +63,20 @@ private struct TimeTableReadOnlyContent: View {
             .map { ($0.1, $0.2) }
     }
 
+    private var scheduledRows: [[(schedule: TimeTableSchedule, course: TimeTableCourse)]] {
+        var rows: [[(schedule: TimeTableSchedule, course: TimeTableCourse)]] = []
+        var seenBranchGroupIDs: Set<Int> = []
+        for item in scheduledCourses {
+            if let branchGroupID = item.schedule.branchGroupID {
+                guard seenBranchGroupIDs.insert(branchGroupID).inserted else { continue }
+                rows.append(scheduledCourses.filter { $0.schedule.branchGroupID == branchGroupID })
+            } else {
+                rows.append([item])
+            }
+        }
+        return rows
+    }
+
     var body: some View {
         ZStack {
             DDColor.surfaceDefault.ignoresSafeArea()
@@ -208,14 +222,25 @@ private struct TimeTableReadOnlyContent: View {
     }
 
     private var originalScheduleRows: some View {
-        ForEach(Array(scheduledCourses.enumerated()), id: \.element.schedule.id) { index, item in
+        ForEach(Array(scheduledRows.enumerated()), id: \.offset) { index, row in
             HStack(alignment: .top, spacing: 20) {
                 timelineMarker(
                     number: index + 1,
-                    isLast: index == scheduledCourses.count - 1,
-                    rowHeight: scheduleCardHeight(item.course)
+                    isLast: index == scheduledRows.count - 1,
+                    rowHeight: row.map { scheduleCardHeight($0.course) }.max() ?? 71
                 )
-                scheduleCard(item.course)
+                if row.count > 1 {
+                    ScrollView(.horizontal) {
+                        HStack(alignment: .top, spacing: DDSpacing.small) {
+                            ForEach(row, id: \.schedule.id) { item in
+                                scheduleCard(item.course).frame(width: 200)
+                            }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                } else if let item = row.first {
+                    scheduleCard(item.course)
+                }
             }
             .padding(.leading, DDSpacing.medium)
             .padding(.trailing, DDSpacing.large)

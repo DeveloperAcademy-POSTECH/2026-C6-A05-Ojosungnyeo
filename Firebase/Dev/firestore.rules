@@ -14,7 +14,9 @@ service cloud.firestore {
           "999150ec9bb6ce141fed9c6666a1ba5f15641fdaca676919d2519c68bde470b3",
           "630f3a1e31f8a3de46cb12acf791b26344b091c20fef93e8a7cae85d880a6822",
           "31eef782e2c8ab07f90fc402d3786cbff8118a68773bdcbbe458940fa189b762",
-          "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039"
+          "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039",
+          "94220151a77fe8912c14b07a291e9df4ea598d63838cea9b077a068974cdea71",
+          "cf2417cf73a770df6a0ae52f12cf63b4b66bc81a4ca8b9151ead075ee7f98e99"
         ];
     }
 
@@ -23,7 +25,9 @@ service cloud.firestore {
         "999150ec9bb6ce141fed9c6666a1ba5f15641fdaca676919d2519c68bde470b3",
         "630f3a1e31f8a3de46cb12acf791b26344b091c20fef93e8a7cae85d880a6822",
         "31eef782e2c8ab07f90fc402d3786cbff8118a68773bdcbbe458940fa189b762",
-        "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039"
+          "6aeccc3b91bb7b2bc44b46bdaa69246a63fe7953e4bfd506c009eddba5fd2039",
+          "94220151a77fe8912c14b07a291e9df4ea598d63838cea9b077a068974cdea71",
+          "cf2417cf73a770df6a0ae52f12cf63b4b66bc81a4ca8b9151ead075ee7f98e99"
       ];
     }
 

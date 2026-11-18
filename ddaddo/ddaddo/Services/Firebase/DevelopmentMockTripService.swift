@@ -35,6 +35,22 @@ enum DevelopmentMockTripService {
         let member: Member
     }
 
+    private struct ItineraryCourseSeed {
+        let id: Int
+        let title: String
+        let placeNames: [String]
+        let memberIndexes: [Int]
+        let durationMinutes: Int
+    }
+
+    private struct ItineraryScheduleSeed {
+        let id: Int
+        let courseID: Int
+        let startMinuteOfDay: Int
+        let branchGroupID: Int?
+        let orderIndex: Int
+    }
+
     private static let members = [
         Member(
             nickname: "헤더",
@@ -194,7 +210,17 @@ enum DevelopmentMockTripService {
                 )
             }
 
-            batch.deleteDocument(tripReference.collection("itinerary").document("current"))
+            let itineraryReference = tripReference.collection("itinerary").document("current")
+            if let places = resolvedPlacesByTripID[trip.id],
+               let itinerary = mockItinerary(
+                   destination: trip.destination,
+                   members: tripMembers,
+                   resolvedPlaces: places
+               ) {
+                batch.setData(itinerary, forDocument: itineraryReference)
+            } else {
+                batch.deleteDocument(itineraryReference)
+            }
         }
 
         for resolvedMember in resolvedMembers {
@@ -413,6 +439,304 @@ enum DevelopmentMockTripService {
             "category": place.category,
             "latitude": latitude,
             "longitude": longitude
+        ]
+    }
+
+    private static func mockItinerary(
+        destination: String,
+        members: [ResolvedMember],
+        resolvedPlaces: [[[String: Any]]]
+    ) -> [String: Any]? {
+        let seeds: (courses: [ItineraryCourseSeed], schedules: [ItineraryScheduleSeed])
+        switch destination {
+        case "도쿄":
+            seeds = (
+                courses: [
+                    ItineraryCourseSeed(
+                        id: 1_001,
+                        title: "아사쿠사 시장·역사 코스",
+                        placeNames: ["센소지", "나카미세 거리"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 1_002,
+                        title: "오다이바 게임·문화 코스",
+                        placeNames: ["도쿄 조이폴리스", "일본과학미래관"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 1_003,
+                        title: "하라주쿠 쇼핑 코스",
+                        placeNames: ["라포레 하라주쿠", "키디랜드 하라주쿠점"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 120
+                    )
+                ],
+                schedules: [
+                    ItineraryScheduleSeed(
+                        id: 1_001,
+                        courseID: 1_001,
+                        startMinuteOfDay: 9 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 0
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 1_002,
+                        courseID: 1_002,
+                        startMinuteOfDay: 12 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 1
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 1_003,
+                        courseID: 1_003,
+                        startMinuteOfDay: 12 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 2
+                    )
+                ]
+            )
+
+        case "상하이":
+            seeds = (
+                courses: [
+                    ItineraryCourseSeed(
+                        id: 2_001,
+                        title: "와이탄 랜드마크·전망 코스",
+                        placeNames: ["와이탄 전망대", "와이바이두 다리"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 2_002,
+                        title: "주자자오 역사·정원 코스",
+                        placeNames: ["청대 우체국", "커즈위안"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 2_003,
+                        title: "디즈니 쇼핑·테마파크 코스",
+                        placeNames: ["디즈니타운", "상하이 디즈니랜드"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 2_004,
+                        title: "팡성교 랜드마크 코스",
+                        placeNames: ["팡성교"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 60
+                    )
+                ],
+                schedules: [
+                    ItineraryScheduleSeed(
+                        id: 2_001,
+                        courseID: 2_001,
+                        startMinuteOfDay: 9 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 0
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 2_002,
+                        courseID: 2_002,
+                        startMinuteOfDay: 12 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 1
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 2_003,
+                        courseID: 2_003,
+                        startMinuteOfDay: 12 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 2
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 2_004,
+                        courseID: 2_004,
+                        startMinuteOfDay: 16 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 3
+                    )
+                ]
+            )
+
+        case "파리":
+            seeds = (
+                courses: [
+                    ItineraryCourseSeed(
+                        id: 3_001,
+                        title: "마레 맛집·문화·자연 코스",
+                        placeNames: ["라스 뒤 팔라펠", "보주 광장", "카르나발레 박물관"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 180
+                    ),
+                    ItineraryCourseSeed(
+                        id: 3_002,
+                        title: "불로뉴 문화·자연·테마파크 코스",
+                        placeNames: ["아클리마타시옹 정원", "루이비통 재단 미술관", "바가텔 공원"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 180
+                    ),
+                    ItineraryCourseSeed(
+                        id: 3_003,
+                        title: "라 빌레트 공연·전시 코스",
+                        placeNames: ["파리 필하모니", "과학산업관", "그랑드 알 드 라 빌레트", "라 제오드"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 180
+                    )
+                ],
+                schedules: [
+                    ItineraryScheduleSeed(
+                        id: 3_001,
+                        courseID: 3_001,
+                        startMinuteOfDay: 9 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 0
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 3_002,
+                        courseID: 3_002,
+                        startMinuteOfDay: 13 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 1
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 3_003,
+                        courseID: 3_003,
+                        startMinuteOfDay: 13 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 2
+                    )
+                ]
+            )
+
+        case "시드니":
+            seeds = (
+                courses: [
+                    ItineraryCourseSeed(
+                        id: 4_001,
+                        title: "시드니 오페라하우스 코스",
+                        placeNames: ["시드니 오페라하우스"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 60
+                    ),
+                    ItineraryCourseSeed(
+                        id: 4_002,
+                        title: "더 록스 시장·문화 코스",
+                        placeNames: ["더 록스 마켓", "시드니 현대미술관"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 4_003,
+                        title: "맨리 문화·쇼핑·해변 코스",
+                        placeNames: ["페어리 바워 풀", "맨리 코르소", "맨리 비치", "맨리 미술관·박물관", "셀리 비치"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 240
+                    ),
+                    ItineraryCourseSeed(
+                        id: 4_004,
+                        title: "패러매타 공연·문화·쇼핑 코스",
+                        placeNames: ["패러매타 스퀘어", "웨스트필드 패러매타", "패러매타 리버사이드 시어터", "처치 스트리트 잇 스트리트", "패러매타 공원"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 240
+                    )
+                ],
+                schedules: [
+                    ItineraryScheduleSeed(
+                        id: 4_001,
+                        courseID: 4_001,
+                        startMinuteOfDay: 9 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 0
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 4_002,
+                        courseID: 4_002,
+                        startMinuteOfDay: 10 * 60 + 30,
+                        branchGroupID: nil,
+                        orderIndex: 1
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 4_003,
+                        courseID: 4_003,
+                        startMinuteOfDay: 13 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 2
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 4_004,
+                        courseID: 4_004,
+                        startMinuteOfDay: 13 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 3
+                    )
+                ]
+            )
+
+        default:
+            return nil
+        }
+
+        let placesByName = resolvedPlaces
+            .flatMap { $0 }
+            .reduce(into: [String: [String: Any]]()) { result, place in
+                guard let name = place["name"] as? String else { return }
+                result[name] = place
+            }
+
+        let courseData: [[String: Any]] = seeds.courses.compactMap { course in
+            let places = course.placeNames.compactMap { name -> [String: Any]? in
+                guard let place = placesByName[name],
+                      let latitude = place["latitude"] as? Double,
+                      let longitude = place["longitude"] as? Double
+                else { return nil }
+                return [
+                    "name": name,
+                    "category": canonicalCategories[name] ?? place["category"] as? String ?? "",
+                    "latitude": latitude,
+                    "longitude": longitude
+                ]
+            }
+            guard places.count == course.placeNames.count else { return nil }
+            let memberIDs = course.memberIndexes.compactMap { index in
+                members.indices.contains(index) ? members[index].member.avatar.rawValue : nil
+            }
+            return [
+                "id": course.id,
+                "title": course.title,
+                "placeNames": course.placeNames,
+                "categories": course.placeNames.compactMap { canonicalCategories[$0] },
+                "memberIDs": memberIDs,
+                "durationMinutes": course.durationMinutes,
+                "places": places
+            ]
+        }
+        guard courseData.count == seeds.courses.count else { return nil }
+
+        let scheduleData: [[String: Any]] = seeds.schedules.map { schedule in
+            var data: [String: Any] = [
+                "id": schedule.id,
+                "courseID": schedule.courseID,
+                "day": "DAY 1",
+                "startMinuteOfDay": schedule.startMinuteOfDay,
+                "orderIndex": schedule.orderIndex
+            ]
+            if let branchGroupID = schedule.branchGroupID {
+                data["branchGroupID"] = branchGroupID
+            }
+            return data
+        }
+
+        return [
+            "courses": courseData,
+            "schedules": scheduleData,
+            "recommendations": [],
+            "updatedBy": "development-seed",
+            "updatedAt": FieldValue.serverTimestamp()
         ]
     }
 

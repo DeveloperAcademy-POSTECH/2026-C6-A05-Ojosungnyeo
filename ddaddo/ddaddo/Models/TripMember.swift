@@ -13,7 +13,18 @@ enum TripMember: String, CaseIterable, Equatable, Hashable, Identifiable, Sendab
 
     var id: Self { self }
 
-    init(avatar: ParticipantAvatar) {
+    /// 기존 Dev 일정에 저장된 아바타 이름도 현재 멤버 ID로 읽는다.
+    nonisolated init?(storedID: String) {
+        if let member = Self(rawValue: storedID) {
+            self = member
+        } else if let avatar = ParticipantAvatar(rawValue: storedID) {
+            self.init(avatar: avatar)
+        } else {
+            return nil
+        }
+    }
+
+    nonisolated init(avatar: ParticipantAvatar) {
         switch avatar {
         case .tae: self = .tae
         case .header: self = .header

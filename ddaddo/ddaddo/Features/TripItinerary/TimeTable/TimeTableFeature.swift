@@ -398,8 +398,12 @@ struct TimeTableFeature: Reducer {
                             placeName: $0.placeName,
                             category: $0.category,
                             groupCategories: $0.groupCategories,
-                            memberIDs: $0.memberIDs,
-                            placeOwnerMemberIDs: $0.placeOwnerMemberIDs,
+                            memberIDs: $0.memberIDs.map {
+                                TripMember(storedID: $0)?.rawValue ?? $0
+                            },
+                            placeOwnerMemberIDs: $0.placeOwnerMemberIDs.map {
+                                TripMember(storedID: $0)?.rawValue ?? $0
+                            },
                             latitude: $0.latitude,
                             longitude: $0.longitude
                         )
@@ -412,7 +416,7 @@ struct TimeTableFeature: Reducer {
                         placeCount: course.placeNames.count,
                         placeNames: course.placeNames,
                         categories: course.categories,
-                        members: course.memberIDs.compactMap(TripMember.init(rawValue:)),
+                        members: course.memberIDs.compactMap(TripMember.init(storedID:)),
                         durationMinutes: course.durationMinutes,
                         places: course.places
                     )
@@ -442,7 +446,7 @@ struct TimeTableFeature: Reducer {
                 state.edit.isSaving = false
                 state.isEditing = false
                 state.edit = TimeTableEditFeature.State()
-                return .none
+                return .send(.delegate(.itineraryUpdated))
 
             case let .itinerarySaveFailed(message):
                 state.edit.isSaving = false
@@ -1215,6 +1219,32 @@ struct TimeTableSchedule: Equatable, Identifiable {
     var branchGroupID: Int?
     var recommendationGroupID: String? = nil
     var orderIndex: Int? = nil
+
+    /// 같은 날짜의 타임테이블과 루트가 저장된 순서·따여행 분기를 함께 사용한다.
+    static func orderedRows(in placements: [Self]) -> [[Self]] {
+        let ordered = placements.enumerated().sorted { lhs, rhs in
+            if let left = lhs.element.orderIndex,
+               let right = rhs.element.orderIndex,
+               left != right {
+                return left < right
+            }
+            if lhs.element.orderIndex != nil && rhs.element.orderIndex == nil { return true }
+            if lhs.element.orderIndex == nil && rhs.element.orderIndex != nil { return false }
+            let left = lhs.element.timing.startMinuteOfDay
+            let right = rhs.element.timing.startMinuteOfDay
+            return left == right ? lhs.offset < rhs.offset : left < right
+        }.map(\.element)
+
+        var seenBranchGroupIDs: Set<Int> = []
+        return ordered.reduce(into: [[Self]]()) { rows, schedule in
+            if let branchGroupID = schedule.branchGroupID {
+                guard seenBranchGroupIDs.insert(branchGroupID).inserted else { return }
+                rows.append(ordered.filter { $0.branchGroupID == branchGroupID })
+            } else {
+                rows.append([schedule])
+            }
+        }
+    }
 
     static func hasTimeConflict(
         courseIDs: [TimeTableCourse.ID],

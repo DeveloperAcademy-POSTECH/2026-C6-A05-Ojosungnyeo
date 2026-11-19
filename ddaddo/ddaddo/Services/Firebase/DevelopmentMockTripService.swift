@@ -850,7 +850,9 @@ enum DevelopmentMockTripService {
             }
             guard places.count == course.placeNames.count else { return nil }
             let memberIDs = course.memberIndexes.compactMap { index in
-                members.indices.contains(index) ? members[index].member.avatar.rawValue : nil
+                members.indices.contains(index)
+                    ? TripMember(avatar: members[index].member.avatar).rawValue
+                    : nil
             }
             return [
                 "id": course.id,

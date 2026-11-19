@@ -59,28 +59,24 @@ struct RouteOverviewFeature: Reducer {
         ) {
             let groupedByDay = Dictionary(grouping: placements, by: \.day)
             stopsByDay = groupedByDay.mapValues { schedules in
-                schedules
-                    .sorted {
-                        if $0.timing.startMinuteOfDay == $1.timing.startMinuteOfDay {
-                            return $0.id < $1.id
+                let validSchedules = schedules.filter { coursesByID[$0.courseID] != nil }
+                return TimeTableSchedule.orderedRows(in: validSchedules)
+                    .enumerated().flatMap { index, row in
+                        row.compactMap { schedule -> RouteStop? in
+                            guard let course = coursesByID[schedule.courseID] else { return nil }
+                            return RouteStop(
+                                id: schedule.id,
+                                order: index,
+                                name: course.title,
+                                category: course.categorySummary,
+                                placeNames: course.placeNames,
+                                places: course.places,
+                                latitude: course.places.first?.latitude ?? 0,
+                                longitude: course.places.first?.longitude ?? 0,
+                                members: Set(course.members),
+                                scheduleID: schedule.id
+                            )
                         }
-                        return $0.timing.startMinuteOfDay < $1.timing.startMinuteOfDay
-                    }
-                    .enumerated()
-                    .compactMap { index, schedule in
-                        guard let course = coursesByID[schedule.courseID] else { return nil }
-                        return RouteStop(
-                            id: schedule.id,
-                            order: index,
-                            name: course.title,
-                            category: course.categorySummary,
-                            placeNames: course.placeNames,
-                            places: course.places,
-                            latitude: 35.6812 + Double(index) * 0.006,
-                            longitude: 139.7671 + Double(index % 2 == 0 ? index : -index) * 0.005,
-                            members: Set(course.members),
-                            scheduleID: schedule.id
-                        )
                     }
             }
             selectedPlaceID = nil
@@ -105,7 +101,9 @@ struct RouteOverviewFeature: Reducer {
         Reduce { state, action in
             switch action {
             case .onAppear:
-                state.selectedDay = .day1
+                if !state.availableDays.contains(state.selectedDay) {
+                    state.selectedDay = state.availableDays.first ?? .day1
+                }
                 state.selectedMembers.removeAll()
                 state.selectedMemberOrder.removeAll()
                 return .none

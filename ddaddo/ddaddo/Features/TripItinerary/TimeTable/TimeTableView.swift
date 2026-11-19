@@ -42,39 +42,20 @@ private struct TimeTableReadOnlyContent: View {
     let onEdit: () -> Void
 
     private var scheduledCourses: [(schedule: TimeTableSchedule, course: TimeTableCourse)] {
-        store.placements.enumerated()
-            .filter {
-                $0.element.day == store.selectedDay &&
-                store.dayOfMonthByDay[$0.element.day] != nil
-            }
-            .compactMap { index, schedule in
-                store.coursesByID[schedule.courseID].map { (index, schedule, $0) }
-            }
-            .sorted {
-                if let left = $0.1.orderIndex, let right = $1.1.orderIndex, left != right {
-                    return left < right
-                }
-                if $0.1.orderIndex != nil && $1.1.orderIndex == nil { return true }
-                if $0.1.orderIndex == nil && $1.1.orderIndex != nil { return false }
-                let left = $0.1.timing.startMinuteOfDay
-                let right = $1.1.timing.startMinuteOfDay
-                return left == right ? $0.0 < $1.0 : left < right
-            }
-            .map { ($0.1, $0.2) }
+        scheduledRows.flatMap { $0 }
     }
 
     private var scheduledRows: [[(schedule: TimeTableSchedule, course: TimeTableCourse)]] {
-        var rows: [[(schedule: TimeTableSchedule, course: TimeTableCourse)]] = []
-        var seenBranchGroupIDs: Set<Int> = []
-        for item in scheduledCourses {
-            if let branchGroupID = item.schedule.branchGroupID {
-                guard seenBranchGroupIDs.insert(branchGroupID).inserted else { continue }
-                rows.append(scheduledCourses.filter { $0.schedule.branchGroupID == branchGroupID })
-            } else {
-                rows.append([item])
+        let placements = store.placements.filter {
+            $0.day == store.selectedDay &&
+            store.dayOfMonthByDay[$0.day] != nil &&
+            store.coursesByID[$0.courseID] != nil
+        }
+        return TimeTableSchedule.orderedRows(in: placements).map { row in
+            row.compactMap { schedule in
+                store.coursesByID[schedule.courseID].map { (schedule, $0) }
             }
         }
-        return rows
     }
 
     var body: some View {
@@ -741,3 +722,24 @@ private struct TimelineRow: Identifiable {
         }
     )
 }
+
+#if DEBUG
+#Preview("따여행 멤버 표시") {
+    let state: TimeTableFeature.State = {
+        var state = TimeTableFeature.debugMockState
+        state.coursesByID = TimeTableCourse.mockCoursesByID
+        state.placements = [
+            .init(id: 0, courseID: 0, day: .day1,
+                  timing: .init(startMinuteOfDay: 9 * 60), branchGroupID: 1, orderIndex: 0),
+            .init(id: 1, courseID: 1, day: .day1,
+                  timing: .init(startMinuteOfDay: 9 * 60), branchGroupID: 1, orderIndex: 0),
+            .init(id: 2, courseID: 2, day: .day1,
+                  timing: .init(startMinuteOfDay: 13 * 60), orderIndex: 1)
+        ]
+        return state
+    }()
+    TimeTableView(store: Store(initialState: state) {
+        TimeTableFeature()
+    })
+}
+#endif

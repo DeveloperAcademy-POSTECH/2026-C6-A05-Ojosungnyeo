@@ -596,7 +596,7 @@ enum DevelopmentMockTripService {
                     ItineraryCourseSeed(
                         id: 4_003,
                         title: "맨리 문화·쇼핑·해변 코스",
-                        placeNames: ["페어리 바워 풀", "맨리 코르소", "맨리 비치", "맨리 미술관·박물관", "셀리 비치"],
+                        placeNames: ["페어리 바워 풀", "맨리 코르소", "맨리 비치", "맨리 미술관·박물관", "셸리 비치"],
                         memberIndexes: [0, 2],
                         durationMinutes: 240
                     ),
@@ -636,6 +636,190 @@ enum DevelopmentMockTripService {
                         startMinuteOfDay: 13 * 60,
                         branchGroupID: 1,
                         orderIndex: 3
+                    )
+                ]
+            )
+
+        case "뉴욕":
+            seeds = (
+                courses: [
+                    ItineraryCourseSeed(
+                        id: 5_001,
+                        title: "클로이스터스 문화·자연 코스",
+                        placeNames: ["메트 클로이스터스", "포트 트라이언 공원"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 5_002,
+                        title: "네이선스 페이머스 맛집 코스",
+                        placeNames: ["네이선스 페이머스 본점"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 60
+                    ),
+                    ItineraryCourseSeed(
+                        id: 5_003,
+                        title: "인우드 역사·자연 코스",
+                        placeNames: ["인우드 힐 공원", "다이크먼 팜하우스 박물관", "유나이티드 팰리스", "포트 워싱턴 퍼블릭 하우스"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 180
+                    ),
+                    ItineraryCourseSeed(
+                        id: 5_004,
+                        title: "코니아일랜드 랜드마크·문화 코스",
+                        placeNames: ["코니아일랜드 보드워크", "패러슈트 점프", "코니아일랜드 박물관", "루나 파크"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 180
+                    ),
+                    ItineraryCourseSeed(
+                        id: 5_005,
+                        title: "뉴욕 수족관·해변 코스",
+                        placeNames: ["뉴욕 아쿠아리움", "코니아일랜드 보드워크"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 120
+                    )
+                ],
+                schedules: [
+                    ItineraryScheduleSeed(
+                        id: 5_001,
+                        courseID: 5_001,
+                        startMinuteOfDay: 9 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 0
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 5_002,
+                        courseID: 5_002,
+                        startMinuteOfDay: 11 * 60 + 30,
+                        branchGroupID: nil,
+                        orderIndex: 1
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 5_003,
+                        courseID: 5_003,
+                        startMinuteOfDay: 13 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 2
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 5_004,
+                        courseID: 5_004,
+                        startMinuteOfDay: 13 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 3
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 5_005,
+                        courseID: 5_005,
+                        startMinuteOfDay: 17 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 4
+                    )
+                ]
+            )
+
+        case "밴쿠버":
+            seeds = (
+                courses: [
+                    ItineraryCourseSeed(
+                        id: 6_001,
+                        title: "그랜빌 쇼핑·시장 코스",
+                        placeNames: ["넷 로프트", "그랜빌 아일랜드 퍼블릭 마켓"],
+                        memberIndexes: [0, 1, 2, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 6_002,
+                        title: "UBC 문화·자연 코스",
+                        placeNames: ["니토베 기념정원", "UBC 인류학박물관", "비티 생물다양성 박물관"],
+                        memberIndexes: [0, 2],
+                        durationMinutes: 180
+                    ),
+                    ItineraryCourseSeed(
+                        id: 6_003,
+                        title: "론즈데일 시장·문화 코스",
+                        placeNames: ["론즈데일 키 마켓", "폴리곤 갤러리"],
+                        memberIndexes: [1, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 6_004,
+                        title: "그랜빌 아일랜드 퍼블릭 마켓",
+                        placeNames: ["그랜빌 아일랜드 퍼블릭 마켓"],
+                        memberIndexes: [2, 3],
+                        durationMinutes: 60
+                    ),
+                    ItineraryCourseSeed(
+                        id: 6_005,
+                        title: "쉽야즈 맛집 코스",
+                        placeNames: ["쉽야즈"],
+                        memberIndexes: [1],
+                        durationMinutes: 60
+                    ),
+                    ItineraryCourseSeed(
+                        id: 6_006,
+                        title: "스티브스턴 랜드마크·시장 코스",
+                        placeNames: ["걸프 오브 조지아 캐너리", "스티브스턴 피셔맨스 워프"],
+                        memberIndexes: [2, 3],
+                        durationMinutes: 120
+                    ),
+                    ItineraryCourseSeed(
+                        id: 6_007,
+                        title: "브리타니아 조선소 랜드마크 코스",
+                        placeNames: ["브리타니아 조선소"],
+                        memberIndexes: [0, 1, 3],
+                        durationMinutes: 60
+                    )
+                ],
+                schedules: [
+                    ItineraryScheduleSeed(
+                        id: 6_001,
+                        courseID: 6_001,
+                        startMinuteOfDay: 9 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 0
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 6_002,
+                        courseID: 6_002,
+                        startMinuteOfDay: 11 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 1
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 6_003,
+                        courseID: 6_003,
+                        startMinuteOfDay: 11 * 60,
+                        branchGroupID: 1,
+                        orderIndex: 2
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 6_004,
+                        courseID: 6_004,
+                        startMinuteOfDay: 14 * 60 + 30,
+                        branchGroupID: nil,
+                        orderIndex: 3
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 6_005,
+                        courseID: 6_005,
+                        startMinuteOfDay: 16 * 60,
+                        branchGroupID: 2,
+                        orderIndex: 4
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 6_006,
+                        courseID: 6_006,
+                        startMinuteOfDay: 16 * 60,
+                        branchGroupID: 2,
+                        orderIndex: 5
+                    ),
+                    ItineraryScheduleSeed(
+                        id: 6_007,
+                        courseID: 6_007,
+                        startMinuteOfDay: 19 * 60,
+                        branchGroupID: nil,
+                        orderIndex: 6
                     )
                 ]
             )

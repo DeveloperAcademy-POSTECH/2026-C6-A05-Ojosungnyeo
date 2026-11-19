@@ -31,7 +31,7 @@ struct TimeTableScheduleCard: View {
 
                     Spacer(minLength: 0)
 
-                    if course.kind(among: tripMembers) == .separate {
+                    if course.kind(among: tripMembers) != nil {
                         memberAvatars
                     }
                 }

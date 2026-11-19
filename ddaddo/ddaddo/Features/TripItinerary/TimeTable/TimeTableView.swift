@@ -262,7 +262,7 @@ private struct TimeTableReadOnlyContent: View {
                             .ddTypography(.bodyEmphasis16)
                             .foregroundStyle(DDColor.textPrimary)
                             .lineLimit(1)
-                        if TimeTableCourse.kind(of: first.memberIDs, among: store.tripMembers) == .separate {
+                        if TimeTableCourse.kind(of: first.memberIDs, among: store.tripMembers) != nil {
                             HStack(spacing: -5) {
                                 ForEach(TripMember.allCases.filter { first.memberIDs.contains($0.rawValue) }) { member in
                                     Circle().fill(member.routeAccentColor).frame(width: 14, height: 14)
@@ -322,7 +322,7 @@ private struct TimeTableReadOnlyContent: View {
                                 .foregroundStyle(DDColor.textPrimary)
                                 .lineLimit(1)
 
-                            if course.kind(among: store.tripMembers) == .separate {
+                            if course.kind(among: store.tripMembers) != nil {
                                 HStack(spacing: -5) {
                                     ForEach(TripMember.allCases.filter(course.members.contains)) { member in
                                         Circle()

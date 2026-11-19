@@ -24,6 +24,7 @@ struct RouteOverviewFeature: Reducer {
         var stopsByDay = RouteStop.stopsByDay
         let places = RoutePlace.mockPlaces
         var memberOrder = TripMember.allCases
+        var memberNicknames: [TripMember: String] = [:]
         var currentMember = TripMember.tae
         var tripHeaderTitle = "여행"
         var availableDays = TripDay.allCases
@@ -51,6 +52,12 @@ struct RouteOverviewFeature: Reducer {
 
         var selectedPlace: RoutePlace {
             places.first { $0.id == selectedPlaceID } ?? places[0]
+        }
+
+        var memberDisplayNames: [TripMember: String] {
+            var names = memberNicknames
+            names[currentMember] = "나"
+            return names
         }
 
         mutating func replaceItinerary(

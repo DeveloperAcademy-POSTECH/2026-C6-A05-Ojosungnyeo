@@ -135,7 +135,8 @@ struct RouteOverviewView: View {
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(
-            height: (isItineraryExpanded ? 413 : 139) + tabBarCoveredHeight,
+            height: (isItineraryExpanded ? 413 : 139)
+                + (RouteMemberProfile.height - 37) + tabBarCoveredHeight,
             alignment: .top
         )
         .background(DDColor.surfaceDefault)
@@ -163,18 +164,20 @@ struct RouteOverviewView: View {
     private var memberFilter: some View {
         HStack(spacing: DDSpacing.xSmall) {
             ForEach(store.memberOrder) { member in
+                let name = store.memberDisplayNames[member] ?? "친구"
                 Button {
                     store.send(.memberTapped(member))
                 } label: {
-                    DDMiniHeadAvatar(character: member.routeAvatarCharacter, size: 37)
-                        .opacity(
-                            store.selectedMembers.isEmpty || store.selectedMembers.contains(member)
-                                ? 1
-                                : 0.35
-                        )
+                    RouteMemberProfile(
+                        member: member,
+                        name: name,
+                        isCurrentUser: member == store.currentMember,
+                        isEmphasized: store.selectedMembers.isEmpty
+                            || store.selectedMembers.contains(member)
+                    )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(member.accessibilityName) 일정 보기")
+                .accessibilityLabel("\(name) 일정 보기")
                 .accessibilityValue(store.selectedMembers.contains(member) ? "선택됨" : "선택 안 됨")
             }
 

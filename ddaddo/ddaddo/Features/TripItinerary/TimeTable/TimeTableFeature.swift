@@ -18,6 +18,7 @@ struct TimeTableFeature: Reducer {
     struct State: Equatable {
         var selectedDay = TripDay.day1
         var tripMembers: [TripMember] = []
+        var memberNicknames: [TripMember: String] = [:]
         var currentTripMember: TripMember?
         var tripStartDate: Date? = nil
         var tripEndDate: Date? = nil
@@ -209,6 +210,7 @@ struct TimeTableFeature: Reducer {
         mutating func resetScheduledItinerary() {
             selectedDay = .day1
             tripMembers = []
+            memberNicknames = [:]
             currentTripMember = nil
             coursesByID = [:]
             groups = []
@@ -370,6 +372,11 @@ struct TimeTableFeature: Reducer {
                     participant.avatarName
                         .flatMap(ParticipantAvatar.init(rawValue:))
                         .map(TripMember.init(avatar:))
+                }
+                state.memberNicknames = joinedParticipants.reduce(into: [:]) { names, participant in
+                    guard let avatarName = participant.avatarName,
+                          let avatar = ParticipantAvatar(rawValue: avatarName) else { return }
+                    names[TripMember(avatar: avatar)] = participant.name
                 }
                 state.currentTripMember = joinedParticipants.first(where: \.isCurrentUser)?
                     .avatarName

@@ -116,6 +116,7 @@ private extension TripItineraryFeature.State {
         routeOverview.tripHeaderTitle = headerTitle
         routeOverview.availableDays = availableDays
         routeOverview.memberOrder = tripMembers
+        routeOverview.memberNicknames = timeTable.memberNicknames
         routeOverview.currentMember = currentMember
         routeOverview.selectedMembers.formIntersection(tripMembers)
         routeOverview.selectedMemberOrder.removeAll { !tripMembers.contains($0) }
